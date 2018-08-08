@@ -15,6 +15,7 @@ open Global
 module C = Cil
 module F = Frontc
 module E = Errormsg
+module L = Logging
 
 let files = ref []
 let marshal_file = ref ""
@@ -93,10 +94,10 @@ let inline : Global.t -> bool
   let recursive_procs = List.filter (fun fid -> Global.is_rec fid global) to_inline in
   let large_procs = List.filter (fun fid -> try List.length (InterCfg.nodes_of_pid global.icfg fid) > !Options.inline_size with _ -> false) to_inline in
   let to_exclude = varargs_procs @ recursive_procs @ large_procs in
-  prerr_endline ("To inline : " ^ Vocab.string_of_list Vocab.id to_inline);
-  prerr_endline ("Excluded variable-arguments functions : " ^ Vocab.string_of_list Vocab.id varargs_procs);
-  prerr_endline ("Excluded recursive functions : " ^ Vocab.string_of_list Vocab.id recursive_procs);
-  prerr_endline ("Excluded too large functions : " ^ Vocab.string_of_list Vocab.id large_procs);
+  L.info "To inline : %s\n" (Vocab.string_of_list Vocab.id to_inline);
+  L.info "Excluded variable-arguments functions : %s\n" (Vocab.string_of_list Vocab.id varargs_procs);
+  L.info "Excluded recursive functions : %s\n" (Vocab.string_of_list Vocab.id recursive_procs);
+  L.info "Excluded too large functions : %s\n" (Vocab.string_of_list Vocab.id large_procs);
   Inline.toinline := List.filter (fun fid -> not (List.mem fid to_exclude)) to_inline;
   Inline.doit f;
   not (!Inline.toinline = [])

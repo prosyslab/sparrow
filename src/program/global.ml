@@ -13,6 +13,8 @@ open Vocab
 open BasicDom
 open InterCfg
 
+module L = Logging
+
 type t = {
   file : Cil.file;
   icfg : InterCfg.t;
@@ -40,13 +42,8 @@ let remove_unreachable_nodes : t -> t
   let nodes_all = InterCfg.nodesof global.icfg in
   let unreachable = InterCfg.unreachable_node global.icfg in
   let global = NodeSet.fold remove_node unreachable global in
-  my_prerr_newline ();
-  my_prerr_string "#nodes all   : ";
-  my_prerr_endline (string_of_int (List.length nodes_all));
-  my_prerr_string "#unreachable : ";
-  my_prerr_endline (string_of_int (NodeSet.cardinal unreachable));
-(*    prerr_string "unreachable nodes : ";
-  prerr_endline (string_of_set InterCfg.Node.to_string unreachable); *)
+  L.info ~level:1 "\n%-14s: %d\n" "#nodes all" (List.length nodes_all);
+  L.info ~level:1 "%-14s: %d\n" "#unreachable" (NodeSet.cardinal unreachable);
   global
 
 let remove_unreachable_functions : t -> t
@@ -56,12 +53,13 @@ let remove_unreachable_functions : t -> t
   let unreachable = PowProc.diff pids_all reachable |> PowProc.remove InterCfg.global_proc in
   let recursive = PowProc.filter (fun pid -> is_rec pid global) reachable in
   let global = if !Options.bugfinder >= 2 then global else PowProc.fold remove_function unreachable global in
-  my_prerr_newline ();
-  my_prerr_endline ("#functions all : " ^ string_of_int (PowProc.cardinal pids_all));
-  my_prerr_endline ("#recursive : " ^ string_of_int (PowProc.cardinal recursive));
-  if PowProc.cardinal recursive > 0 then my_prerr_endline (PowProc.to_string recursive);
-  my_prerr_endline ("#unreachable   : " ^ string_of_int (PowProc.cardinal unreachable));
-  if PowProc.cardinal unreachable > 0 then my_prerr_endline (PowProc.to_string unreachable);
+  L.info ~level:1 "%-16s: %d\n" "#functions all" (PowProc.cardinal pids_all);
+  L.info ~level:1 "%-16s: %d\n" "#recursive" (PowProc.cardinal recursive);
+  if PowProc.cardinal recursive > 0 then
+    L.info ~level:1 "%a\n" PowProc.pp recursive;
+  L.info ~level:1 "%-16s: %d\n" "#unreachable" (PowProc.cardinal unreachable);
+  if PowProc.cardinal unreachable > 0 then
+    L.info ~level:1 "%a\n" PowProc.pp unreachable;
   global
 
 let init file =

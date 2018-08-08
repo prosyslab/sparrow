@@ -14,6 +14,8 @@ open BasicDom
 open AbsSem
 open Dug
 
+module L = Logging
+
 let total_iterations = ref 0
 let g_clock = ref 0.0
 let l_clock = ref 0.0
@@ -171,7 +173,7 @@ struct
     worklist
     |> Worklist.push_set InterCfg.start_node (DUGraph.nodesof dug)
     |> (fun init_worklist -> iterate (analyze_node spec) dug (init_worklist, global, inputof, outputof))
-    |> (fun x -> my_prerr_endline ("\n#iteration in widening : " ^ string_of_int !total_iterations); x)
+    |> (fun x -> L.info ~level:1 "\n#iteration in widening : %d\n" !total_iterations; x)
 
   let narrowing ?(initnodes=BatSet.empty) : Spec.t -> DUGraph.t -> (Worklist.t * Global.t * Table.t * Table.t)
       -> (Worklist.t * Global.t * Table.t * Table.t)
@@ -181,7 +183,7 @@ struct
     |> Worklist.push_set InterCfg.start_node (if (BatSet.is_empty initnodes) then DUGraph.nodesof dug else initnodes)
     |> (fun init_worklist -> iterate (analyze_node_with_otable (Dom.narrow, fun x y -> Dom.le y x) spec)
         dug (init_worklist, global, inputof, outputof))
-    |> (fun x -> my_prerr_endline ("#iteration in narrowing : " ^ string_of_int !total_iterations); x)
+    |> (fun x -> L.info ~level:1 "#iteration in narrowing : %d\n" !total_iterations; x)
 
   let print_dug (access,global,dug) =
     if !Options.dug then
@@ -198,8 +200,8 @@ struct
     else
     begin
       prerr_memory_usage ();
-      prerr_endline ("#Nodes in def-use graph : " ^ i2s (DUGraph.nb_node dug));
-      prerr_endline ("#Locs on def-use graph : " ^ i2s (DUGraph.nb_loc dug));
+      L.info "#Nodes in def-use graph : %d\n" (DUGraph.nb_node dug);
+      L.info "#Locs on def-use graph : %d\n" (DUGraph.nb_loc dug);
     end
 
   let bind_fi_locs global mem_fi dug access inputof =
@@ -243,8 +245,8 @@ struct
 
   let print_spec : Spec.t -> unit
   = fun spec ->
-    my_prerr_endline ("#total abstract locations  = " ^ string_of_int (PowLoc.cardinal spec.Spec.locset));
-    my_prerr_endline ("#flow-sensitive abstract locations  = " ^ string_of_int (PowLoc.cardinal spec.Spec.locset_fs))
+    L.info ~level:1 "#total abstract locations  = %d\n" (PowLoc.cardinal spec.Spec.locset);
+    L.info ~level:1 "#flow-sensitive abstract locations  = %d\n" (PowLoc.cardinal spec.Spec.locset_fs)
 
   let perform : Spec.t -> Global.t -> Global.t * Table.t * Table.t
   =fun spec global ->

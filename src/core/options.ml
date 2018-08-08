@@ -68,10 +68,11 @@ let filter_complex_exp = ref false
 let filter_rec = ref false
 let filter_allocsite = ref BatSet.empty
 
-(* Marshaling *)
+(* Input & OUtput *)
+let outdir = ref "sparrow-out"
 let marshal_in = ref false
 let marshal_out = ref false
-let marshal_dir = ref "marshal"
+
 
 (* Debug *)
 let debug = ref false
@@ -134,6 +135,7 @@ let opts =
   ("-no_optil", (Arg.Clear optil), "Do not optimize IL");
   ("-marshal_in", (Arg.Set marshal_in), "Read analysis results from marshaled data");
   ("-marshal_out", (Arg.Set marshal_out), "Write analysis results to marshaled data");
-  ("-marshal_dir", (Arg.Set_string marshal_dir), "Directory where the marshaled data exists (default: marshal/)");
+  ("-outdir", (Arg.Set_string outdir),
+   "Output directory (default: sparrow-out)");
   ("-int_overflow", (Arg.Set int_overflow), "Consider integer overflow");
   ]

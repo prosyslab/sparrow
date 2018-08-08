@@ -8,15 +8,19 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
-let output : string -> 'a -> unit
-= fun name data ->
-  let chan = open_out (!Options.marshal_dir ^ "/" ^ name) in
+let output name data =
+  let dirname = !Options.outdir ^ "/marshal" in
+  (if not (Sys.file_exists dirname) then
+     Unix.mkdir dirname 0o755);
+  let chan = open_out (dirname ^ "/" ^ name) in
   Marshal.to_channel chan data [];
   close_out chan
 
-let input : string -> 'a
-= fun name ->
-  let chan = open_in (!Options.marshal_dir ^ "/" ^ name) in
+let input name =
+  let dirname = !Options.outdir ^ "/marshal" in
+  (if not (Sys.file_exists dirname) then
+     failwith (dirname ^ " not found"));
+  let chan = open_in (dirname ^ name) in
   let data = Marshal.from_channel chan in
   close_in chan;
   data

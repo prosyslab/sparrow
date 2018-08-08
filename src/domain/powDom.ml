@@ -136,12 +136,10 @@ struct
   let of_list = BatSet.of_list
 
   let pp fmt x =
-    let rec pp_elt fmt x =
-      if cardinal x = 1 then Format.fprintf fmt "@[<h>%a@]" A.pp (choose x)
-      else iter (fun elt -> Format.fprintf fmt "@[<h>%a,@]" A.pp elt) x
-    in
+    let pp_sep fmt () = Format.fprintf fmt "," in
+    let pp_list fmt l = Format.pp_print_list ~pp_sep A.pp fmt l in
     if is_empty x then Format.fprintf fmt "bot"
-    else Format.fprintf fmt "@[<hov 2>{%a}@]" pp_elt x
+    else Format.fprintf fmt "{%a}" pp_list (elements x)
 end
 
 module MakeLAT (A:SET) =

@@ -13,6 +13,8 @@ open Global
 open BasicDom
 open ItvDom
 
+module L = Logging
+
 (* ***************************** *
  * Flow-insensitive pre-analysis *
  * ***************************** *)
@@ -28,9 +30,9 @@ let rec fixpt : Node.t list -> int -> Mem.t * Global.t -> Mem.t * Global.t
   flush stderr;
   let (mem',global') = onestep_transfer nodes (mem,global) in
   let mem' = Mem.widen mem mem' in
-    if Mem.le mem' mem && Dump.le global'.dump global.dump
-    then (my_prerr_newline (); (mem',global'))
-    else fixpt nodes (k+1) (mem',global')
+  if Mem.le mem' mem && Dump.le global'.dump global.dump
+  then (L.info ~level:1 "#iteration : %d\n" k; (mem',global'))
+  else fixpt nodes (k+1) (mem',global')
 
 let callees_of : InterCfg.t -> InterCfg.Node.t -> Mem.t -> PowProc.t
 = fun icfg node mem ->
@@ -67,7 +69,7 @@ let perform : Global.t -> Global.t
 = fun global ->
   let nodes = InterCfg.nodesof global.icfg in
   let (mem, global) = fixpt nodes 1 (Mem.bot,global) in
-  my_prerr_endline ("mem size : " ^ i2s (Mem.cardinal mem));
+  L.info ~level:1 "mem size : %d\n\n" (Mem.cardinal mem);
   { global with mem = mem }
   |> draw_call_edges nodes mem
   |> draw_callgraph nodes mem

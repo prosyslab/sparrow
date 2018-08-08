@@ -15,6 +15,7 @@ open IntraCfg
 open InterCfg
 open BasicDom
 
+module L = Logging
 module type S =
 sig
   module Access : Access.S
@@ -297,7 +298,7 @@ struct
   =fun (global,access,locset) dug ->
     Profiler.start_event "DugGen.draw_intraedges";
     let n_pids = List.length (InterCfg.pidsof global.icfg) in
-    my_prerr_endline "draw intra-procedural edges";
+    L.info ~level:1 "draw intra-procedural edges\n";
     let r =snd (
         InterCfg.fold_cfgs (fun pid cfg (k,dug) ->
           prerr_progressbar k n_pids;
@@ -310,7 +311,7 @@ struct
   =fun (global,access,locset) dug ->
     let calls = InterCfg.callnodesof global.icfg in
     let n_calls = List.length calls in
-    my_prerr_endline "draw inter-procedural edges";
+    L.info ~level:1 "draw inter-procedural edges\n";
     list_fold (fun call (k,dug) ->
       prerr_progressbar k n_calls;
       let return = InterCfg.returnof call global.icfg in

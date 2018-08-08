@@ -13,6 +13,8 @@ open Cil
 open Global
 open Vocab
 
+module L = Logging
+
 (* transformation based on syntactic heuristics *)
 let transform_simple file =
   opt !Options.unsound_alloc UnsoundAlloc.transform file
@@ -40,8 +42,8 @@ let print_pgm_info : Global.t -> Global.t
 = fun global ->
   let pids = InterCfg.pidsof global.icfg in
   let nodes = InterCfg.nodesof global.icfg in
-  prerr_endline ("#Procs : " ^ string_of_int (List.length pids));
-  prerr_endline ("#Nodes : " ^ string_of_int (List.length nodes));
+  L.info "#Procs : %d\n" (List.length pids);
+  L.info "#Nodes : %d\n" (List.length nodes);
   global
 
 let print_il file =
@@ -59,10 +61,11 @@ let print_cfg : Global.t -> Global.t
       ("cfgs", InterCfg.to_json global.icfg)]
   |> Yojson.Safe.pretty_to_channel stdout; exit 0
 
-let finish t0 () =
-  my_prerr_endline "Finished properly.";
+let finalize t0 =
+  L.info ~level:1 "Finished properly.\n";
   Profiler.report stdout;
-  my_prerr_endline (string_of_float (Sys.time () -. t0))
+  L.info ~level:1 "%f\n" (Sys.time () -. t0);
+  L.finalize ()
 
 let octagon_analysis (global,itvinputof,_,_) =
   StepManager.stepf true "Oct Sparse Analysis" OctAnalysis.do_analysis (global,itvinputof)
@@ -82,21 +85,29 @@ let extract_feature : Global.t -> Global.t
     exit 0
   else global
 
+let mk_outdir dirname =
+  if Sys.file_exists dirname && Sys.is_directory dirname then ()
+  else if Sys.file_exists dirname && not (Sys.is_directory dirname) then
+    let _ = L.error "Error: %s already exists." dirname in
+    exit 1
+  else
+    Unix.mkdir dirname 0o755
+
+let initialize () =
+  Printexc.record_backtrace true;
+  (* process arguments *)
+  let usageMsg = "Usage: sparrow [options] source-files" in
+  Arg.parse Options.opts Frontend.args usageMsg;
+  mk_outdir !Options.outdir;
+  L.init (if !Options.debug then L.DEBUG else L.INFO);
+  List.iter (fun f -> L.info "%s " f) !Frontend.files;
+  L.info "\n";
+  Profiler.start_logger ();
+  Cil.initCIL ()
+
 let main () =
   let t0 = Sys.time () in
-  let _ = Profiler.start_logger () in
-
-  let usageMsg = "Usage: main.native [options] source-files" in
-
-  Printexc.record_backtrace true;
-
-  (* process arguments *)
-  Arg.parse Options.opts Frontend.args usageMsg;
-  List.iter (fun f -> prerr_string (f ^ " ")) !Frontend.files;
-  prerr_endline "";
-
-  Cil.initCIL ();
-
+  initialize ();
   try
     StepManager.stepf true "Front-end" Frontend.parse ()
     |> Frontend.makeCFGinfo
@@ -109,9 +120,10 @@ let main () =
     |> case [ (!Options.oct, octagon_analysis);
               (!Options.taint, taint_analysis) ] (fun (global,_,_,alarm) -> (global, alarm))
     |> (fun (global, alarm) -> Report.print global alarm)
-    |> finish t0
+    |> (fun () -> finalize t0)
   with exc ->
-    prerr_endline (Printexc.to_string exc);
-    prerr_endline (Printexc.get_backtrace())
+    L.error "\n%s\n" (Printexc.to_string exc);
+    L.error "%s\n" (Printexc.get_backtrace ());
+    exit 1
 
 let _ = main ()

@@ -74,12 +74,11 @@ val oct_debug : bool ref
 val print_premem : bool ref
 val verbose : int ref
 
+(** {2 Input & Output } *)
 
-(** {2 Marshaling } *)
-
+val outdir : string ref
 val marshal_in : bool ref
 val marshal_out : bool ref
-val marshal_dir : string ref
 
 (** {2 Options lists } *)
 
