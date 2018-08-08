@@ -89,7 +89,7 @@ let opts =
   ("-cfg", (Arg.Set cfg), "Print Cfg");
   ("-dug", (Arg.Set dug), "Print Def-Use graph");
   ("-noalarm", (Arg.Set noalarm), "Do not print alarms");
-  ("-verbose", (Arg.Int (fun x -> verbose := x)), "Verbose level (default: 1)");
+  ("-verbose", (Arg.Set_int verbose), "Verbose level (default: 1)");
   ("-debug", (Arg.Set debug), "Print debug information");
   ("-oct_debug", (Arg.Set oct_debug), "Print debug information for octagon analysis");
   ("-taint_debug", (Arg.Set taint_debug), "Print debug information for taint analysis");
@@ -98,10 +98,10 @@ let opts =
   ("-nd", (Arg.Set nd), "Print Null-dereference alarms");
   ("-bo", (Arg.Set bo), "Print Buffer-overrun alarms");
   ("-dz", (Arg.Set dz), "Print Divide-by-zero alarms");
-  ("-bugfinder", (Arg.Int (fun x -> bugfinder := x)), "Unsoundness level in bugfinding mode (default: 0)");
+  ("-bugfinder", (Arg.Set_int bugfinder), "Unsoundness level in bugfinding mode (default: 0)");
   ("-inline", (Arg.String (fun s -> inline := s::(!inline))), "Inline functions whose names contain X");
-  ("-inline_size", (Arg.Int (fun x -> inline_size := x)), "Size constraint for function inline");
-  ("-pfs", (Arg.Int (fun x -> pfs := x)), "Partial flow-sensitivity -pfs [0-100] (0: flow-insensitive, 100: fully flow-sensitive). default=100");
+  ("-inline_size", (Arg.Set_int inline_size), "Size constraint for function inline");
+  ("-pfs", (Arg.Set_int pfs), "Partial flow-sensitivity -pfs [0-100] (0: flow-insensitive, 100: fully flow-sensitive). default=100");
   ("-pfs_wv", (Arg.String (fun s -> pfs_wv := s)), "Weight vector for flow-sensitivity (e.g., \"0 1 -1 ... \"). Unspecified weights are zeros.");
   ("-oct", (Arg.Set oct), "Do octagon analysis");
   ("-taint", (Arg.Set taint), "Do taint analysis");
@@ -134,6 +134,6 @@ let opts =
   ("-no_optil", (Arg.Clear optil), "Do not optimize IL");
   ("-marshal_in", (Arg.Set marshal_in), "Read analysis results from marshaled data");
   ("-marshal_out", (Arg.Set marshal_out), "Write analysis results to marshaled data");
-  ("-marshal_dir", (Arg.String (fun s -> marshal_dir := s)), "Directory where the marshaled data exists (default: marshal/)");
+  ("-marshal_dir", (Arg.Set_string marshal_dir), "Directory where the marshaled data exists (default: marshal/)");
   ("-int_overflow", (Arg.Set int_overflow), "Consider integer overflow");
   ]
