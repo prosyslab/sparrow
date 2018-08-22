@@ -38,8 +38,7 @@ let init_analysis : Cil.file -> Global.t
   |> StepManager.stepf true "Pre-analysis" PreAnalysis.perform
   |> transform
 
-let print_pgm_info : Global.t -> Global.t
-= fun global ->
+let print_pgm_info global =
   let pids = InterCfg.pidsof global.icfg in
   let nodes = InterCfg.nodesof global.icfg in
   L.info "#Procs : %d\n" (List.length pids);

@@ -203,7 +203,9 @@ let eval_array_alloc ?(spec=Spec.empty) : Node.t -> Cil.exp -> bool -> Mem.t -> 
   (* NOTE: stride is always one when allocating memory. *)
   let st = Itv.of_int 1 in
   let np = Itv.nat in
-  let pow_loc = if is_static then PowLoc.bot else PowLoc.singleton Loc.null in
+  let pow_loc =
+    if is_static || !Options.unsound_alloc then PowLoc.bot
+    else PowLoc.singleton Loc.null in
   let array = ArrayBlk.make allocsite o sz st np in
   Val.join (Val.of_pow_loc pow_loc) (Val.of_array array)
 
@@ -378,13 +380,13 @@ let model_input mode spec pid lvo (mem, global) =
       let ext_loc = PowLoc.singleton (Loc.of_allocsite allocsite) in
       let mem = update mode spec global (eval_lv ~spec pid lv mem) ext_v mem in
       let mem = update mode spec global ext_loc Val.itv_top mem in
-        (mem,global)
+      (mem,global)
   | _ -> (mem,global)
 
 let model_assign mode spec pid (lvo,exps) (mem, global) =
   match (lvo,exps) with
     (Some lv, e::_) ->
-      (update mode spec global (eval_lv ~spec pid lv mem) (eval ~spec pid e mem) mem, global)
+    (update mode spec global (eval_lv ~spec pid lv mem) (eval ~spec pid e mem) mem, global)
   | (_, _) -> (mem,global)
 
 
@@ -583,7 +585,7 @@ let eval_src src_typ pid mem arg_e =
   match src_typ with
   | ApiSem.Value -> eval pid arg_e mem
   | ApiSem.Array ->
-    let ploc = eval pid arg_e mem |> Val.all_loc_of_val in
+    let ploc = eval pid arg_e mem |> Val.all_locs in
     lookup ploc mem
 
 let rec collect_src_vals arg_exps arg_typs pid mem =
@@ -636,22 +638,22 @@ let rec collect_size_vals arg_exps arg_typs node mem =
 
 let process_dst mode spec pid src_vals global mem dst_e =
   let src_v = List.fold_left Val.join Val.bot src_vals in
-  let dst_loc = Val.all_loc_of_val (eval pid dst_e mem) in
+  let dst_loc = Val.all_locs (eval pid dst_e mem) in
   update mode spec global dst_loc src_v mem
 
 let process_buf mode spec node global mem dst_e =
   let pid = Node.get_pid node in
-  let buf_loc = Val.all_loc_of_val (eval pid dst_e mem) in
+  let buf_loc = Val.all_locs (eval pid dst_e mem) in
   let allocsite = Allocsite.allocsite_of_node node in
   let input_v = Val.external_value allocsite in
   update mode spec global buf_loc input_v mem
 
 let process_struct_ptr mode spec node global mem ptr_e =
   let pid = Node.get_pid node in
-  let struct_loc = Val.all_loc_of_val (eval pid ptr_e mem) in
+  let struct_loc = Val.all_locs (eval pid ptr_e mem) in
   let allocsite = Allocsite.allocsite_of_node node in
   let ext_v = Val.external_value allocsite in
-  let ext_loc = Val.all_loc_of_val ext_v in
+  let ext_loc = Val.all_locs ext_v in
   let mem = update mode spec global struct_loc ext_v mem in
   let mem = update mode spec global ext_loc ext_v mem in
   (mem, global)
@@ -807,8 +809,7 @@ let bind_arg_lvars_set : update_mode -> Spec.t -> Global.t -> (Loc.t list) BatSe
   BatSet.fold (bind_arg_ids mode spec global vs) arg_ids_set mem
 
 (* Default update option is weak update. *)
-let run : update_mode -> Spec.t -> Node.t -> Mem.t * Global.t -> Mem.t * Global.t
-= fun mode spec node (mem, global) ->
+let run mode spec node (mem, global) =
   let pid = Node.get_pid node in
   match InterCfg.cmdof global.icfg node with
   | IntraCfg.Cmd.Cset (l, e, loc) ->
@@ -825,7 +826,7 @@ let run : update_mode -> Spec.t -> Node.t -> Mem.t * Global.t -> Mem.t * Global.
        let ext_loc = PowLoc.singleton (Loc.of_allocsite allocsite) in
        let mem = update mode spec global (eval_lv ~spec pid l mem) ext_v mem in
        let mem = update mode spec global ext_loc ext_v mem in
-        (mem,global))
+       (mem,global))
   | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, is_static, loc) ->
     (update mode spec global (eval_lv ~spec pid l mem) (eval_array_alloc ~spec node e is_static mem) mem, global)
   | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Struct s, is_static, loc) ->

@@ -16,6 +16,7 @@ module type CPO =
 sig
   include CPO
   type elt
+  module A : AbsDom.SET with type t = elt
 
   val empty : t
   val filter : (elt -> bool) -> t -> t
@@ -58,6 +59,7 @@ end
 module MakeCPO (A:SET) =
 struct
   module BatSet = BatSet.Make(A)
+  module A = A
   type elt = A.t
   type t = BatSet.t
 
@@ -145,6 +147,7 @@ end
 module MakeLAT (A:SET) =
 struct
   module PowCPO = MakeCPO(A)
+  module A = A
   type t = V of PowCPO.t | Top [@@deriving compare]
   type elt = A.t
 

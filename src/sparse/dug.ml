@@ -42,7 +42,9 @@ sig
 
   val fold_node         : (node -> 'a -> 'a) -> t -> 'a -> 'a
   val fold_edges        : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
+  val iter_node         : (node -> unit) -> t -> unit
   val iter_edges        : (node -> node -> unit) -> t -> unit
+  val iter_edges_e      : (node -> node -> PowLoc.t -> unit) -> t -> unit
   val fold_succ         : (node -> 'a ->'a) -> t -> node -> 'a -> 'a
 
 (** {2 Print } *)
@@ -70,7 +72,12 @@ struct
     let pred_e g n = I.pred g.graph n |> List.map (fun p -> (p, Hashtbl.find g.label (p,n), n))
     let fold_vertex f g a = I.fold_vertex f g.graph a
     let fold_edges f g a = I.fold_edges f g.graph a
+    let iter_vertex f g = I.iter_vertex f g.graph
     let iter_edges f g = I.iter_edges f g.graph
+    let iter_edges_e f g =
+      I.iter_edges (fun s d ->
+          let locset = Hashtbl.find g.label (s, d) in
+          f s d locset) g.graph
     let fold_succ f g a = I.fold_succ f g.graph a
 
     let remove_vertex g n = I.remove_vertex g.graph n; g
@@ -127,7 +134,9 @@ struct
 
   let fold_node = G.fold_vertex
   let fold_edges = G.fold_edges
+  let iter_node = G.iter_vertex
   let iter_edges = G.iter_edges
+  let iter_edges_e = G.iter_edges_e
   let fold_succ = G.fold_succ
 
   let nb_loc dug =

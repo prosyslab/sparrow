@@ -157,12 +157,12 @@ let rec collect_size_vals arg_exps arg_typs node itvmem mem =
 
 let process_dst mode pid src_vals global itvmem mem dst_e =
   let src_v = List.fold_left Val.join Val.bot src_vals in
-  let dst_loc = ItvDom.Val.all_loc_of_val (ItvSem.eval pid dst_e itvmem) in
+  let dst_loc = ItvDom.Val.all_locs (ItvSem.eval pid dst_e itvmem) in
   update mode global dst_loc src_v mem
 
 let process_buf mode node global loc itvmem mem dst_e =
   let pid = Node.get_pid node in
-  let buf_loc = ItvDom.Val.all_loc_of_val (ItvSem.eval pid dst_e itvmem) in
+  let buf_loc = ItvDom.Val.all_locs (ItvSem.eval pid dst_e itvmem) in
   update mode global buf_loc (Val.input_value node loc) mem
 
 let rec process_args mode node arg_exps arg_typs src_vals loc itvmem (mem, global) =

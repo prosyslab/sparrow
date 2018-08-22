@@ -78,6 +78,8 @@ val optimize : t -> t
 
 val fold_node : (node -> 'a -> 'a) -> t -> 'a -> 'a
 val fold_edges : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
+val iter_node : (node -> unit) -> t -> unit
+val iter_vertex : (node -> unit) -> t -> unit
 
 (** {2 Predecessors and Successors } *)
 

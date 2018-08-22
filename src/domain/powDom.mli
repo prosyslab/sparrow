@@ -14,6 +14,7 @@ module type CPO =
 sig
   include AbsDom.CPO
   type elt
+  module A : AbsDom.SET with type t = elt
 
   val empty : t
   val filter : (elt -> bool) -> t -> t

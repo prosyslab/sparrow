@@ -20,7 +20,7 @@ module Val : sig
   val struct_of_val : t -> StructBlk.t
   val pow_proc_of_val : t -> BasicDom.PowProc.t
   val allocsites_of_val : t -> BasicDom.Allocsite.t BatSet.t
-  val all_loc_of_val : t -> BasicDom.PowLoc.t
+  val all_locs : t -> BasicDom.PowLoc.t
   val of_itv : Itv.t -> t
   val of_pow_loc : BasicDom.PowLoc.t -> t
   val of_array : ArrayBlk.t -> t

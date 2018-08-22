@@ -35,7 +35,9 @@ sig
 
   val fold_node         : (node -> 'a -> 'a) -> t -> 'a -> 'a
   val fold_edges        : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
+  val iter_node         : (node -> unit) -> t -> unit
   val iter_edges        : (node -> node -> unit) -> t -> unit
+  val iter_edges_e      : (node -> node -> PowLoc.t -> unit) -> t -> unit
   val fold_succ         : (node -> 'a ->'a) -> t -> node -> 'a -> 'a
 
 (** {2 Print } *)

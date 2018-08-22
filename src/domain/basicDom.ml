@@ -91,6 +91,8 @@ struct
       else c
     | _, _ -> Pervasives.compare (tag_of_t x) (tag_of_t y)
   and tag_of_t = function GVar _ -> 0 | LVar _ -> 1 | Allocsite _ -> 2 | Field _ -> 3
+  let equal = [%compare.equal : t]
+  let hash = Hashtbl.hash
 
   let typ = function GVar (_, t) | LVar (_, _, t) | Field (_, _, t) -> Some t | _ -> None
 

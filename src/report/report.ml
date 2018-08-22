@@ -75,9 +75,9 @@ let get_status queries =
 let get_proved_query_point queries =
   let all = partition queries in
   let unproved = partition (get queries UnProven) in
-  let all_loc = BatMap.foldi (fun l _ -> BatSet.add l) all BatSet.empty in
-  let unproved_loc = BatMap.foldi (fun l _ -> BatSet.add l) unproved BatSet.empty in
-  BatSet.diff all_loc unproved_loc
+  let all = BatMap.foldi (fun l _ -> BatSet.add l) all BatSet.empty in
+  let unproved = BatMap.foldi (fun l _ -> BatSet.add l) unproved BatSet.empty in
+  BatSet.diff all unproved
 
 let string_of_query q =
   (CilHelper.s_location q.loc)^ " "^
@@ -117,17 +117,19 @@ let filter_rec global partition =
 let filter_complex_exp partition =
   BatMap.filterv (fun ql ->
       not (List.exists (fun q ->
-        match q.exp with
-        | AlarmExp.ArrayExp (_, BinOp (bop, _, _, _), _) -> bop = BAnd || bop = BOr || bop = BXor
-        | AlarmExp.ArrayExp (_, Lval (Var vi, _), _) -> vi.vglob
-        | AlarmExp.DerefExp (Lval (Var vi, _), _) -> vi.vglob
-        | _ -> false) ql)) partition
+          match q.exp with
+          | AlarmExp.ArrayExp (_, BinOp (bop, _, _, _), _) ->
+            bop = BAnd || bop = BOr || bop = BXor
+          | AlarmExp.ArrayExp (_, Lval (Var vi, _), _) -> vi.vglob
+          | AlarmExp.DerefExp (Lval (Var vi, _), _) -> vi.vglob
+          | _ -> false) ql)) partition
 
 let filter_allocsite partition =
   BatMap.filterv (fun ql ->
       not (List.exists (fun q ->
           match q.allocsite with
-          | Some allocsite -> BatSet.mem (Allocsite.to_string allocsite) !Options.filter_allocsite
+          | Some allocsite ->
+            BatSet.mem (Allocsite.to_string allocsite) !Options.filter_allocsite
           | None -> false) ql)) partition
 
 let alarm_filter global part =
@@ -179,22 +181,3 @@ let print global queries =
     print_alarms fmt global queries;
     close_out report_file;
   else ()
-
-let print_raw summary_only queries =
-  let unproven = List.filter (fun x -> x.status = UnProven) queries in
-  let botalarm = List.filter (fun x -> x.status = BotAlarm) queries in
-  prerr_newline ();
-  prerr_endline ("= "^"Alarms"^ "=");
-  List.iteri (fun k q ->
-    prerr_string (string_of_int (k + 1) ^ ". ");
-    prerr_string ( "  " ^ AlarmExp.to_string q.exp ^ " @");
-    prerr_string (InterCfg.Node.to_string q.node);
-    prerr_string ("  ");
-    prerr_string (CilHelper.s_location q.loc);
-    prerr_endline ( ":  " ^ q.desc )
-  ) (sort_queries unproven);
-  prerr_endline "";
-  prerr_endline ("#queries                 : " ^ i2s (List.length queries));
-  prerr_endline ("#proven                  : " ^ i2s (BatSet.cardinal (get_proved_query_point queries)));
-  prerr_endline ("#unproven                : " ^ i2s (List.length unproven));
-  prerr_endline ("#bot-involved            : " ^ i2s (List.length botalarm))

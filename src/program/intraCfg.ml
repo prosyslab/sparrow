@@ -43,9 +43,7 @@ module Node = struct
     | EXIT -> -1
     | Node id -> id
 
-  let to_string : t -> string
-  =fun n ->
-    match n with
+  let to_string = function
     | ENTRY -> "ENTRY"
     | EXIT -> "EXIT"
     | Node i -> string_of_int i
@@ -86,14 +84,13 @@ module Cmd = struct
     | Return (expo,loc) -> Creturn (expo,loc)
     | _ -> Cskip
 
-  let rec to_string : t -> string
-  =fun c ->
-    match c with
+  let rec to_string = function
     | Cinstr instrs -> s_instrs instrs
     | Cset (lv,e,_) -> "set("^s_lv lv^","^s_exp e^")"
     | Cexternal (lv,_) -> "extern("^s_lv lv^")"
     | Calloc (lv, Array e,_,_) -> "alloc("^s_lv lv^",["^s_exp e^"])"
-    | Calloc (lv, Struct compinfo,_,_) -> "alloc("^s_lv lv^",{"^compinfo.cname^"})"
+    | Calloc (lv, Struct compinfo,_,_) ->
+      "alloc("^s_lv lv^",{"^compinfo.cname^"})"
     | Csalloc (lv, s, _) -> "salloc("^s_lv lv^", \""^s^"\")"
     | Cfalloc (lv, f, _) -> "falloc("^s_lv lv^", "^f.svar.vname^")"
     | Ccall (Some lv,fexp,params,_) ->
@@ -108,9 +105,7 @@ module Cmd = struct
     | Casm _ -> "asm"
     | Cskip -> "skip"
 
-  let location_of : t -> Cil.location
-  =fun c ->
-    match c with
+  let location_of = function
     | Cset (_,_,l)
     | Cexternal (_,l)
     | Calloc (_,_,_,l)
@@ -243,6 +238,8 @@ let succ : node -> t -> node list
 
 let fold_node f g a = G.fold_vertex f g.graph a
 let fold_edges f g a = G.fold_edges f g.graph a
+let iter_node f g = G.iter_vertex f g.graph
+let iter_vertex f g = G.iter_vertex f g.graph
 
 let is_entry : node -> bool
 =fun node ->
