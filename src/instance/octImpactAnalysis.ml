@@ -15,13 +15,13 @@ open BasicDom
 open Vocab
 open IntraCfg
 open InterCfg
-open ItvAnalysis
 open OctDom
 open OctImpactDom
 open AlarmExp
 open Report
 open ArrayBlk
 
+let analysis = Spec.OctagonImpact
 module Analysis = SparseAnalysis.Make(OctImpactSem)
 module Table = Analysis.Table
 module Spec = Analysis.Spec
@@ -206,11 +206,13 @@ let inspect_alarm (global,itvinputof,inputof,outputof) =
   |> PackConf.make itvinputof
 
 let do_analysis (global,itvinputof) =
-  let spec = { Spec.empty with
-       Spec.locset = OctImpactDom.packconf;
-       Spec.locset_fs = OctImpactDom.packconf;
-       Spec.ptrinfo = itvinputof;
-       Spec.premem = Mem.top OctImpactDom.packconf }
+  let spec =
+    { Spec.empty with
+      analysis
+    ; locset = OctImpactDom.packconf
+    ; locset_fs = OctImpactDom.packconf
+    ; Spec.ptrinfo = itvinputof
+    ; Spec.premem = Mem.top OctImpactDom.packconf }
   in
   Analysis.perform spec global
   |> (fun (g, i,o) -> (g, itvinputof, i, o))

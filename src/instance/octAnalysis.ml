@@ -16,11 +16,11 @@ open Vocab
 open ArrayBlk
 open IntraCfg
 open InterCfg
-open ItvAnalysis
 open OctDom
 open AlarmExp
 open Report
 
+let analysis = Spec.Octagon
 module Analysis = SparseAnalysis.MakeWithAccess(OctSem)
 module Table = Analysis.Table
 module Spec = Analysis.Spec
@@ -223,11 +223,13 @@ let do_analysis : Global.t * ItvDom.Table.t -> Global.t * Table.t * Table.t * Re
        (!Options.pack_impact, OctImpactAnalysis.packing)] (global, itvinputof)
   in
   PackConf.print_info packconf;
-  let spec = { Spec.empty with
-      Spec.locset = packconf;
-      Spec.locset_fs = packconf;
-      Spec.ptrinfo = itvinputof;
-      Spec.premem = Mem.top packconf }
+  let spec =
+    { Spec.empty with
+      analysis
+    ; locset = packconf
+    ; locset_fs = packconf
+    ; ptrinfo = itvinputof
+    ; premem = Mem.top packconf }
   in
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global
   |> opt !Options.marshal_out marshal_out

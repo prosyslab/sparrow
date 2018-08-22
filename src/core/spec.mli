@@ -8,11 +8,13 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
+type analysis = Pre | Interval | OctagonImpact | Octagon | Taint
 module type S =
 sig
   module Dom : InstrumentedMem.S
 
   type t = {
+    analysis : analysis;
     locset : Dom.PowA.t;
     locset_fs : Dom.PowA.t;
     ptrinfo : ItvDom.Table.t;

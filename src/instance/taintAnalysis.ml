@@ -5,6 +5,7 @@ open Global
 open Report
 open Vocab
 
+let analysis = Spec.Taint
 module Analysis = SparseAnalysis.Make(TaintSem)
 module Table = Analysis.Table
 module Spec = Analysis.Spec
@@ -72,10 +73,14 @@ let make_top_mem locset =
 let do_analysis (global, itvinputof) =
   let global = { global with table = itvinputof } in
   let locset = get_locset global.mem in
-  let spec = { Spec.empty with
-               Spec.locset; Spec.locset_fs = locset;
-               Spec.premem = make_top_mem locset;
-               Spec.ptrinfo = itvinputof } in
+  let spec =
+    { Spec.empty with
+      analysis
+    ; locset
+    ; locset_fs = locset
+    ; premem = make_top_mem locset
+    ; ptrinfo = itvinputof }
+  in
   (* NOTE: fully flow-sensitive taint analysis *)
   let _ = Options.pfs := 100 in
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global

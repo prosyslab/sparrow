@@ -20,6 +20,7 @@ open ArrayBlk
 open AlarmExp
 open Report
 
+let analysis = Spec.Interval
 module Analysis = SparseAnalysis.Make(ItvSem)
 module Table = Analysis.Table
 module Spec = Analysis.Spec
@@ -332,9 +333,16 @@ let do_analysis : Global.t -> Global.t * Table.t * Table.t * Report.query list
   let unsound_lib = UnsoundLib.collect global in
   let unsound_update = (!Options.bugfinder >= 2) in
   let unsound_bitwise = (!Options.bugfinder >= 1) in
-  let spec = { Spec.empty with
-    Spec.locset; Spec.locset_fs; premem = global.mem; Spec.unsound_lib;
-    Spec.unsound_update; Spec.unsound_bitwise; } in
+  let spec =
+    { Spec.empty with
+      analysis
+    ; locset
+    ; locset_fs
+    ; premem = global.mem
+    ; unsound_lib
+    ; unsound_update
+    ; unsound_bitwise }
+  in
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global
   |> opt !Options.marshal_out marshal_out
   |> StepManager.stepf true "Generate Alarm Report" (fun (global,inputof,outputof) ->
