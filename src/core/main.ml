@@ -30,13 +30,24 @@ let transform : Global.t -> Global.t
     |> StepManager.stepf true "Pre-analysis (after inline)" PreAnalysis.perform
   else global (* nothing changed *)
 
-let init_analysis : Cil.file -> Global.t
-= fun file ->
-  file
-  |> transform_simple
-  |> StepManager.stepf true "Translation to graphs" Global.init
-  |> StepManager.stepf true "Pre-analysis" PreAnalysis.perform
-  |> transform
+let marshal_in file =
+  let filename = Filename.basename file.Cil.fileName in
+  MarshalManager.input (filename ^ ".global")
+
+let marshal_out file global =
+  let filename = Filename.basename file.Cil.fileName in
+  MarshalManager.output (filename ^ ".global") global;
+  global
+
+let init_analysis file =
+  if !Options.marshal_in then marshal_in file
+  else
+    file
+    |> transform_simple
+    |> StepManager.stepf true "Translation to graphs" Global.init
+    |> StepManager.stepf true "Pre-analysis" PreAnalysis.perform
+    |> transform
+    |> opt !Options.marshal_out (marshal_out file)
 
 let print_pgm_info global =
   let pids = InterCfg.pidsof global.icfg in

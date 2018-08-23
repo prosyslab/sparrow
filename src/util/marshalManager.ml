@@ -20,7 +20,7 @@ let input name =
   let dirname = !Options.outdir ^ "/marshal" in
   (if not (Sys.file_exists dirname) then
      failwith (dirname ^ " not found"));
-  let chan = open_in (dirname ^ name) in
+  let chan = open_in (dirname ^ "/" ^ name) in
   let data = Marshal.from_channel chan in
   close_in chan;
   data
