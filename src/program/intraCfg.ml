@@ -15,6 +15,8 @@ open Cil
 open CilHelper
 open Printf
 
+module F = Format
+
 module Node = struct
   type t = ENTRY | EXIT | Node of int [@@deriving compare]
   let equal n1 n2 =
@@ -114,7 +116,6 @@ module Cmd = struct
     | Cassume (_,l) -> l
     | Cskip l -> l
     | _ -> Cil.locUnknown
-
 end
 
 type node = Node.t
@@ -930,3 +931,14 @@ let to_json g =
                ;`String (Node.to_string v2) ])::edges) g.graph []) in
   `Assoc [("nodes", nodes);
           ("edges", edges)]
+
+let to_json_simple g =
+  let nodes = G.fold_vertex (fun v l ->
+      let cmd = find_cmd v g in
+      let loc = Cmd.location_of cmd |> CilHelper.s_location in
+      let item = `Assoc [ ("cmd", `String (Cmd.to_string cmd));
+                          ("loc", `String loc) ]
+      in
+      (g.fd.svar.vname ^ "-" ^ Node.to_string v, item)::l) g.graph []
+  in
+  `Assoc nodes

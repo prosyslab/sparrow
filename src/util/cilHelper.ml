@@ -11,6 +11,8 @@
 open Cil
 open Vocab
 
+module F = Format
+
 (* ******************* *
  * to_string functions *
  * ******************* *)
@@ -190,3 +192,14 @@ let byteSizeOf : Cil.typ -> int
     (if !Options.verbose >= 2 then prerr_endline ("warn: Cil.bitsSizeOf (" ^ s_type typ ^ ")"));
     raise e
 
+module Lval = struct
+  type t = Cil.lval
+  let compare x y = compare (Hashtbl.hash x) (Hashtbl.hash y)
+  let pp fmt x = F.fprintf fmt "%s" (s_lv x)
+end
+
+module Exp = struct
+  type t = Cil.exp
+  let compare x y = compare (Hashtbl.hash x) (Hashtbl.hash y)
+  let pp fmt x = F.fprintf fmt "%s" (s_exp x)
+end

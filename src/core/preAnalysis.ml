@@ -73,4 +73,5 @@ let perform : Global.t -> Global.t
   { global with mem = mem }
   |> draw_call_edges nodes mem
   |> draw_callgraph nodes mem
-  |> Global.remove_unreachable_functions
+  |> opt (not !Options.extract_datalog_fact)
+    Global.remove_unreachable_functions

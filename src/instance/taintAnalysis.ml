@@ -5,6 +5,8 @@ open Global
 open Report
 open Vocab
 
+module F = Format
+
 let analysis = Spec.Taint
 module Analysis = SparseAnalysis.Make(TaintSem)
 module Table = Analysis.Table
@@ -35,7 +37,7 @@ let inspect_aexp node aexp itvmem mem queries =
         let size_ovfl = TaintSem.eval pid e itvmem mem |> TaintDom.Val.int_overflow |> TaintDom.IntOverflow.is_bot |> not in
         let status = if size_ovfl then UnProven else Proven in
         let desc = "size = " ^ Itv.to_string size_itv
-                   ^ ", source = " ^ Node.to_string src_node ^ " @"
+                   ^ ", source = " ^ Node.to_string src_node ^ " @ "
                    ^ CilHelper.s_location src_loc
         in
         { node; exp = aexp; loc; allocsite = None; status; desc
@@ -80,6 +82,25 @@ let make_top_mem locset =
   PowLoc.fold (fun l mem ->
       Mem.add l TaintDom.Val.top mem) locset Mem.bot
 
+let print_datalog_alarms alarms =
+  let oc = open_out (!Options.outdir ^ "/datalog/IntOverflowAlarm.facts") in
+  let fmt = F.formatter_of_out_channel oc in
+  List.iter (fun alarm ->
+      match alarm.src with
+      | Some (src_node, _) ->
+        F.fprintf fmt "%a\t%a\n" Node.pp src_node Node.pp alarm.node
+      | _ -> ()) alarms;
+  F.pp_print_flush fmt ();
+  close_out oc
+
+let post_process spec (global, inputof, outputof) =
+  let alarms = StepManager.stepf true "Generate Alarm Report"
+      (inspect_alarm global spec) inputof
+  in
+  (if !Options.extract_datalog_fact_full then
+     print_datalog_alarms alarms);
+  (global, inputof, outputof, alarms)
+
 let do_analysis (global, itvinputof) =
   let global = { global with table = itvinputof } in
   let locset = get_locset global.mem in
@@ -95,6 +116,4 @@ let do_analysis (global, itvinputof) =
   let _ = Options.pfs := 100 in
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global
   |> opt !Options.marshal_out marshal_out
-  |> StepManager.stepf true "Generate Alarm Report"
-    (fun (global,inputof,outputof) ->
-       (global,inputof,outputof,inspect_alarm global spec inputof))
+  |> post_process spec

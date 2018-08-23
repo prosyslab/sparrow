@@ -25,6 +25,7 @@ sig
     unsound_bitwise : bool;
   }
   val empty : t
+  val is_interval : t -> bool
 end
 
 module Make(Dom: InstrumentedMem.S) : S

@@ -25,6 +25,7 @@ sig
     unsound_bitwise : bool;
   }
   val empty : t
+  val is_interval : t -> bool
 end
 
 module Make(Dom: InstrumentedMem.S) =
@@ -54,4 +55,6 @@ struct
     unsound_update = false;
     unsound_bitwise = false;
   }
+
+  let is_interval spec = (spec.analysis = Interval)
 end

@@ -55,6 +55,10 @@ let unsound_recursion = ref false
 let unsound_alloc = ref false
 let bugfinder = ref 0
 
+(* datalog *)
+let extract_datalog_fact = ref false
+let extract_datalog_fact_full = ref false
+
 (* Alarm Report *)
 let noalarm = ref false
 let bo = ref true
@@ -73,7 +77,6 @@ let outdir = ref "sparrow-out"
 let marshal_in = ref false
 let marshal_out = ref false
 
-
 (* Debug *)
 let debug = ref false
 let oct_debug = ref false
@@ -83,6 +86,15 @@ let taint_debug = ref false
 let print_premem = ref false
 let verbose = ref 1
 let int_overflow = ref false
+
+let datalog_opts =
+  [ ("-extract_datalog_fact", (Arg.Set extract_datalog_fact),
+     "Extract simple datalog facts (syntax and def-use graph)")
+  ; ("-extract_datalog_fact_full",
+     (Arg.Unit (fun () ->
+          extract_datalog_fact := true;
+          extract_datalog_fact_full := true)),
+     "Extract extensive datalog facts") ]
 
 let opts =
   [
@@ -139,3 +151,4 @@ let opts =
    "Output directory (default: sparrow-out)");
   ("-int_overflow", (Arg.Set int_overflow), "Consider integer overflow");
   ]
+  @ datalog_opts

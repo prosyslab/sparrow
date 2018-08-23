@@ -22,6 +22,26 @@ open BatTuple
 module Dom = ItvDom.Mem
 module Access = Dom.Access
 module Spec = Spec.Make(Dom)
+module Rel = RelSemantics
+
+let provenance = ref Provenance.G.empty
+let record_provenance = ref false
+let start_provenance () =
+  record_provenance := true;
+  provenance := Provenance.G.empty
+let finish_provenance () =
+  record_provenance := false;
+  !provenance
+
+let provenance_list = ref []
+let start_provenance_list () =
+  record_provenance := true;
+  provenance_list := [];
+  provenance := Provenance.G.empty
+
+let finish_provenance_list () =
+  record_provenance := false;
+  !provenance_list
 
 (* ********************** *
  * Abstract memory access *
@@ -39,6 +59,14 @@ let can_strong_update mode spec global lvs =
       else false
 
 let lookup locs mem =
+  if !Options.extract_datalog_fact then
+    PowLoc.iter (fun l ->
+        let rvset = Mem.find l mem |> Val.all_locs in
+        PowLoc.iter (fun r ->
+            provenance := Provenance.G.add_edge !provenance l r) rvset;
+        (* for now, introduce dummy loc for provenance of non-pointer values *)
+        provenance := Provenance.G.add_edge !provenance l Loc.dummy;
+      ) locs;
   Mem.lookup locs mem
 
 let update mode spec global locs v mem =
@@ -184,7 +212,13 @@ and eval ?(spec=Spec.empty) pid e mem =
   | Cil.StartOf l -> lookup (eval_lv ~spec pid l mem) mem
 
 let eval_list spec pid exps mem =
-  List.map (fun e -> eval ~spec pid e mem) exps
+  List.map (fun e ->
+      start_provenance ();
+      let v = eval ~spec pid e mem in
+      let prov = finish_provenance () in
+      provenance_list := !provenance_list @ [prov];
+      v
+    ) exps
 
 let eval_array_alloc ?(spec=Spec.empty) node e is_static mem =
   let pid = Node.get_pid node in
@@ -801,13 +835,20 @@ let run mode spec node (mem, global) =
   let pid = Node.get_pid node in
   match InterCfg.cmdof global.icfg node with
   | IntraCfg.Cmd.Cset (l, e, loc) ->
-      (update mode spec global (eval_lv ~spec pid l mem) (eval ~spec pid e mem) mem, global)
+    start_provenance ();
+    let ploc = eval_lv ~spec pid l mem in
+    let v = eval ~spec pid e mem in
+    let prov = finish_provenance () in
+    let mem = update mode spec global ploc v mem in
+    let relations = Provenance.set spec.analysis global.icfg
+        node e ploc v prov global.relations in
+    (mem, { global with relations })
   | IntraCfg.Cmd.Cexternal (l, _) ->
     (match Cil.typeOfLval l with
-       Cil.TInt (_, _) | Cil.TFloat (_, _) ->
-         let ext_v = Val.of_itv Itv.top in
-         let mem = update mode spec global (eval_lv ~spec pid l mem) ext_v mem in
-         (mem,global)
+     | Cil.TInt (_, _) | Cil.TFloat (_, _) ->
+       let ext_v = Val.of_itv Itv.top in
+       let mem = update mode spec global (eval_lv ~spec pid l mem) ext_v mem in
+       (mem,global)
      | _ ->
        let allocsite = Allocsite.allocsite_of_ext None in
        let ext_v = Val.external_value allocsite in
@@ -816,7 +857,12 @@ let run mode spec node (mem, global) =
        let mem = update mode spec global ext_loc ext_v mem in
        (mem,global))
   | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, is_static, loc) ->
-    (update mode spec global (eval_lv ~spec pid l mem) (eval_array_alloc ~spec node e is_static mem) mem, global)
+    let ploc = eval_lv ~spec pid l mem in
+    let v = eval_array_alloc ~spec node e is_static mem in
+    let mem = update mode spec global ploc v mem in
+    let relations = Provenance.alloc spec.analysis node l e ploc v
+        global.relations in
+    (mem, { global with relations })
   | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Struct s, is_static, loc) ->
     let lv = eval_lv ~spec pid l mem in
     (update mode spec global lv (eval_struct_alloc lv s) mem, global)
@@ -850,7 +896,9 @@ let run mode spec node (mem, global) =
         let lvars = List.map (fun x -> Loc.of_lvar f x.Cil.vname x.Cil.vtype) args in
         BatSet.add lvars acc in
       let arg_lvars_set = PowProc.fold arg_lvars_of_proc fs BatSet.empty in
+      start_provenance_list ();
       let arg_vals = eval_list spec pid arg_exps mem in
+      let prov_list = finish_provenance_list () in
       let dump =
          match lvo with
          | None -> global.dump
@@ -864,12 +912,19 @@ let run mode spec node (mem, global) =
               Dump.weak_add f (eval_lv ~spec pid lv mem) d
            ) fs global.dump in
       let mem = bind_arg_lvars_set mode spec global arg_lvars_set arg_vals mem in
-      (mem, { global with dump })
+      let relations = Provenance.call spec.analysis global.icfg node
+          arg_lvars_set prov_list global.relations in
+      (mem, { global with dump; relations })
   | IntraCfg.Cmd.Creturn (None, _) -> (mem, global)
   | IntraCfg.Cmd.Creturn (Some e, _) ->
+    start_provenance ();
     let ploc = Loc.return_var pid (Cil.typeOf e) |> PowLoc.singleton in
     let v = eval ~spec pid e mem in
-    update Weak spec global ploc v mem |> (fun mem -> (mem, global))
+    let prov = finish_provenance () in
+    let mem = update Weak spec global ploc v mem in
+    let relations = Provenance.set spec.analysis global.icfg
+        node e ploc v prov global.relations in
+    (mem, { global with relations })
   | IntraCfg.Cmd.Cskip _ when InterCfg.is_returnnode node global.icfg ->
     let callnode = InterCfg.callof node global.icfg in
     (match InterCfg.cmdof global.icfg callnode with

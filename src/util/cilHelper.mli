@@ -33,3 +33,15 @@ val remove_cast : Cil.exp -> Cil.exp
 val remove_coeff : Cil.exp -> Cil.exp
 val is_unsigned : Cil.typ -> bool
 val byteSizeOf : Cil.typ -> int
+
+module Lval : sig
+  type t = Cil.lval
+  val compare : t -> t -> int
+  val pp : Format.formatter -> t -> unit
+end
+
+module Exp : sig
+  type t = Cil.exp
+  val compare : t -> t -> int
+  val pp : Format.formatter -> t -> unit
+end

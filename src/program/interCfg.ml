@@ -179,6 +179,13 @@ let to_json : t -> json
     BatMap.foldi (fun pid cfg json ->
       (pid, IntraCfg.to_json cfg)::json) g.cfgs [])
 
+let to_json_simple g =
+  BatMap.fold (fun cfg json ->
+      let cfg_json = IntraCfg.to_json_simple cfg in
+      match json, cfg_json with
+      | `Assoc l1, `Assoc l2 -> `Assoc (l1 @ l2)
+      | _ -> failwith "Invalid format") g.cfgs (`Assoc [])
+
 let print_json : out_channel -> t -> unit
 = fun chan g ->
   Yojson.Safe.pretty_to_channel chan (to_json g)
@@ -257,4 +264,3 @@ let init : Cil.file -> t
   { cfgs = gen_cfgs file; globals = file.Cil.globals ; call_edges = BatMap.empty }
   |> opt !Options.optil optimize_il
   |> compute_dom_and_scc
-

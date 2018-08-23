@@ -22,6 +22,7 @@ type t = {
   dump : Dump.t;
   mem : ItvDom.Mem.t;
   table : ItvDom.Table.t;
+  relations : RelSemantics.Set.t;
 }
 
 let remove_node : InterCfg.node -> t -> t = fun node global ->
@@ -68,7 +69,8 @@ let init file =
     callgraph = CallGraph.empty;
     dump = Dump.empty;
     mem = ItvDom.Mem.bot;
-    table = ItvDom.Table.bot; }
+    table = ItvDom.Table.bot;
+    relations = RelSemantics.Set.empty; }
   |> remove_unreachable_nodes
 
 let is_undef : InterCfg.pid -> t -> bool = fun pid global ->

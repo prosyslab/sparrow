@@ -185,7 +185,7 @@ struct
         dug (init_worklist, global, inputof, outputof))
     |> (fun x -> L.info ~level:1 "#iteration in narrowing : %d\n" !total_iterations; x)
 
-  let print_dug (access,global,dug) =
+  let print_dug spec (access,global,dug) =
     if !Options.dug then
     begin
       `Assoc
@@ -197,6 +197,15 @@ struct
       |> Yojson.Safe.pretty_to_channel stdout;
       exit 0
     end
+    else if !Options.extract_datalog_fact && Spec.is_interval spec then
+      let oc = open_out (!Options.outdir ^ "/datalog/DUEdge.facts") in
+      let fmt = Format.formatter_of_out_channel oc in
+      DUGraph.iter_edges_e (fun src dst locset ->
+          PowLoc.iter (fun l ->
+              Format.fprintf fmt "%a\t%a\t%a\n"
+                Node.pp src PowLoc.A.pp l Node.pp dst) locset) dug;
+      close_out oc;
+      (if not !Options.extract_datalog_fact_full then exit 0)
     else
     begin
       prerr_memory_usage ();
@@ -253,7 +262,7 @@ struct
     print_spec spec;
     let access = StepManager.stepf false "Access Analysis" (AccessAnalysis.perform global spec.Spec.locset (Sem.run Strong spec)) spec.Spec.premem in
     let dug = StepManager.stepf false "Def-use graph construction" SsaDug.make (global, access, spec.Spec.locset_fs) in
-    print_dug (access,global,dug);
+    print_dug spec (access,global,dug);
     let worklist = StepManager.stepf false "Workorder computation" Worklist.init dug in
     (worklist, global, initialize spec global dug access, Table.empty)
     |> StepManager.stepf false "Fixpoint iteration with widening" (widening spec dug)

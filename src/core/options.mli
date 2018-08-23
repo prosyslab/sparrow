@@ -64,6 +64,9 @@ val filter_complex_exp : bool ref
 val filter_rec : bool ref
 val filter_allocsite : string BatSet.t ref
 
+val extract_datalog_fact : bool ref
+val extract_datalog_fact_full : bool ref
+
 (** {2 Pretty Printer & Debugging } *)
 
 val nobar : bool ref

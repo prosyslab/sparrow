@@ -17,6 +17,7 @@ type t = {
   dump : BasicDom.Dump.t;
   mem : ItvDom.Mem.t;
   table : ItvDom.Table.t;
+  relations : RelSemantics.Set.t;
 }
 
 val init : Cil.file -> t
