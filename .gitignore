@@ -19,8 +19,9 @@ _build/
 setup.data
 setup.log
 
-# Sparrow binaryies
+# Sparrow binaries and outputs
 bin/sparrow*
+sparrow-out
 
 # vim swp files
 .*.swp

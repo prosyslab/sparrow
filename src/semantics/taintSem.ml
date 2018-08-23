@@ -82,20 +82,20 @@ let sparrow_print pid exps itvmem mem loc =
 let sparrow_arg mode node exps loc itvmem (mem,global) =
   match exps with
     (Cil.Lval argc)::(Cil.Lval argv)::_ ->
-      let argv_a = Allocsite.allocsite_of_ext (Some "argv") in
-      let arg_a = Allocsite.allocsite_of_ext (Some "arg") in
-      let pid = Node.get_pid node in
-      update mode global (ItvSem.eval_lv pid argc itvmem) (Val.input_value node loc) mem
-      |> update mode global (PowLoc.singleton (Loc.of_allocsite argv_a)) (Val.input_value node loc)
-      |> update mode global (PowLoc.singleton (Loc.of_allocsite arg_a)) (Val.input_value node loc)
+    let argv_a = Allocsite.allocsite_of_ext (Some "argv") in
+    let arg_a = Allocsite.allocsite_of_ext (Some "arg") in
+    let pid = Node.get_pid node in
+    update mode global (ItvSem.eval_lv pid argc itvmem) (Val.input_value node loc) mem
+    |> update mode global (PowLoc.singleton (Loc.of_allocsite argv_a)) (Val.input_value node loc)
+    |> update mode global (PowLoc.singleton (Loc.of_allocsite arg_a)) (Val.input_value node loc)
   | _ -> mem
 
 (* optind, optarg *)
 let sparrow_opt mode node exps loc itvmem (mem,global) =
   match exps with
     (Cil.Lval optind)::(Cil.Lval optarg)::_ ->
-      let arg_a = Allocsite.allocsite_of_ext (Some "arg") in
-      update mode global (PowLoc.singleton (Loc.of_allocsite arg_a)) (Val.input_value node loc) mem
+    let arg_a = Allocsite.allocsite_of_ext (Some "arg") in
+    update mode global (PowLoc.singleton (Loc.of_allocsite arg_a)) (Val.input_value node loc) mem
   | _ -> mem
 
 let eval_src src_typ pid itvmem mem arg_e =
@@ -103,8 +103,8 @@ let eval_src src_typ pid itvmem mem arg_e =
   | Value -> eval pid arg_e itvmem mem
   | Array ->
     let ploc = ItvSem.eval pid arg_e itvmem
-			|> ItvDom.Val.array_of_val |> ArrayBlk.pow_loc_of_array
-		in
+               |> ItvDom.Val.array_of_val |> ArrayBlk.pow_loc_of_array
+    in
     lookup ploc mem
 
 let rec collect_src_vals arg_exps arg_typs pid itvmem mem =
@@ -136,7 +136,7 @@ let rec collect_dst_vals arg_exps arg_typs pid itvmem mem =
 let rec collect_buf_vals arg_exps arg_typs pid itvmem mem =
   match arg_exps, arg_typs with
   | [], _ | _, [] -> []
-	| _, (Buf (Variable, _) :: []) ->
+  | _, (Buf (Variable, _) :: []) ->
     List.map (fun e -> eval pid e itvmem mem) arg_exps
   | _, (Buf (Variable, _) :: _) ->
     failwith "itvSem.ml : API encoding error (Varg not at the last position)"
@@ -149,7 +149,7 @@ let rec collect_buf_vals arg_exps arg_typs pid itvmem mem =
 let rec collect_size_vals arg_exps arg_typs node itvmem mem =
   match arg_exps, arg_typs with
   | [], _ | _, [] -> []
-	| (arg_e :: arg_exps_left), (Size :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (Size :: arg_typs_left) ->
     let size_v = eval node arg_e itvmem mem in
     size_v :: (collect_size_vals arg_exps_left arg_typs_left node itvmem mem)
   | (_ :: arg_exps_left), (_ :: arg_typs_left) ->
@@ -169,7 +169,7 @@ let rec process_args mode node arg_exps arg_typs src_vals loc itvmem (mem, globa
   let va_src_flag =
     List.exists (function | Src (Variable, _, _) -> true | _ -> false) arg_typs
   in
-	let pid = Node.get_pid node in
+  let pid = Node.get_pid node in
   match arg_exps, arg_typs with
   | [], _ | _ , [] -> mem
   | _, (Dst (Variable, _) :: []) ->
@@ -192,7 +192,7 @@ let rec process_args mode node arg_exps arg_typs src_vals loc itvmem (mem, globa
   | (_ :: arg_exps_left), (Size :: arg_typs_left)
   | (_ :: arg_exps_left), (Skip :: arg_typs_left) ->
     process_args mode node arg_exps_left arg_typs_left src_vals loc itvmem (mem, global)
-	| _, _ -> mem
+  | _, _ -> mem
 
 let gen_block mode node init_v (mem, global) =
   let allocsite = Allocsite.allocsite_of_node node in
@@ -200,7 +200,7 @@ let gen_block mode node init_v (mem, global) =
   (update mode global pow_loc init_v mem, Val.bot)
 
 let produce_ret mode node ret_typ va_src_flag
-      src_vals dst_vals buf_vals size_vals loc (mem, global) =
+    src_vals dst_vals buf_vals size_vals loc (mem, global) =
   match ret_typ with
   | Const -> (mem, Val.bot)
   | TaintInput -> (* User input value (top itv & taintness) *)
@@ -233,7 +233,7 @@ let produce_ret mode node ret_typ va_src_flag
     gen_block mode node (Val.input_value node loc) (mem, global)
 
 let handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc =
-	let pid = Node.get_pid node in
+  let pid = Node.get_pid node in
   let arg_typs = api_type.ApiSem.arg_typs in
   let ret_typ = api_type.ApiSem.ret_typ in
   let src_vals = collect_src_vals exps arg_typs pid itvmem mem in
@@ -253,14 +253,14 @@ let handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc =
   | None -> mem
 
 let handle_undefined_functions mode node (lvo,f,exps) itvmem (mem,global) loc =
-	let pid = Node.get_pid node in
+  let pid = Node.get_pid node in
   match f.vname with
   | "sparrow_arg" -> sparrow_arg mode node exps loc itvmem (mem,global)
   | "sparrow_opt" -> sparrow_opt mode node exps loc itvmem (mem,global)
   | "sparrow_print" -> sparrow_print pid exps itvmem mem loc; mem
-	| fname when ApiSem.ApiMap.mem fname ApiSem.api_map ->
-		let api_type = ApiSem.ApiMap.find fname ApiSem.api_map in
-		handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc
+  | fname when ApiSem.ApiMap.mem fname ApiSem.api_map ->
+    let api_type = ApiSem.ApiMap.find fname ApiSem.api_map in
+    handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc
   | _ -> mem
 
 let bind_lvar mode global lvar v mem =
@@ -307,22 +307,20 @@ let run_cmd mode node cmd itvmem (mem, global) =
       let arg_lvars_set = PowProc.fold arg_lvars_of_proc fs BatSet.empty in
       let arg_vals = eval_list pid arg_exps itvmem mem in
       bind_arg_lvars_set mode global arg_lvars_set arg_vals mem
-  | IntraCfg.Cmd.Creturn (ret_opt, _) ->
-      (match ret_opt with
-      | None -> mem
-      | Some e ->
-        update Weak global
-          (Loc.return_var pid (Cil.typeOf e) |> PowLoc.singleton)
-          (eval pid e itvmem mem) mem)
+  | IntraCfg.Cmd.Creturn (None, _) -> mem
+  | IntraCfg.Cmd.Creturn (Some e, _) ->
+    update Weak global
+      (Loc.return_var pid (Cil.typeOf e) |> PowLoc.singleton)
+      (eval pid e itvmem mem) mem
   | IntraCfg.Cmd.Cskip when InterCfg.is_returnnode node global.icfg ->
     let callnode = InterCfg.callof node global.icfg in
     (match InterCfg.cmdof global.icfg callnode with
        IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
-        let callees = ItvDom.Val.pow_proc_of_val (ItvSem.eval pid f itvmem) in
-        let retvar_set = PowProc.fold (fun f ->
-          let ret = Loc.return_var f (Cil.typeOfLval lv) in
-          PowLoc.add ret) callees PowLoc.empty in
-        update Weak global (ItvSem.eval_lv pid lv itvmem) (lookup retvar_set mem) mem
+       let callees = ItvDom.Val.pow_proc_of_val (ItvSem.eval pid f itvmem) in
+       let retvar_set = PowProc.fold (fun f ->
+           let ret = Loc.return_var f (Cil.typeOfLval lv) in
+           PowLoc.add ret) callees PowLoc.empty in
+       update Weak global (ItvSem.eval_lv pid lv itvmem) (lookup retvar_set mem) mem
      | _ -> mem)
   | IntraCfg.Cmd.Cskip -> mem
   | IntraCfg.Cmd.Casm _ -> mem
