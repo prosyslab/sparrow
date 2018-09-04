@@ -36,7 +36,7 @@ module Cmd : sig
             (string option * string * Cil.lval) list *
             (string option * string * Cil.exp) list *
             string list * Cil.location
-  | Cskip
+  | Cskip of Cil.location
   and alloc = Array of Cil.exp | Struct of Cil.compinfo
   and static = bool
 

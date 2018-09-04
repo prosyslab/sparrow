@@ -304,7 +304,7 @@ let rec run_cmd mode node cmd ptrmem (mem,global) =
   | IntraCfg.Cmd.Creturn (Some e, _) ->
       let ret_locs = Dump.find (InterCfg.Node.get_pid node) global.dump |> PowOctLoc.of_locs in
       set mode global ptrmem pid ret_locs e mem
-  | IntraCfg.Cmd.Cskip when InterCfg.start_node = node ->
+  | IntraCfg.Cmd.Cskip _ when InterCfg.start_node = node ->
       update mode global pid AbsOct.top mem
   | _ -> mem
 

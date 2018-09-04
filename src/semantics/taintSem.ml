@@ -333,7 +333,7 @@ let run_cmd mode node cmd itvmem (mem, global) =
     update Weak global
       (Loc.return_var pid (Cil.typeOf e) |> PowLoc.singleton)
       (eval pid e itvmem mem) mem
-  | IntraCfg.Cmd.Cskip when InterCfg.is_returnnode node global.icfg ->
+  | IntraCfg.Cmd.Cskip _ when InterCfg.is_returnnode node global.icfg ->
     let callnode = InterCfg.callof node global.icfg in
     (match InterCfg.cmdof global.icfg callnode with
        IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
@@ -343,7 +343,7 @@ let run_cmd mode node cmd itvmem (mem, global) =
            PowLoc.add ret) callees PowLoc.empty in
        update Weak global (ItvSem.eval_lv pid lv itvmem) (lookup retvar_set mem) mem
      | _ -> mem)
-  | IntraCfg.Cmd.Cskip -> mem
+  | IntraCfg.Cmd.Cskip _ -> mem
   | IntraCfg.Cmd.Casm _ -> mem
   | _ -> invalid_arg "taintSem.ml: run"
 

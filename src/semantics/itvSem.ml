@@ -872,7 +872,7 @@ let run mode spec node (mem, global) =
     let ploc = Loc.return_var pid (Cil.typeOf e) |> PowLoc.singleton in
     let v = eval ~spec pid e mem in
     update Weak spec global ploc v mem |> (fun mem -> (mem, global))
-  | IntraCfg.Cmd.Cskip when InterCfg.is_returnnode node global.icfg ->
+  | IntraCfg.Cmd.Cskip _ when InterCfg.is_returnnode node global.icfg ->
     let callnode = InterCfg.callof node global.icfg in
     (match InterCfg.cmdof global.icfg callnode with
        IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
@@ -883,7 +883,7 @@ let run mode spec node (mem, global) =
         update Weak spec global (eval_lv ~spec pid lv mem) (lookup retvar_set mem) mem
      | _ -> mem)
     |> (fun mem -> (mem, global))
-  | IntraCfg.Cmd.Cskip -> (mem, global)
+  | IntraCfg.Cmd.Cskip _ -> (mem, global)
   | IntraCfg.Cmd.Casm _ -> (mem, global)    (* Not supported *)
   | _ -> invalid_arg "itvSem.ml: run_cmd"
 

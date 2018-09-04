@@ -71,18 +71,16 @@ module Cmd = struct
             (string option * string * lval) list *
             (string option * string * exp) list *
             string list * location
-  | Cskip
+  | Cskip of location
   and alloc = Array of exp | Struct of compinfo
   and static = bool
 
-  let fromCilStmt: Cil.stmtkind -> t
-  =fun s ->
-    match s with
+  let fromCilStmt = function
     | Instr instrs -> Cinstr instrs
     | If (exp,b1,b2,loc) -> Cif (exp,b1,b2,loc)
     | Loop (_,loc,_,_) -> CLoop loc
     | Return (expo,loc) -> Creturn (expo,loc)
-    | _ -> Cskip
+    | _ -> Cskip Cil.locUnknown
 
   let rec to_string = function
     | Cinstr instrs -> s_instrs instrs
@@ -103,7 +101,7 @@ module Cmd = struct
     | Cassume (e,loc) -> "assume(" ^ s_exp e ^ ")"
     | CLoop _ -> "loop"
     | Casm _ -> "asm"
-    | Cskip -> "skip"
+    | Cskip _ -> "skip"
 
   let location_of = function
     | Cset (_,_,l)
@@ -111,9 +109,10 @@ module Cmd = struct
     | Calloc (_,_,_,l)
     | Csalloc (_, _, l)
     | Cfalloc (_, _, l)
-    | Ccall (_,_,_,l) -> l
+    | Ccall (_,_,_,l)
     | Creturn (_,l) -> l
     | Cassume (_,l) -> l
+    | Cskip l -> l
     | _ -> Cil.locUnknown
 
 end
@@ -199,7 +198,7 @@ let add_node : node -> t -> t
 
 let find_cmd : node -> t ->  cmd
 =fun n g ->
-  try if n = Node.ENTRY || n = Node.EXIT then Cmd.Cskip
+  try if n = Node.ENTRY || n = Node.EXIT then Cmd.Cskip Cil.locUnknown
       else BatMap.find n g.cmd_map
   with _ ->
      raise (Failure ("Can't find cmd of " ^ Node.to_string n))
@@ -317,23 +316,21 @@ let remove_if_loop : t -> t
 =fun g ->
   fold_node (fun n g ->
     match find_cmd n g with
-    | Cmd.Cif _
-    | Cmd.CLoop _ -> add_cmd n Cmd.Cskip g
+    | Cmd.Cif (_, _, _, l)
+    | Cmd.CLoop l -> add_cmd n (Cmd.Cskip l) g
     | _ -> g
   ) g g
 
 (* remove all nodes s.t. n1 -> empty_node -> n2 *)
-let remove_empty_nodes : t -> t
-=fun g ->
+let remove_empty_nodes g =
   fold_node (fun n g ->
-    if find_cmd n g = Cmd.Cskip &&
-       List.length (succ n g) = 1 &&
-       List.length (pred n g) = 1
-    then
+    match find_cmd n g with
+    | Cmd.Cskip _
+      when List.length (succ n g) = 1 && List.length (pred n g) = 1 ->
       let p = List.nth (pred n g) 0 in
       let s = List.nth (succ n g) 0 in
-        g |> remove_node n |> add_edge p s
-    else g
+      g |> remove_node n |> add_edge p s
+    | _ -> g
   ) g g
 
 (* split instructions into set/call/asm *)
@@ -364,7 +361,7 @@ let flatten_instructions : t -> t
           |> list_fold (fun s -> add_edge last s) succs
           |> remove_node n
 
-    | Cmd.Cinstr [] -> add_cmd n Cmd.Cskip g
+    | Cmd.Cinstr [] -> add_cmd n (Cmd.Cskip Cil.locUnknown) g
     | _ -> g
   ) g g
 
@@ -391,7 +388,7 @@ let make_init_loop fd lv exp loc entry f g =
   let g = add_cmd init_node init_cmd g in
   (* while (i < exp) *)
   let skip_node = Node.make () in
-  let g = add_cmd skip_node Cmd.Cskip g in
+  let g = add_cmd skip_node (Cmd.Cskip loc) g in
   let g = add_edge init_node skip_node g in
   let g = add_edge entry init_node g in
   let assume_node = Node.make () in
@@ -562,7 +559,7 @@ let transform_string_allocs : Cil.fundec -> t -> t
             (_, []) -> g
           | (e, l) ->
             let (empty_node, last_node) = (Node.make (), Node.make ()) in
-            let g = add_cmd empty_node Cmd.Cskip g in
+            let g = add_cmd empty_node (Cmd.Cskip loc) g in
             let (node, g) = generate_sallocs l loc empty_node g in
             let cmd = Cmd.Cset (lv, e, loc) in
             let g = add_cmd last_node cmd g in
@@ -573,7 +570,7 @@ let transform_string_allocs : Cil.fundec -> t -> t
             (_, []) -> g
           | (e, l) ->
             let (empty_node, last_node) = (Node.make (), Node.make ()) in
-            let g = add_cmd empty_node Cmd.Cskip g in
+            let g = add_cmd empty_node (Cmd.Cskip loc) g in
             let (node, g) = generate_sallocs l loc empty_node g in
             let cmd = Cmd.Cassume (e, loc) in
             let g = add_cmd last_node cmd g in
@@ -590,7 +587,7 @@ let transform_string_allocs : Cil.fundec -> t -> t
             (_, []) -> g
           | (el, l) ->
             let (empty_node, last_node) = (Node.make (), Node.make ()) in
-            let g = add_cmd empty_node Cmd.Cskip g in
+            let g = add_cmd empty_node (Cmd.Cskip loc) g in
             let (node, g) = generate_sallocs l loc empty_node g in
             let cmd = Cmd.Ccall (lv, f, el, loc) in
             let g = add_cmd last_node cmd g in
@@ -601,7 +598,7 @@ let transform_string_allocs : Cil.fundec -> t -> t
             (_, []) -> g
           | (e, l) ->
             let (empty_node, last_node) = (Node.make (), Node.make ()) in
-            let g = add_cmd empty_node Cmd.Cskip g in
+            let g = add_cmd empty_node (Cmd.Cskip loc) g in
             let (node, g) = generate_sallocs l loc empty_node g in
             let cmd = Cmd.Creturn (Some e, loc) in
             let g = add_cmd last_node cmd g in
@@ -673,16 +670,16 @@ let insert_return_nodes : t -> t
 =fun g ->
   List.fold_left (fun g c ->
     match find_cmd c g with
-      Cmd.Ccall (_, Lval (Var varinfo, _), _, _)
+      Cmd.Ccall (_, Lval (Var varinfo, _), _, loc)
       when varinfo.vname = "exit" || varinfo.vname = "abort" ->
         let r = returnof c g in
         let n = Node.make () in
         remove_edge c r g
-        |> add_cmd n Cmd.Cskip
+        |> add_cmd n (Cmd.Cskip loc)
         |> add_edge c n
-    | Cmd.Ccall (_, _, _, _) ->
+    | Cmd.Ccall (_, _, _, loc) ->
         let r = returnof c g in
-        add_new_node c Cmd.Cskip r g
+        add_new_node c (Cmd.Cskip loc) r g
     | _ -> g
   ) g (nodesof g)
 
