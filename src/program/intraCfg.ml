@@ -84,7 +84,7 @@ module Cmd = struct
     | Return (expo,loc) -> Creturn (expo,loc)
     | _ -> Cskip Cil.locUnknown
 
-  let rec to_string = function
+  let to_string = function
     | Cinstr instrs -> s_instrs instrs
     | Cset (lv,e,_) -> "set("^s_lv lv^","^s_exp e^")"
     | Cexternal (lv,_) -> "extern("^s_lv lv^")"
@@ -104,6 +104,65 @@ module Cmd = struct
     | CLoop _ -> "loop"
     | Casm _ -> "asm"
     | Cskip _ -> "skip"
+
+  let to_json = function
+    | Cinstr _ -> `List []
+    | Cset (lv, e, _) ->
+      `List
+        [ `String "set"
+        ; `String (s_lv lv)
+        ; `String (s_exp e) ]
+    | Cexternal (lv, _) ->
+      `List
+        [ `String "extern"
+        ; `String (s_lv lv) ]
+    | Calloc (lv, Array e, _, _) ->
+      `List
+        [ `String "alloc"
+        ; `String (s_lv lv)
+        ; `String (s_exp e) ]
+    | Calloc (lv, Struct compinfo,_,_) ->
+      `List
+        [ `String "alloc"
+        ; `String (s_lv lv)
+        ; `String compinfo.cname ]
+    | Csalloc (lv, s, _) ->
+      `List
+        [ `String "salloc"
+        ; `String (s_lv lv)
+        ; `String ("\"" ^ s ^ "\"") ]
+    | Cfalloc (lv, f, _) ->
+      `List
+        [ `String "falloc"
+        ; `String (s_lv lv)
+        ; `String f.svar.vname ]
+    | Ccall (Some lv, fexp, params, _) ->
+      `List
+        [ `String "call"
+        ; `String (s_lv lv)
+        ; `String (s_exp fexp)
+        ; `String (s_exps params) ]
+    | Ccall (None, fexp, params, _) ->
+      `List
+        [ `String "call"
+        ; `Null
+        ; `String (s_exp fexp)
+        ; `String (s_exps params) ]
+    | Creturn (Some e, _) ->
+      `List
+        [ `String "return"
+        ; `String (s_exp e) ]
+    | Creturn (None, _) ->
+      `List
+        [ `String "return"
+        ; `Null ]
+    | Cassume (e, _) ->
+      `List
+        [ `String "assume"
+        ; `String (s_exp e) ]
+    | Cskip _ ->
+      `List [ `String "skip" ]
+    | _ -> `Null
 
   let location_of = function
     | Cset (_,_,l)
@@ -936,8 +995,9 @@ let to_json_simple g =
   let nodes = G.fold_vertex (fun v l ->
       let cmd = find_cmd v g in
       let loc = Cmd.location_of cmd |> CilHelper.s_location in
-      let item = `Assoc [ ("cmd", `String (Cmd.to_string cmd));
-                          ("loc", `String loc) ]
+      let item = `Assoc
+          [ ("cmd", Cmd.to_json cmd)
+          ; ("loc", `String loc) ]
       in
       (g.fd.svar.vname ^ "-" ^ Node.to_string v, item)::l) g.graph []
   in
