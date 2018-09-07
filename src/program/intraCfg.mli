@@ -29,7 +29,7 @@ module Cmd : sig
   | Calloc of Cil.lval * alloc * static * Cil.location
   | Csalloc of Cil.lval * string * Cil.location
   | Cfalloc of Cil.lval * Cil.fundec * Cil.location
-  | Cassume of Cil.exp * Cil.location
+  | Cassume of Cil.exp * branch * Cil.location
   | Ccall of Cil.lval option * Cil.exp * Cil.exp list * Cil.location
   | Creturn of Cil.exp option * Cil.location
   | Casm of Cil.attributes * string list *
@@ -39,6 +39,7 @@ module Cmd : sig
   | Cskip of Cil.location
   and alloc = Array of Cil.exp | Struct of Cil.compinfo
   and static = bool
+  and branch = bool
 
   val fromCilStmt : Cil.stmtkind -> t
   val to_string : t -> string

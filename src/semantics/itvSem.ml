@@ -878,7 +878,7 @@ let run mode spec node (mem, global) =
   | IntraCfg.Cmd.Cfalloc (l, fd, _) ->
     let clos = Val.of_pow_proc (PowProc.singleton fd.svar.vname) in
     (update mode spec global (eval_lv ~spec pid l mem) clos mem, global)
-  | IntraCfg.Cmd.Cassume (e, _) ->
+  | IntraCfg.Cmd.Cassume (e, _, _) ->
     let _ = eval ~spec pid e mem in (* for inspection *)
     (prune mode spec global pid e mem, global)
   | IntraCfg.Cmd.Ccall (lvo, Cil.Lval (Cil.Var f, Cil.NoOffset), arg_exps, loc)

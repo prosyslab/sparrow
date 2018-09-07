@@ -285,7 +285,7 @@ let rec run_cmd mode node cmd ptrmem (mem,global) =
       let ptrs = ItvSem.eval_string_alloc node s ptrmem |> ItvDom.Val.allocsites_of_val |> PowOctLoc.of_sizes in
       let e = Cil.integer (String.length s + 1) in
       alloc mode global ptrmem pid lv ptrs e mem
-  | IntraCfg.Cmd.Cassume (e, _) ->
+  | IntraCfg.Cmd.Cassume (e, _, _) ->
       prune mode global ptrmem pid e mem
   | IntraCfg.Cmd.Ccall (lvo, Cil.Lval (Cil.Var f, Cil.NoOffset), arg_exps, loc)
     when Global.is_undef f.vname global -> (* undefined library functions *)

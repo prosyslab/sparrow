@@ -133,7 +133,7 @@ let rec collect : IntraCfg.cmd -> t list
     [AllocSize ("malloc", e, loc)]
   | Cmd.Calloc (lv,Array e,_,loc) -> (c_lv lv loc) @ (c_exp e loc)
   | Cmd.Csalloc (lv,_,loc) -> c_lv lv loc
-  | Cmd.Cassume (e,loc) -> c_exp e loc
+  | Cmd.Cassume (e,_,loc) -> c_exp e loc
   | Cmd.Creturn (Some e, loc) -> c_exp e loc
   | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) when List.mem f.vname query_lib -> c_lib f es loc
   | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) when !Options.taint ->

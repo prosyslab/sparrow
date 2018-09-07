@@ -114,7 +114,7 @@ let pp_cmd fmt icfg n =
     pp_exp fmt e;
     let id = Hashtbl.find exp_map e in
     F.fprintf fmt.return "%a\t%s\n" Node.pp n id
-  | Cassume (_,_) -> F.fprintf fmt.cmd "assume\n"
+  | Cassume (_,_,_) -> F.fprintf fmt.cmd "assume\n"
   | _ -> F.fprintf fmt.cmd "unknown"
 
 let make_formatters dirname =

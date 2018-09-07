@@ -32,15 +32,13 @@ module Node = struct
 
   let nid = ref 0
 
-  let fromCilStmt : Cil.stmt -> t
-  =fun s ->
+  let fromCilStmt s =
     if !nid < s.sid then nid := s.sid;
     Node s.sid
 
   let make () = nid := !nid + 1; Node !nid
 
-  let id n =
-    match n with
+  let id = function
     | ENTRY
     | EXIT -> -1
     | Node id -> id
@@ -66,7 +64,7 @@ module Cmd = struct
   | Calloc of lval * alloc * static * location
   | Csalloc of lval * string * location
   | Cfalloc of lval * fundec * location
-  | Cassume of exp * location
+  | Cassume of exp * branch * location
   | Ccall of lval option * exp * exp list * location
   | Creturn of exp option * location
   | Casm of attributes * string list *
@@ -76,13 +74,14 @@ module Cmd = struct
   | Cskip of location
   and alloc = Array of exp | Struct of compinfo
   and static = bool
+  and branch = bool
 
   let fromCilStmt = function
     | Instr instrs -> Cinstr instrs
     | If (exp,b1,b2,loc) -> Cif (exp,b1,b2,loc)
     | Loop (_,loc,_,_) -> CLoop loc
     | Return (expo,loc) -> Creturn (expo,loc)
-    | _ -> Cskip Cil.locUnknown
+    | s -> Cskip (Cil.get_stmtLoc s)
 
   let to_string = function
     | Cinstr instrs -> s_instrs instrs
@@ -100,7 +99,7 @@ module Cmd = struct
     | Creturn (Some e,_) -> "return " ^ s_exp e
     | Creturn (None,_) -> "return"
     | Cif (e,b1,b2,loc) -> "if"
-    | Cassume (e,loc) -> "assume(" ^ s_exp e ^ ")"
+    | Cassume (e,_,loc) -> "assume(" ^ s_exp e ^ ")"
     | CLoop _ -> "loop"
     | Casm _ -> "asm"
     | Cskip _ -> "skip"
@@ -156,9 +155,10 @@ module Cmd = struct
       `List
         [ `String "return"
         ; `Null ]
-    | Cassume (e, _) ->
+    | Cassume (e, b, _) ->
       `List
         [ `String "assume"
+        ; `Bool b
         ; `String (s_exp e) ]
     | Cskip _ ->
       `List [ `String "skip" ]
@@ -172,7 +172,7 @@ module Cmd = struct
     | Cfalloc (_, _, l)
     | Ccall (_,_,_,l)
     | Creturn (_,l) -> l
-    | Cassume (_,l) -> l
+    | Cassume (_,_,l) -> l
     | Cskip l -> l
     | _ -> Cil.locUnknown
 end
@@ -331,14 +331,15 @@ let generate_assumes g =
               | [],[] -> s1,s2
               | t::l,_ -> if t.sid = Node.id s1 then s1,s2 else s2,s1
               | _,t::l -> if t.sid = Node.id s2 then s1,s2 else s2,s1 in
-            let tassert = Cmd.Cassume (e,loc) in
-            let fassert = Cmd.Cassume (UnOp (LNot,e,Cil.typeOf e),loc) in
+            let tassert = Cmd.Cassume (e, true, loc) in
+            let not_e = UnOp (LNot,e,Cil.typeOf e) in
+            let fassert = Cmd.Cassume (not_e, false, loc) in
             (add_new_node n fassert fbn
              >>> add_new_node n tassert tbn) g
           else (* XXX : when if-statement has only one successor.
                         seems to happen inside dead code *)
             let tbn = List.nth succs 0 in
-            let tassert = Cmd.Cassume (e,loc) in
+            let tassert = Cmd.Cassume (e, true, loc) in
             add_new_node n tassert tbn g
         | _ -> g
       ) g g
@@ -391,7 +392,6 @@ let flatten_instructions g =
         |> list_fold (fun p -> add_edge p first) preds
         |> list_fold (fun s -> add_edge last s) succs
         |> remove_node n
-
       | Cmd.Cinstr [] -> add_cmd n (Cmd.Cskip Cil.locUnknown) g
       | _ -> g
     ) g g
@@ -422,11 +422,11 @@ let make_init_loop fd lv exp loc entry f g =
   let g = add_edge entry init_node g in
   let assume_node = Node.make () in
   let cond = Cil.BinOp (Cil.Lt, Cil.Lval idx, exp, Cil.intType) in
-  let assume_cmd = Cmd.Cassume (cond, loc) in
+  let assume_cmd = Cmd.Cassume (cond, true, loc) in
   let g = add_cmd assume_node assume_cmd g in
   let g = add_edge skip_node assume_node g in
   let nassume_node = Node.make () in
-  let nassume_cmd = Cmd.Cassume (Cil.UnOp (Cil.LNot, cond, Cil.intType), loc) in
+  let nassume_cmd = Cmd.Cassume (Cil.UnOp (Cil.LNot, cond, Cil.intType), false, loc) in
   let g = add_cmd nassume_node nassume_cmd g in
   let g = add_edge skip_node nassume_node g in
   let element = Cil.addOffsetLval (Index (Lval (Var idxinfo, NoOffset), NoOffset)) lv in
@@ -586,14 +586,14 @@ let transform_string_allocs fd g =
            let g = add_cmd last_node cmd g in
            let g = add_edge node last_node g in
            replace_node_graph n empty_node last_node g)
-      | Cmd.Cassume (e, loc) ->
+      | Cmd.Cassume (e, b, loc) ->
         (match replace_str e with
          | (_, []) -> g
          | (e, l) ->
            let (empty_node, last_node) = (Node.make (), Node.make ()) in
            let g = add_cmd empty_node (Cmd.Cskip loc) g in
            let (node, g) = generate_sallocs l loc empty_node g in
-           let cmd = Cmd.Cassume (e, loc) in
+           let cmd = Cmd.Cassume (e, b, loc) in
            let g = add_cmd last_node cmd g in
            let g = add_edge node last_node g in
            replace_node_graph n empty_node last_node g)

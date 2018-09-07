@@ -239,7 +239,7 @@ let add_gvar global cond feat =
 let get_cond_exp cond cfg =
   let cmd = IntraCfg.find_cmd (InterCfg.Node.get_cfgnode cond) cfg in
   match cmd with
-    IntraCfg.Cmd.Cassume (e, _) -> e
+    IntraCfg.Cmd.Cassume (e, _, _) -> e
   | _ -> raise (Failure ("get_cond_exp : "^(IntraCfg.Cmd.to_string cmd)))
 
 let add_array_content global cond cfg feat =

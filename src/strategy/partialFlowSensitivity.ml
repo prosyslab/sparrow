@@ -506,7 +506,7 @@ let extract1 : InterCfg.t -> Mem.t -> Global.t -> InterCfg.Node.t -> feature -> 
     feature |>
       (match cmd with
       | Cset (lv,e,_) -> extract_set pid (lv,e) mem global
-      | Cassume (e,_) -> extract_assume node pid e mem global
+      | Cassume (e,_,_) -> extract_assume node pid e mem global
       | Calloc (lv,IntraCfg.Cmd.Array e,_,_) -> extract_alloc node pid (lv,e) mem global
       | Ccall (lvo, fe, el, _) -> extract_call node pid (lvo,fe,el) mem global
       | _ -> id)
