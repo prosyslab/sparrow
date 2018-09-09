@@ -43,6 +43,11 @@ let list_fold2 : ('a -> 'b -> 'c -> 'c) -> 'a list -> 'b list -> 'c -> 'c
   let f' acc a b = f a b acc in
   List.fold_left2 f' init list1 list2
 
+let rec list_fold2_prefix f list1 list2 acc =
+  match list1, list2 with
+  | [], _ | _, [] -> acc
+  | h1::t1, h2::t2 -> list_fold2_prefix f t1 t2 (f h1 h2 acc)
+
 let list_rev : 'a list -> 'a list
 = fun l ->
   let rec list_rev_rec l1 l2 =

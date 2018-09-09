@@ -2,7 +2,7 @@
 type arg_typ =
   (* boolean is to mark if this argument should generate buffer access query *)
   | Src of (var * src_typ * bool) (* Source of propagation *)
-  | Dst of (var * bool) (* Array where Src arg (& top itv) must be moved to *)
+  | Dst of (var * bool * bool) (* Array where Src arg (& top itv) must be moved to *)
   | Buf of (var * bool) (* Array where user input must be stored in *)
   | StructPtr (* Pointer where external value must be stored in *)
   | Size
@@ -40,16 +40,18 @@ let v_src = Src (Fixed, Value, false)
 let v_src_va = Src (Variable, Value, false)
 let arr_src = Src (Fixed, Array, false)
 let arr_src_va = Src (Variable, Array, false)
-let dst = Dst (Fixed, false)
-let dst_va = Dst (Variable, false)
+let dst = Dst (Fixed, false, false)
+let dst_alloc = Dst (Fixed, false, true)
+let dst_va = Dst (Variable, false, false)
 let buf = Buf (Fixed, false)
 let buf_va = Buf (Variable, false)
 
 (* arguments without query generation *)
 let arr_src_q = Src (Fixed, Array, true)
 let arr_src_va_q = Src (Variable, Array, true)
-let dst_q = Dst (Fixed, true)
-let dst_va_q = Dst (Variable, true)
+let dst_q = Dst (Fixed, true, false)
+let dst_q_alloc = Dst (Fixed, true, true)
+let dst_va_q = Dst (Variable, true, false)
 let buf_q = Buf (Fixed, true)
 let buf_va_q = Buf (Variable, true)
 
@@ -95,7 +97,7 @@ ApiMap.empty
 |> ApiMap.add "strrchr" {arg_typs = [arr_src; Skip]; ret_typ = SrcArg}
 |> ApiMap.add "strspn" {arg_typs = [arr_src; Skip]; ret_typ = SrcArg}
 |> ApiMap.add "strstr" {arg_typs = [arr_src; Skip]; ret_typ = SrcArg}
-|> ApiMap.add "strtok" {arg_typs = [arr_src; Skip; Skip]; ret_typ = SrcArg}
+|> ApiMap.add "strtok" {arg_typs = [v_src; Skip; Skip]; ret_typ = SrcArg}
 |> ApiMap.add "strtok_r" {arg_typs = [arr_src; Skip; Skip]; ret_typ = SrcArg}
 |> ApiMap.add "wcrtomb" {arg_typs = [dst; arr_src; Skip]; ret_typ = TopWithSrcTaint}
 |> ApiMap.add "mbrtowc" {arg_typs = [dst; arr_src; Skip]; ret_typ = TopWithSrcTaint}
@@ -222,14 +224,17 @@ ApiMap.empty
 |> ApiMap.add "close" {arg_typs = [Skip]; ret_typ = int_v}
 |> ApiMap.add "unlink" {arg_typs = [Skip]; ret_typ = int_v}
 |> ApiMap.add "select" {arg_typs = [Skip; Skip; Skip; Skip; Skip]; ret_typ = int_v}
-
+|> ApiMap.add "getenv" {arg_typs = [Skip]; ret_typ = tainted_arr}
 (* etc *)
 |> ApiMap.add "scanf" {arg_typs = [Skip; buf_va]; ret_typ = int_v}
 |> ApiMap.add "sscanf" {arg_typs = [arr_src; Skip; dst_va]; ret_typ = int_v}
 |> ApiMap.add "fgets" {arg_typs = [buf_q; Size; Skip]; ret_typ = BufArg}
+|> ApiMap.add "fgetc" {arg_typs = [Skip]; ret_typ = tainted_v}
 |> ApiMap.add "sprintf" {arg_typs = [dst_q; Skip; arr_src_va]; ret_typ = int_v}
 |> ApiMap.add "snprintf" {arg_typs = [dst_q; Size; Skip; arr_src_va]; ret_typ = int_v}
 |> ApiMap.add "vsnprintf" {arg_typs = [dst_q; Size; Skip; arr_src_va]; ret_typ = int_v}
+|> ApiMap.add "asprintf" {arg_typs = [dst_q_alloc; Skip; arr_src_va]; ret_typ = int_v}
+|> ApiMap.add "vasprintf" {arg_typs = [dst_q_alloc; Skip; arr_src_va]; ret_typ = int_v}
 |> ApiMap.add "atoi" {arg_typs = [arr_src]; ret_typ = TopWithSrcTaint}
 |> ApiMap.add "atof" {arg_typs = [arr_src]; ret_typ = TopWithSrcTaint}
 |> ApiMap.add "atol" {arg_typs = [arr_src]; ret_typ = TopWithSrcTaint}

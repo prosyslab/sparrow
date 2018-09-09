@@ -123,11 +123,11 @@ let rec collect_src_vals arg_exps arg_typs pid itvmem mem =
 let rec collect_dst_vals arg_exps arg_typs pid itvmem mem =
   match arg_exps, arg_typs with
   | [], _ | _, [] -> []
-  | _, (Dst (Variable, _) :: []) ->
+  | _, (Dst (Variable, _, _) :: []) ->
     List.map (fun e -> eval pid e itvmem mem) arg_exps
-  | _, (Dst (Variable, _) :: _) ->
+  | _, (Dst (Variable, _, _) :: _) ->
     failwith "itvSem.ml : API encoding error (Varg not at the last position)"
-  | (arg_e :: arg_exps_left), (Dst (Fixed, _) :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (Dst (Fixed, _, _) :: arg_typs_left) ->
     let dst_v = eval pid arg_e itvmem mem in
     dst_v :: (collect_dst_vals arg_exps_left arg_typs_left pid itvmem mem)
   | (_ :: arg_exps_left), (_ :: arg_typs_left) ->
@@ -155,10 +155,15 @@ let rec collect_size_vals arg_exps arg_typs node itvmem mem =
   | (_ :: arg_exps_left), (_ :: arg_typs_left) ->
     collect_size_vals arg_exps_left arg_typs_left node itvmem mem
 
-let process_dst mode pid src_vals global itvmem mem dst_e =
+let process_dst mode node pid src_vals global alloc itvmem mem dst_e =
   let src_v = List.fold_left Val.join Val.bot src_vals in
   let dst_loc = ItvDom.Val.all_locs (ItvSem.eval pid dst_e itvmem) in
-  update mode global dst_loc src_v mem
+  if alloc then
+    let allocsite = Allocsite.allocsite_of_node node in
+    let loc = PowLoc.singleton @@ Loc.of_allocsite allocsite in
+    update mode global loc src_v mem
+  else
+    update mode global dst_loc src_v mem
 
 let process_buf mode node global loc itvmem mem dst_e =
   let pid = Node.get_pid node in
@@ -172,14 +177,14 @@ let rec process_args mode node arg_exps arg_typs src_vals loc itvmem (mem, globa
   let pid = Node.get_pid node in
   match arg_exps, arg_typs with
   | [], _ | _ , [] -> mem
-  | _, (Dst (Variable, _) :: []) ->
+  | _, (Dst (Variable, _, alloc) :: []) ->
     let _ = assert (va_src_flag || List.length src_vals > 0) in
-    List.fold_left (process_dst mode pid src_vals global itvmem) mem arg_exps
-  | _, (Dst (Variable, _) :: _) ->
+    List.fold_left (process_dst mode node pid src_vals global alloc itvmem) mem arg_exps
+  | _, (Dst (Variable, _, _) :: _) ->
     failwith "API encoding error (Varg not at the last position)"
-  | (arg_e :: arg_exps_left), (Dst (Fixed, _) :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (Dst (Fixed, _, alloc) :: arg_typs_left) ->
     let _ = assert (va_src_flag || List.length src_vals > 0) in
-    let mem = process_dst mode pid src_vals global itvmem mem arg_e in
+    let mem = process_dst mode node pid src_vals global alloc itvmem mem arg_e in
     process_args mode node arg_exps_left arg_typs_left src_vals loc itvmem (mem, global)
   | _, (Buf (Variable, _) :: []) ->
     List.fold_left (process_buf mode node global loc itvmem) mem arg_exps
@@ -252,15 +257,33 @@ let handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc =
     update mode global (ItvSem.eval_lv pid lv itvmem) ret_v mem
   | None -> mem
 
+let is_printf0 fname = fname = "printf"
+let is_printf1 fname =
+  List.mem fname
+    [ "fprintf"; "sprintf"; "vfprintf"; "vsprintf"; "vasprintf"; "__asprintf"
+    ; "asprintf"; "vdprintf"; "dprintf"; "easprintf"; "evasprintf" ]
+let is_printf2 fname = List.mem fname ["snprintf"; "vsnprintf"]
+let is_printf fname = is_printf0 fname || is_printf1 fname || is_printf2 fname
+
+let dummy_read_printf fname pid exps itvmem mem =
+  let typ = if is_printf0 fname then 0 else if is_printf1 fname then 1 else 2 in
+  let locs = ItvDom.Val.all_locs (ItvSem.eval pid (List.nth exps typ) itvmem) in
+  let _ = lookup locs mem in (* for inspection *)
+  ()
+
 let handle_undefined_functions mode node (lvo,f,exps) itvmem (mem,global) loc =
   let pid = Node.get_pid node in
   match f.vname with
   | "sparrow_arg" -> sparrow_arg mode node exps loc itvmem (mem,global)
-  | "sparrow_opt" -> sparrow_opt mode node exps loc itvmem (mem,global)
+(*   | "sparrow_opt" -> sparrow_opt mode node exps loc itvmem (mem,global) *)
   | "sparrow_print" -> sparrow_print pid exps itvmem mem loc; mem
   | fname when ApiSem.ApiMap.mem fname ApiSem.api_map ->
+    (if is_printf fname then dummy_read_printf fname pid exps itvmem mem);
     let api_type = ApiSem.ApiMap.find fname ApiSem.api_map in
     handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc
+  | fname when is_printf fname ->
+    (if is_printf fname then dummy_read_printf fname pid exps itvmem mem);
+    mem
   | _ -> mem
 
 let bind_lvar mode global lvar v mem =
@@ -268,13 +291,11 @@ let bind_lvar mode global lvar v mem =
   update mode global l v mem
 
 let bind_arg_ids mode global vs arg_ids mem =
-  list_fold2 (bind_lvar mode global) arg_ids vs mem
+  list_fold2_prefix (bind_lvar mode global) arg_ids vs mem
 
 (* Binds a list of values to a set of argument lists.  If |args_set|
     > 1, the argument binding does weak update. *)
 let bind_arg_lvars_set mode global arg_ids_set vs mem =
-  let is_same_length l = List.length l = List.length vs in
-  let arg_ids_set = BatSet.filter is_same_length arg_ids_set in
   let mode = if BatSet.cardinal arg_ids_set > 1 then AbsSem.Weak else mode in
   BatSet.fold (bind_arg_ids mode global vs) arg_ids_set mem
 

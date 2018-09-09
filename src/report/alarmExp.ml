@@ -22,6 +22,7 @@ type t =
   | Memcpy of exp * exp * exp * location
   | Memmove of exp * exp * exp * location
   | AllocSize of exp * location
+  | Printf of exp * location
 
 let to_string t =
   match t with
@@ -34,6 +35,7 @@ let to_string t =
   | Memmove (e1, e2, e3, _) -> "memmove ("^(CilHelper.s_exp e1)^", "^(CilHelper.s_exp e2)^", "^(CilHelper.s_exp e3)^")"
   | Strcat (e1, e2, _) -> "strcat ("^(CilHelper.s_exp e1)^", "^(CilHelper.s_exp e2)^")"
   | AllocSize (e, _) -> "alloc (" ^ CilHelper.s_exp e ^ ")"
+  | Printf (e, _) -> "printf (" ^ CilHelper.s_exp e ^ ")"
 
 let location_of = function
   | ArrayExp (_,_,l)
@@ -44,7 +46,8 @@ let location_of = function
   | Memcpy (_, _, _, l)
   | Memmove (_, _, _, l)
   | Strcat (_, _, l)
-  | AllocSize (_, l) -> l
+  | AllocSize (_, l)
+  | Printf (_, l) -> l
 
 (* NOTE: you may use Cil.addOffset or Cil.addOffsetLval instead of
    add_offset, append_field, and append_index. *)
@@ -112,6 +115,11 @@ let c_lib_taint f es loc =
   | "mmap"
   | "realloc" -> [AllocSize (List.nth es 1, loc)]
   | "calloc" -> [AllocSize (List.nth es 0, loc)]
+  | "printf" -> [Printf (List.nth es 0, loc)]
+  | "fprintf" | "sprintf" | "vfprintf" | "vsprintf" | "vasprintf" | "__asprintf"
+  | "asprintf" | "vdprintf" | "dprintf" | "easprintf" | "evasprintf" ->
+    [Printf (List.nth es 1, loc)]
+  | "snprintf" | "vsnprintf" -> [Printf (List.nth es 2, loc)]
   | _ -> []
 
 let rec collect : IntraCfg.cmd -> t list

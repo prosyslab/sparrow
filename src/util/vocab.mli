@@ -29,6 +29,7 @@ val compare_int : int -> int -> int
 val domof : ('a, 'b) BatMap.t -> 'a BatSet.t
 val list_fold : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
 val list_fold2 : ('a -> 'b -> 'c -> 'c) -> 'a list -> 'b list -> 'c -> 'c
+val list_fold2_prefix : ('a -> 'b -> 'c -> 'c) -> 'a list -> 'b list -> 'c -> 'c
 val list_rev : 'a list -> 'a list
 val append_opt : 'a option -> 'a list -> 'a list
 val find_opt : 'a -> ('a, 'b) BatMap.t -> 'b option

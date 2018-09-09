@@ -369,10 +369,10 @@ let model_strdup mode spec node (lvo, exps) (mem, global) =
     (mem,global)
   | _ -> (mem,global)
 
-let model_input mode spec pid lvo (mem, global) =
+let model_input mode spec node pid lvo (mem, global) =
   match lvo with
   | Some lv ->
-      let allocsite = Allocsite.allocsite_of_ext None in
+      let allocsite = Allocsite.allocsite_of_node node in
       let ext_v = Val.external_value allocsite in
       let ext_loc = PowLoc.singleton (Loc.of_allocsite allocsite) in
       let mem = update mode spec global (eval_lv ~spec pid lv mem) ext_v mem in
@@ -613,11 +613,11 @@ let rec collect_src_vals arg_exps arg_typs pid mem =
 let rec collect_dst_vals arg_exps arg_typs pid mem =
   match arg_exps, arg_typs with
   | [], _ | _, [] -> []
-  | _, (ApiSem.Dst (ApiSem.Variable, _) :: []) ->
+  | _, (ApiSem.Dst (ApiSem.Variable, _, _) :: []) ->
     List.map (fun e -> eval pid e mem) arg_exps
-  | _, (ApiSem.Dst (ApiSem.Variable, _) :: _) ->
+  | _, (ApiSem.Dst (ApiSem.Variable, _, _) :: _) ->
     failwith "itvSem.ml : API encoding error (Varg not at the last position)"
-  | (arg_e :: arg_exps_left), (ApiSem.Dst (ApiSem.Fixed, _) :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (ApiSem.Dst (ApiSem.Fixed, _, _) :: arg_typs_left) ->
     let dst_v = eval pid arg_e mem in
     dst_v :: (collect_dst_vals arg_exps_left arg_typs_left pid mem)
   | (_ :: arg_exps_left), (_ :: arg_typs_left) ->
@@ -645,10 +645,22 @@ let rec collect_size_vals arg_exps arg_typs node mem =
   | (_ :: arg_exps_left), (_ :: arg_typs_left) ->
     collect_size_vals arg_exps_left arg_typs_left node mem
 
-let process_dst mode spec pid src_vals global mem dst_e =
+let process_dst mode spec node pid src_vals global alloc mem dst_e =
   let src_v = List.fold_left Val.join Val.bot src_vals in
   let dst_loc = Val.all_locs (eval pid dst_e mem) in
-  update mode spec global dst_loc src_v mem
+  if alloc then
+    let allocsite = Allocsite.allocsite_of_node node in
+    let offset = Itv.of_int 0 in
+    let sz = Itv.top in
+    let st = Itv.of_int 1 in
+    let np = Itv.nat in
+    let array = ArrayBlk.make allocsite offset sz st np in
+    let block_v = Val.of_array array in
+    let loc = PowLoc.singleton @@ Loc.of_allocsite allocsite in
+    let mem = update mode spec global loc src_v mem in
+    update mode spec global dst_loc block_v mem
+  else
+    update mode spec global dst_loc src_v mem
 
 let process_buf mode spec node global mem dst_e =
   let pid = Node.get_pid node in
@@ -674,14 +686,14 @@ let rec process_args mode spec node arg_exps arg_typs src_vals (mem, global) =
   let pid = Node.get_pid node in
   match arg_exps, arg_typs with
   | [], _ | _ , [] -> mem
-  | _, (ApiSem.Dst (ApiSem.Variable, _) :: []) ->
+  | _, (ApiSem.Dst (ApiSem.Variable, _, alloc) :: []) ->
     let _ = assert (va_src_flag || List.length src_vals > 0) in
-    List.fold_left (process_dst mode spec pid src_vals global) mem arg_exps
-  | _, (ApiSem.Dst (ApiSem.Variable, _) :: _) ->
+    List.fold_left (process_dst mode spec node pid src_vals global alloc) mem arg_exps
+  | _, (ApiSem.Dst (ApiSem.Variable, _, _) :: _) ->
     failwith "API encoding error (Varg not at the last position)"
-  | (arg_e :: arg_exps_left), (ApiSem.Dst (ApiSem.Fixed, _) :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (ApiSem.Dst (ApiSem.Fixed, _, alloc) :: arg_typs_left) ->
     let _ = assert (va_src_flag || List.length src_vals > 0) in
-    let mem = process_dst mode spec pid src_vals global mem arg_e in
+    let mem = process_dst mode spec node pid src_vals global alloc mem arg_e in
     process_args mode spec node arg_exps_left arg_typs_left src_vals (mem, global)
   | _, (ApiSem.Buf (ApiSem.Variable, _) :: []) ->
     List.fold_left (process_buf mode spec node global) mem arg_exps
@@ -769,7 +781,7 @@ let scaffolded_functions mode spec node pid (lvo,f,exps) (mem, global) =
     | "fgets" -> model_fgets mode spec pid (lvo, exps) (mem, global)
     | "sprintf" -> model_sprintf mode spec pid (lvo, exps) (mem, global)
     | "scanf" -> model_scanf mode spec pid exps (mem, global)
-    | "getenv" -> model_input mode spec pid lvo (mem, global)
+    | "getenv" -> model_input mode spec node pid lvo (mem, global)
     | "strdup" -> model_strdup mode spec node (lvo, exps) (mem, global)
     | "gettext" -> model_assign mode spec pid (lvo, exps) (mem, global)
     | "memcpy" -> model_memcpy mode spec pid (lvo, exps) (mem, global)
@@ -806,14 +818,12 @@ let bind_lvar : update_mode -> Spec.t -> Global.t -> Loc.t -> Val.t -> Mem.t -> 
 
 let bind_arg_ids : update_mode -> Spec.t -> Global.t -> Val.t list -> Loc.t list -> Mem.t -> Mem.t
 = fun mode spec global vs arg_ids mem ->
-  list_fold2 (bind_lvar mode spec global) arg_ids vs mem
+  list_fold2_prefix (bind_lvar mode spec global) arg_ids vs mem
 
 (* Binds a list of values to a set of argument lists.  If |args_set|
     > 1, the argument binding does weak update. *)
 let bind_arg_lvars_set : update_mode -> Spec.t -> Global.t -> (Loc.t list) BatSet.t -> Val.t list -> Mem.t -> Mem.t
 = fun mode spec global arg_ids_set vs mem ->
-  let is_same_length l = List.length l = List.length vs in
-  let arg_ids_set = BatSet.filter is_same_length arg_ids_set in
   let mode = if BatSet.cardinal arg_ids_set > 1 then AbsSem.Weak else mode in
   BatSet.fold (bind_arg_ids mode spec global vs) arg_ids_set mem
 
