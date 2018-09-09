@@ -110,8 +110,7 @@ let initialize () =
   Arg.parse Options.opts Frontend.args usageMsg;
   mk_outdir !Options.outdir;
   L.init (if !Options.debug then L.DEBUG else L.INFO);
-  List.iter (fun f -> L.info "%s " f) !Frontend.files;
-  L.info "\n";
+  L.info "%s\n" (String.concat " " !Frontend.files);
   Profiler.start_logger ();
   Cil.initCIL ()
 

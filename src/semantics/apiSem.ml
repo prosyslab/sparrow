@@ -1,8 +1,8 @@
 (* Represent the argument of API functions *)
 type arg_typ =
   (* boolean is to mark if this argument should generate buffer access query *)
-  | Src of (var * src_typ * bool) (* Source of propagation *)
-  | Dst of (var * bool * bool) (* Array where Src arg (& top itv) must be moved to *)
+  | Src of (var * src_typ) (* Source of propagation *)
+  | Dst of (var * bool) (* Array where Src arg (& top itv) must be moved to *)
   | Buf of (var * bool) (* Array where user input must be stored in *)
   | StructPtr (* Pointer where external value must be stored in *)
   | Size
@@ -36,24 +36,15 @@ type api_typ =
 (* Arguments *)
 
 (* arguments that generates query *)
-let v_src = Src (Fixed, Value, false)
-let v_src_va = Src (Variable, Value, false)
-let arr_src = Src (Fixed, Array, false)
-let arr_src_va = Src (Variable, Array, false)
-let dst = Dst (Fixed, false, false)
-let dst_alloc = Dst (Fixed, false, true)
-let dst_va = Dst (Variable, false, false)
+let v_src = Src (Fixed, Value)
+let v_src_va = Src (Variable, Value)
+let arr_src = Src (Fixed, Array)
+let arr_src_va = Src (Variable, Array)
+let dst = Dst (Fixed, false)
+let dst_alloc = Dst (Fixed, true)
+let dst_va = Dst (Variable, false)
 let buf = Buf (Fixed, false)
 let buf_va = Buf (Variable, false)
-
-(* arguments without query generation *)
-let arr_src_q = Src (Fixed, Array, true)
-let arr_src_va_q = Src (Variable, Array, true)
-let dst_q = Dst (Fixed, true, false)
-let dst_q_alloc = Dst (Fixed, true, true)
-let dst_va_q = Dst (Variable, true, false)
-let buf_q = Buf (Fixed, true)
-let buf_va_q = Buf (Variable, true)
 
 (* Fixed return values *)
 let ones = Const
@@ -63,25 +54,27 @@ let int_arr = AllocConst
 let tainted_arr = AllocBuf
 
 
-module ApiMap = Map.Make (struct type t = string let compare = Pervasives.compare end)
+module ApiMap = Map.Make (struct
+    type t = string let compare = Pervasives.compare
+  end)
 
 let api_map =
 (* <cstring> ( <string.h> ) *)
 ApiMap.empty
 
 (* Copy *)
-|> ApiMap.add "memcpy" {arg_typs = [dst_q; arr_src_q; Size]; ret_typ = DstArg}
-|> ApiMap.add "memmove" {arg_typs = [dst_q; arr_src_q; Size]; ret_typ = DstArg}
-|> ApiMap.add "strcpy" {arg_typs = [dst_q; arr_src]; ret_typ = DstArg}
-|> ApiMap.add "strncpy" {arg_typs = [dst_q; arr_src; Size]; ret_typ = DstArg}
-|> ApiMap.add "strxfrm" {arg_typs = [dst_q; arr_src; Size]; ret_typ = TopWithSrcTaint}
+|> ApiMap.add "memcpy" {arg_typs = [dst; arr_src; Size]; ret_typ = DstArg}
+|> ApiMap.add "memmove" {arg_typs = [dst; arr_src; Size]; ret_typ = DstArg}
+|> ApiMap.add "strcpy" {arg_typs = [dst; arr_src]; ret_typ = DstArg}
+|> ApiMap.add "strncpy" {arg_typs = [dst; arr_src; Size]; ret_typ = DstArg}
+|> ApiMap.add "strxfrm" {arg_typs = [dst; arr_src; Size]; ret_typ = TopWithSrcTaint}
 
 (* Concatenation *)
-|> ApiMap.add "strcat" {arg_typs = [dst_q; arr_src]; ret_typ = DstArg}
-|> ApiMap.add "strncat" {arg_typs = [dst_q; arr_src; Size]; ret_typ = DstArg} (* XXX *)
+|> ApiMap.add "strcat" {arg_typs = [dst; arr_src]; ret_typ = DstArg}
+|> ApiMap.add "strncat" {arg_typs = [dst; arr_src; Size]; ret_typ = DstArg} (* XXX *)
 
 (* Comparison *)
-|> ApiMap.add "memcmp" {arg_typs = [arr_src_q; arr_src_q; Size]; ret_typ = ones} (* XXX *)
+|> ApiMap.add "memcmp" {arg_typs = [arr_src; arr_src; Size]; ret_typ = ones} (* XXX *)
 |> ApiMap.add "strcmp" {arg_typs = [Skip; Skip]; ret_typ = ones}
 |> ApiMap.add "strcoll" {arg_typs = [Skip; Skip]; ret_typ = ones}
 |> ApiMap.add "strncmp" {arg_typs = [Skip; Skip; Skip]; ret_typ = ones}
@@ -103,8 +96,8 @@ ApiMap.empty
 |> ApiMap.add "mbrtowc" {arg_typs = [dst; arr_src; Skip]; ret_typ = TopWithSrcTaint}
 
 (* Others *)
-(* FIXME: Do not assign v_src to the 1st arg. Do assign it to *dst_q
- * |> ApiMap.add "memset" {arg_typs = [dst_q; v_src; Size]; ret_typ = DstArg} *)
+(* FIXME: Do not assign v_src to the 1st arg. Do assign it to *dst
+ * |> ApiMap.add "memset" {arg_typs = [dst; v_src; Size]; ret_typ = DstArg} *)
 |> ApiMap.add "strerror" {arg_typs = [Skip]; ret_typ = int_arr}
 |> ApiMap.add "strlen" {arg_typs = [arr_src]; ret_typ = int_v}
 
@@ -212,14 +205,14 @@ ApiMap.empty
 |> ApiMap.add "pclose" {arg_typs = [Skip]; ret_typ = int_v}
 |> ApiMap.add "_IO_getc" {arg_typs = [Skip]; ret_typ = tainted_v}
 |> ApiMap.add "getchar" {arg_typs = []; ret_typ = tainted_v}
-|> ApiMap.add "read" {arg_typs = [Skip; buf_q; Size]; ret_typ = SizeArg}
-|> ApiMap.add "fread" {arg_typs = [buf_q; Skip; Size; Skip]; ret_typ = SizeArg}
-|> ApiMap.add "write" {arg_typs = [Skip; arr_src_q; Size]; ret_typ = SizeArg}
-|> ApiMap.add "fwrite" {arg_typs = [arr_src_q; Skip; Size; Skip]; ret_typ = SizeArg}
-|> ApiMap.add "recv" {arg_typs = [Skip; buf_q; Size; Skip]; ret_typ = SizeArg}
-|> ApiMap.add "send" {arg_typs = [Skip; arr_src_q; Size; Skip]; ret_typ = SizeArg}
+|> ApiMap.add "read" {arg_typs = [Skip; buf; Size]; ret_typ = SizeArg}
+|> ApiMap.add "fread" {arg_typs = [buf; Skip; Size; Skip]; ret_typ = SizeArg}
+|> ApiMap.add "write" {arg_typs = [Skip; arr_src; Size]; ret_typ = SizeArg}
+|> ApiMap.add "fwrite" {arg_typs = [arr_src; Skip; Size; Skip]; ret_typ = SizeArg}
+|> ApiMap.add "recv" {arg_typs = [Skip; buf; Size; Skip]; ret_typ = SizeArg}
+|> ApiMap.add "send" {arg_typs = [Skip; arr_src; Size; Skip]; ret_typ = SizeArg}
 |> ApiMap.add "nl_langinfo" {arg_typs = [Skip]; ret_typ = int_v}
-|> ApiMap.add "readlink" {arg_typs = [arr_src; dst_q; Size]; ret_typ = int_v}
+|> ApiMap.add "readlink" {arg_typs = [arr_src; dst; Size]; ret_typ = int_v}
 |> ApiMap.add "open" {arg_typs = [Skip; Skip; Skip]; ret_typ = int_v}
 |> ApiMap.add "close" {arg_typs = [Skip]; ret_typ = int_v}
 |> ApiMap.add "unlink" {arg_typs = [Skip]; ret_typ = int_v}
@@ -228,13 +221,13 @@ ApiMap.empty
 (* etc *)
 |> ApiMap.add "scanf" {arg_typs = [Skip; buf_va]; ret_typ = int_v}
 |> ApiMap.add "sscanf" {arg_typs = [arr_src; Skip; dst_va]; ret_typ = int_v}
-|> ApiMap.add "fgets" {arg_typs = [buf_q; Size; Skip]; ret_typ = BufArg}
+|> ApiMap.add "fgets" {arg_typs = [buf; Size; Skip]; ret_typ = BufArg}
 |> ApiMap.add "fgetc" {arg_typs = [Skip]; ret_typ = tainted_v}
-|> ApiMap.add "sprintf" {arg_typs = [dst_q; Skip; arr_src_va]; ret_typ = int_v}
-|> ApiMap.add "snprintf" {arg_typs = [dst_q; Size; Skip; arr_src_va]; ret_typ = int_v}
-|> ApiMap.add "vsnprintf" {arg_typs = [dst_q; Size; Skip; arr_src_va]; ret_typ = int_v}
-|> ApiMap.add "asprintf" {arg_typs = [dst_q_alloc; Skip; arr_src_va]; ret_typ = int_v}
-|> ApiMap.add "vasprintf" {arg_typs = [dst_q_alloc; Skip; arr_src_va]; ret_typ = int_v}
+|> ApiMap.add "sprintf" {arg_typs = [dst; Skip; arr_src_va]; ret_typ = int_v}
+|> ApiMap.add "snprintf" {arg_typs = [dst; Size; Skip; arr_src_va]; ret_typ = int_v}
+|> ApiMap.add "vsnprintf" {arg_typs = [dst; Size; Skip; arr_src_va]; ret_typ = int_v}
+|> ApiMap.add "asprintf" {arg_typs = [dst_alloc; Skip; arr_src_va]; ret_typ = int_v}
+|> ApiMap.add "vasprintf" {arg_typs = [dst_alloc; Skip; arr_src_va]; ret_typ = int_v}
 |> ApiMap.add "atoi" {arg_typs = [arr_src]; ret_typ = TopWithSrcTaint}
 |> ApiMap.add "atof" {arg_typs = [arr_src]; ret_typ = TopWithSrcTaint}
 |> ApiMap.add "atol" {arg_typs = [arr_src]; ret_typ = TopWithSrcTaint}

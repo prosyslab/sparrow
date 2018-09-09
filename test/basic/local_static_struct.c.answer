@@ -1,4 +1,4 @@
-local_static_struct.c 
+basic/local_static_struct.c
 To inline : []
 Excluded variable-arguments functions : []
 Excluded recursive functions : []

@@ -1,4 +1,4 @@
-struct_pointer.c 
+basic/struct_pointer.c
 To inline : []
 Excluded variable-arguments functions : []
 Excluded recursive functions : []

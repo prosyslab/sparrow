@@ -1,4 +1,4 @@
-local_dynamic_struct.c 
+basic/local_dynamic_struct.c
 To inline : []
 Excluded variable-arguments functions : []
 Excluded recursive functions : []

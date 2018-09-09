@@ -489,19 +489,6 @@ let model_unknown mode spec node pid lvo f exps (mem, global) =
       let mem = update mode spec global ext_loc Val.itv_top mem in
       (mem,global)
 
-let model_memcpy mode spec pid (lvo, exps) (mem, global) =
-  match (lvo, exps) with
-    Some lv, dst::src::_ ->
-      let (src_v, dst_v) = tuple mem |> Tuple2.map (eval ~spec pid src) (eval ~spec pid dst) in
-      let (src_l, dst_l) = (src_v, dst_v) |> Tuple2.mapn Val.array_of_val
-                           |> Tuple2.mapn ArrayBlk.pow_loc_of_array
-      in
-      mem
-      |> update mode spec global dst_l (lookup src_l mem)
-      |> update mode spec global (eval_lv ~spec pid lv mem) dst_v
-      |> (fun mem -> (mem, global))
-  | _, _ -> (mem, global)
-
 let model_getpwent mode spec node pid lvo f (mem,global) =
   match lvo, f.vtype with
     Some lv, Cil.TFun ((Cil.TPtr ((Cil.TComp (comp, _) as elem_t), _) as ptr_t), _, _, _) ->
@@ -530,20 +517,6 @@ let rec model_strcpy mode spec node pid es (mem, global) =
       let mem = mem |> update mode spec global (eval_lv ~spec pid dst mem) newv in
       (mem, global)
   | _ -> (mem, global)
-
-let rec model_strncpy mode spec node pid es (mem, global) =
-  match es with
-    CastE (_, e)::t -> model_strncpy mode spec node pid (e::t) (mem, global)
-  | (Lval dst)::_::size::_
-  | (StartOf dst)::_::size::_ ->
-      let arr = Val.array_of_val (lookup (eval_lv ~spec pid dst mem) mem) in
-      let sz = Val.itv_of_val (eval ~spec pid size mem) in
-      let np = Itv.join Itv.zero (Itv.minus sz Itv.one)in
-      let newv = Val.of_array (ArrayBlk.set_null_pos arr np) in
-      let mem = mem |> update mode spec global (eval_lv ~spec pid dst mem) newv in
-      (mem, global)
-  | _ -> (mem,global)
-
 
 let rec model_strcat mode spec node pid es (mem, global) =
   match es with
@@ -600,11 +573,11 @@ let eval_src src_typ pid mem arg_e =
 let rec collect_src_vals arg_exps arg_typs pid mem =
   match arg_exps, arg_typs with
   | [], _ | _, [] -> []
-  | _, (ApiSem.Src (ApiSem.Variable, src_typ, _) :: []) ->
+  | _, (ApiSem.Src (ApiSem.Variable, src_typ) :: []) ->
     List.map (eval_src src_typ pid mem) arg_exps
-  | _, (ApiSem.Src (ApiSem.Variable, src_typ, _) :: _) ->
+  | _, (ApiSem.Src (ApiSem.Variable, src_typ) :: _) ->
     failwith "itvSem.ml : API encoding error (Varg not at the last position)"
-  | (arg_e :: arg_exps_left), (ApiSem.Src (ApiSem.Fixed, src_typ, _) :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (ApiSem.Src (ApiSem.Fixed, src_typ) :: arg_typs_left) ->
     let src_v = eval_src src_typ pid mem arg_e in
     src_v :: (collect_src_vals arg_exps_left arg_typs_left pid mem)
   | (_ :: arg_exps_left), (_ :: arg_typs_left) ->
@@ -613,11 +586,11 @@ let rec collect_src_vals arg_exps arg_typs pid mem =
 let rec collect_dst_vals arg_exps arg_typs pid mem =
   match arg_exps, arg_typs with
   | [], _ | _, [] -> []
-  | _, (ApiSem.Dst (ApiSem.Variable, _, _) :: []) ->
+  | _, (ApiSem.Dst (ApiSem.Variable, _) :: []) ->
     List.map (fun e -> eval pid e mem) arg_exps
-  | _, (ApiSem.Dst (ApiSem.Variable, _, _) :: _) ->
+  | _, (ApiSem.Dst (ApiSem.Variable, _) :: _) ->
     failwith "itvSem.ml : API encoding error (Varg not at the last position)"
-  | (arg_e :: arg_exps_left), (ApiSem.Dst (ApiSem.Fixed, _, _) :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (ApiSem.Dst (ApiSem.Fixed, _) :: arg_typs_left) ->
     let dst_v = eval pid arg_e mem in
     dst_v :: (collect_dst_vals arg_exps_left arg_typs_left pid mem)
   | (_ :: arg_exps_left), (_ :: arg_typs_left) ->
@@ -681,17 +654,17 @@ let process_struct_ptr mode spec node global mem ptr_e =
 
 let rec process_args mode spec node arg_exps arg_typs src_vals (mem, global) =
   let va_src_flag =
-    List.exists (function | ApiSem.Src (ApiSem.Variable, _, _) -> true | _ -> false) arg_typs
+    List.exists (function | ApiSem.Src (ApiSem.Variable, _) -> true | _ -> false) arg_typs
   in
   let pid = Node.get_pid node in
   match arg_exps, arg_typs with
   | [], _ | _ , [] -> mem
-  | _, (ApiSem.Dst (ApiSem.Variable, _, alloc) :: []) ->
+  | _, (ApiSem.Dst (ApiSem.Variable, alloc) :: []) ->
     let _ = assert (va_src_flag || List.length src_vals > 0) in
     List.fold_left (process_dst mode spec node pid src_vals global alloc) mem arg_exps
-  | _, (ApiSem.Dst (ApiSem.Variable, _, _) :: _) ->
+  | _, (ApiSem.Dst (ApiSem.Variable, _) :: _) ->
     failwith "API encoding error (Varg not at the last position)"
-  | (arg_e :: arg_exps_left), (ApiSem.Dst (ApiSem.Fixed, _, alloc) :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (ApiSem.Dst (ApiSem.Fixed, alloc) :: arg_typs_left) ->
     let _ = assert (va_src_flag || List.length src_vals > 0) in
     let mem = process_dst mode spec node pid src_vals global alloc mem arg_e in
     process_args mode spec node arg_exps_left arg_typs_left src_vals (mem, global)
@@ -767,7 +740,7 @@ let handle_api mode spec node (lvo, exps) (mem, global) api_type =
   match lvo with
   | Some lv ->
     let va_src_flag =
-      List.exists (function | ApiSem.Src (ApiSem.Variable, _, _) -> true | _ -> false) arg_typs
+      List.exists (function | ApiSem.Src (ApiSem.Variable, _) -> true | _ -> false) arg_typs
     in
     let (mem, ret_v) =
       produce_ret mode spec node ret_typ
@@ -784,10 +757,8 @@ let scaffolded_functions mode spec node pid (lvo,f,exps) (mem, global) =
     | "getenv" -> model_input mode spec node pid lvo (mem, global)
     | "strdup" -> model_strdup mode spec node (lvo, exps) (mem, global)
     | "gettext" -> model_assign mode spec pid (lvo, exps) (mem, global)
-    | "memcpy" -> model_memcpy mode spec pid (lvo, exps) (mem, global)
     | "getpwent" -> model_getpwent mode spec node pid lvo f (mem,global)
     | "strcpy" -> model_strcpy mode spec node pid exps (mem, global)
-    | "strncpy" -> model_strncpy mode spec node pid exps (mem, global)
     | "strcat" -> model_strcat mode spec node pid exps (mem, global)
     | "strchr" | "strrchr" -> model_strchr mode spec node pid (lvo, exps) (mem, global)
     | s when List.mem s mem_alloc_libs -> model_alloc_one mode spec pid lvo f (mem, global)

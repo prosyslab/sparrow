@@ -110,11 +110,11 @@ let eval_src src_typ pid itvmem mem arg_e =
 let rec collect_src_vals arg_exps arg_typs pid itvmem mem =
   match arg_exps, arg_typs with
   | [], _ | _, [] -> []
-  | _, (Src (Variable, src_typ, _) :: []) ->
+  | _, (Src (Variable, src_typ) :: []) ->
     List.map (eval_src src_typ pid itvmem mem) arg_exps
-  | _, (Src (Variable, src_typ, _) :: _) ->
+  | _, (Src (Variable, src_typ) :: _) ->
     failwith "itvSem.ml : API encoding error (Varg not at the last position)"
-  | (arg_e :: arg_exps_left), (Src (Fixed, src_typ, _) :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (Src (Fixed, src_typ) :: arg_typs_left) ->
     let src_v = eval_src src_typ pid itvmem mem arg_e in
     src_v :: (collect_src_vals arg_exps_left arg_typs_left pid itvmem mem)
   | (_ :: arg_exps_left), (_ :: arg_typs_left) ->
@@ -123,11 +123,11 @@ let rec collect_src_vals arg_exps arg_typs pid itvmem mem =
 let rec collect_dst_vals arg_exps arg_typs pid itvmem mem =
   match arg_exps, arg_typs with
   | [], _ | _, [] -> []
-  | _, (Dst (Variable, _, _) :: []) ->
+  | _, (Dst (Variable, _) :: []) ->
     List.map (fun e -> eval pid e itvmem mem) arg_exps
-  | _, (Dst (Variable, _, _) :: _) ->
+  | _, (Dst (Variable, _) :: _) ->
     failwith "itvSem.ml : API encoding error (Varg not at the last position)"
-  | (arg_e :: arg_exps_left), (Dst (Fixed, _, _) :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (Dst (Fixed, _) :: arg_typs_left) ->
     let dst_v = eval pid arg_e itvmem mem in
     dst_v :: (collect_dst_vals arg_exps_left arg_typs_left pid itvmem mem)
   | (_ :: arg_exps_left), (_ :: arg_typs_left) ->
@@ -172,17 +172,17 @@ let process_buf mode node global loc itvmem mem dst_e =
 
 let rec process_args mode node arg_exps arg_typs src_vals loc itvmem (mem, global) =
   let va_src_flag =
-    List.exists (function | Src (Variable, _, _) -> true | _ -> false) arg_typs
+    List.exists (function | Src (Variable, _) -> true | _ -> false) arg_typs
   in
   let pid = Node.get_pid node in
   match arg_exps, arg_typs with
   | [], _ | _ , [] -> mem
-  | _, (Dst (Variable, _, alloc) :: []) ->
+  | _, (Dst (Variable, alloc) :: []) ->
     let _ = assert (va_src_flag || List.length src_vals > 0) in
     List.fold_left (process_dst mode node pid src_vals global alloc itvmem) mem arg_exps
-  | _, (Dst (Variable, _, _) :: _) ->
+  | _, (Dst (Variable, _) :: _) ->
     failwith "API encoding error (Varg not at the last position)"
-  | (arg_e :: arg_exps_left), (Dst (Fixed, _, alloc) :: arg_typs_left) ->
+  | (arg_e :: arg_exps_left), (Dst (Fixed, alloc) :: arg_typs_left) ->
     let _ = assert (va_src_flag || List.length src_vals > 0) in
     let mem = process_dst mode node pid src_vals global alloc itvmem mem arg_e in
     process_args mode node arg_exps_left arg_typs_left src_vals loc itvmem (mem, global)
@@ -249,7 +249,7 @@ let handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc =
   match lvo with
   | Some lv ->
     let va_src_flag =
-      List.exists (function | Src (Variable, _, _) -> true | _ -> false) arg_typs
+      List.exists (function | Src (Variable, _) -> true | _ -> false) arg_typs
     in
     let (mem, ret_v) =
       produce_ret mode node ret_typ

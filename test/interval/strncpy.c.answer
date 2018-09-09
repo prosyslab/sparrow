@@ -1,0 +1,21 @@
+interval/strncpy.c
+To inline : []
+Excluded variable-arguments functions : []
+Excluded recursive functions : []
+Excluded too large functions : []
+#Procs : 2
+#Nodes : 20
+#Nodes in def-use graph : 12
+#Locs on def-use graph : 11
+
+= Alarms =
+1. strncpy.c:6 {main} UnProven
+  strncpy ((void *)StartOf(buf), (void *)str, 7) @main-11:  offset: [6, 6], size: [6, 6] UnProven, allocsite: main-16
+2. strncpy.c:7 {main} UnProven
+  *(p+10) @main-13:  offset: [10, 10], size: [10, 10] UnProven, allocsite: main-8
+
+#queries                 : 3
+#queries mod alarm point : 2
+#proven                  : 0
+#unproven                : 2
+#bot-involved            : 0

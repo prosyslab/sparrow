@@ -1,4 +1,4 @@
-narrow.c 
+narrowing/narrow.c
 To inline : []
 Excluded variable-arguments functions : []
 Excluded recursive functions : []
