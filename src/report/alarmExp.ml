@@ -12,6 +12,8 @@ open Cil
 open IntraCfg
 open Cmd
 
+module F = Format
+
 type t =
   | ArrayExp of lval * exp * location
   | DerefExp of exp * location
@@ -21,8 +23,8 @@ type t =
   | Strncpy of exp * exp * exp * location
   | Memcpy of exp * exp * exp * location
   | Memmove of exp * exp * exp * location
-  | AllocSize of exp * location
-  | Printf of exp * location
+  | AllocSize of string * exp * location
+  | Printf of string * exp * location
 
 let to_string t =
   match t with
@@ -34,8 +36,8 @@ let to_string t =
   | Memcpy (e1, e2, e3, _) -> "memcpy ("^(CilHelper.s_exp e1)^", "^(CilHelper.s_exp e2)^", "^(CilHelper.s_exp e3)^")"
   | Memmove (e1, e2, e3, _) -> "memmove ("^(CilHelper.s_exp e1)^", "^(CilHelper.s_exp e2)^", "^(CilHelper.s_exp e3)^")"
   | Strcat (e1, e2, _) -> "strcat ("^(CilHelper.s_exp e1)^", "^(CilHelper.s_exp e2)^")"
-  | AllocSize (e, _) -> "alloc (" ^ CilHelper.s_exp e ^ ")"
-  | Printf (e, _) -> "printf (" ^ CilHelper.s_exp e ^ ")"
+  | AllocSize (f, e, _) -> F.sprintf "%s(%s)" f (CilHelper.s_exp e)
+  | Printf (f, e, _) -> F.sprintf "%s(%s)" f (CilHelper.s_exp e)
 
 let location_of = function
   | ArrayExp (_,_,l)
@@ -46,8 +48,8 @@ let location_of = function
   | Memcpy (_, _, _, l)
   | Memmove (_, _, _, l)
   | Strcat (_, _, l)
-  | AllocSize (_, l)
-  | Printf (_, l) -> l
+  | AllocSize (_, _, l)
+  | Printf (_, _, l) -> l
 
 (* NOTE: you may use Cil.addOffset or Cil.addOffsetLval instead of
    add_offset, append_field, and append_index. *)
@@ -113,13 +115,13 @@ let c_lib f es loc =
 let c_lib_taint f es loc =
   match f.vname with
   | "mmap"
-  | "realloc" -> [AllocSize (List.nth es 1, loc)]
-  | "calloc" -> [AllocSize (List.nth es 0, loc)]
-  | "printf" -> [Printf (List.nth es 0, loc)]
+  | "realloc" -> [AllocSize (f.vname, List.nth es 1, loc)]
+  | "calloc" -> [AllocSize (f.vname, List.nth es 0, loc)]
+  | "printf" -> [Printf (f.vname, List.nth es 0, loc)]
   | "fprintf" | "sprintf" | "vfprintf" | "vsprintf" | "vasprintf" | "__asprintf"
   | "asprintf" | "vdprintf" | "dprintf" | "easprintf" | "evasprintf" ->
-    [Printf (List.nth es 1, loc)]
-  | "snprintf" | "vsnprintf" -> [Printf (List.nth es 2, loc)]
+    [Printf (f.vname, List.nth es 1, loc)]
+  | "snprintf" | "vsnprintf" -> [Printf (f.vname, List.nth es 2, loc)]
   | _ -> []
 
 let rec collect : IntraCfg.cmd -> t list
@@ -127,7 +129,8 @@ let rec collect : IntraCfg.cmd -> t list
   match cmd with
   | Cmd.Cset (lv,e,loc) -> (c_lv lv loc) @ (c_exp e loc)
   | Cmd.Cexternal (lv,loc) -> c_lv lv loc
-  | Cmd.Calloc (lv,Array e,_,loc) when !Options.taint -> [AllocSize (e, loc)]
+  | Cmd.Calloc (lv,Array e,_,loc) when !Options.taint ->
+    [AllocSize ("malloc", e, loc)]
   | Cmd.Calloc (lv,Array e,_,loc) -> (c_lv lv loc) @ (c_exp e loc)
   | Cmd.Csalloc (lv,_,loc) -> c_lv lv loc
   | Cmd.Cassume (e,loc) -> c_exp e loc

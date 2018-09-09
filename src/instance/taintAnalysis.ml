@@ -27,7 +27,7 @@ let marshal_out (global,input,output) =
 
 let inspect_aexp node aexp itvmem mem queries =
   match aexp with
-  | AllocSize (e,loc) ->
+  | AllocSize (_, e, loc) ->
     let pid = InterCfg.Node.get_pid node in
     let size_itv = ItvSem.eval pid e itvmem |> ItvDom.Val.itv_of_val in
     let taint = TaintSem.eval pid e itvmem mem |> TaintDom.Val.user_input in
@@ -40,7 +40,7 @@ let inspect_aexp node aexp itvmem mem queries =
         in
         { node; exp = aexp; loc; allocsite = None; status; desc
         ; src = Some (src_node, src_loc) } :: queries) taint queries
-  | Printf (e, loc) ->
+  | Printf (_, e, loc) ->
     let pid = InterCfg.Node.get_pid node in
     let taint = ItvSem.eval pid e itvmem |> ItvDom.Val.all_locs |> flip Mem.lookup mem |> TaintDom.Val.user_input in
     TaintDom.UserInput.fold (fun (src_node, src_loc) queries ->
