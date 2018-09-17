@@ -669,19 +669,20 @@ let transform_allocs : Cil.fundec -> t -> t
 let insert_return_nodes : t -> t
 =fun g ->
   List.fold_left (fun g c ->
-    match find_cmd c g with
-      Cmd.Ccall (_, Lval (Var varinfo, _), _, loc)
-      when varinfo.vname = "exit" || varinfo.vname = "abort" ->
+      match find_cmd c g with
+      | Cmd.Ccall (_, Lval (Var varinfo, _), _, loc)
+        when varinfo.vname = "exit" || varinfo.vname = "abort"
+             || Cil.hasAttribute "noreturn" varinfo.vattr ->
         let r = returnof c g in
         let n = Node.make () in
         remove_edge c r g
         |> add_cmd n (Cmd.Cskip loc)
         |> add_edge c n
-    | Cmd.Ccall (_, _, _, loc) ->
+      | Cmd.Ccall (_, _, _, loc) ->
         let r = returnof c g in
         add_new_node c (Cmd.Cskip loc) r g
-    | _ -> g
-  ) g (nodesof g)
+      | _ -> g
+    ) g (nodesof g)
 
 (** before each exit-node, insert a return cmd if there is not *)
 let insert_return_before_exit : t -> t
