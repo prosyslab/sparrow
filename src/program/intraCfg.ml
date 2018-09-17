@@ -799,6 +799,15 @@ let generate_cmd_args fd loc g =
   (opt_node, g)
 
 let init fd loc =
+  let regexps = List.map (fun str -> Str.regexp (".*" ^ str ^ ".*"))
+      !Options.unsound_skip_function
+  in
+  if (!Options.unsound_noreturn_function &&
+      Cil.hasAttribute "noreturn" fd.svar.vattr) ||
+     (List.exists (fun re -> Str.string_match re fd.svar.vname 0) regexps)
+  then
+    add_edge Node.ENTRY Node.EXIT (empty fd)
+  else
   let entry = Node.fromCilStmt (List.nth fd.sallstmts 0) in
   let g =
     (* add nodes *)

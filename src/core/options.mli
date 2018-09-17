@@ -44,6 +44,9 @@ val top_location : bool ref
 val bugfinder :  int ref
 val unsound_recursion : bool ref
 val unsound_alloc : bool ref
+val unsound_const_string : bool ref
+val unsound_noreturn_function : bool ref
+val unsound_skip_function : string list ref
 
 (** {2 Main Analysis } *)
 

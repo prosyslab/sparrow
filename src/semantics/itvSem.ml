@@ -867,14 +867,16 @@ let run mode spec node (mem, global) =
     let lv = eval_lv ~spec pid l mem in
     (update mode spec global lv (eval_struct_alloc lv s) mem, global)
   | IntraCfg.Cmd.Csalloc (l, s, loc) ->
-    let str_loc =
-      Allocsite.allocsite_of_string node
-      |> Loc.of_allocsite |> PowLoc.singleton
-    in
-    mem
-    |> update mode spec global (eval_lv ~spec pid l mem) (eval_string_alloc node s mem)
-    |> update mode spec global str_loc (eval_string s)
-    |> (fun mem -> (mem, global))
+    if !Options.unsound_const_string then (mem, global)
+    else
+      let str_loc =
+        Allocsite.allocsite_of_string node
+        |> Loc.of_allocsite |> PowLoc.singleton
+      in
+      mem
+      |> update mode spec global (eval_lv ~spec pid l mem) (eval_string_alloc node s mem)
+      |> update mode spec global str_loc (eval_string s)
+      |> (fun mem -> (mem, global))
   | IntraCfg.Cmd.Cfalloc (l, fd, _) ->
     let clos = Val.of_pow_proc (PowProc.singleton fd.svar.vname) in
     (update mode spec global (eval_lv ~spec pid l mem) clos mem, global)

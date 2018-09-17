@@ -53,6 +53,9 @@ let extract_lib_feat = ref false
 let top_location = ref false
 let unsound_recursion = ref false
 let unsound_alloc = ref false
+let unsound_const_string = ref false
+let unsound_noreturn_function = ref false
+let unsound_skip_function = ref []
 let bugfinder = ref 0
 
 (* datalog *)
@@ -87,6 +90,29 @@ let print_premem = ref false
 let verbose = ref 1
 let int_overflow = ref false
 
+let unsoundness_opts =
+  [ ("-unsound_loop",
+     Arg.String (fun s -> unsound_loop := BatSet.add s !unsound_loop),
+     "Unsound loops")
+  ; ("-unsound_lib",
+     Arg.String (fun s -> unsound_lib := BatSet.add s !unsound_lib),
+     "Unsound libs")
+  ; ("-unsound_recursion",
+     Arg.Set unsound_recursion,
+     "Unsound recursive calls")
+  ; ("-unsound_alloc",
+     Arg.Set unsound_alloc,
+     "Unsound memory allocation (never return null)")
+  ; ("-unsound_const_string",
+     Arg.Set unsound_const_string,
+     "Unsoundly ignore constant string allocations")
+  ; ("-unsound_noreturn_function",
+     Arg.Set unsound_noreturn_function,
+     "Unsoundly ignore functions whose attributes conatin \"__noreturn__\"")
+  ; ("-unsound_skip_function",
+     Arg.String (fun s -> unsound_skip_function := s::!unsound_skip_function),
+     "Unsoundly ignore functions whose names contain the given argument") ]
+
 let datalog_opts =
   [ ("-extract_datalog_fact", (Arg.Set extract_datalog_fact),
      "Extract simple datalog facts (syntax and def-use graph)")
@@ -120,10 +146,6 @@ let opts =
   ("-taint", (Arg.Set taint), "Do taint analysis");
   ("-profile", (Arg.Set profile), "Profiler");
   ("-narrow", (Arg.Set narrow), "Do narrowing");
-  ("-unsound_loop", (Arg.String (fun s -> unsound_loop := BatSet.add s !unsound_loop)), "Unsound loops");
-  ("-unsound_lib", (Arg.String (fun s -> unsound_lib := BatSet.add s !unsound_lib)), "Unsound libs");
-  ("-unsound_recursion", (Arg.Set unsound_recursion), "Unsound recursive calls");
-  ("-unsound_alloc", (Arg.Set unsound_alloc), "Unsound memory allocation (never return null)");
   ("-extract_loop_feat", (Arg.Set extract_loop_feat), "Extract features of loops for harmless unsoundness");
   ("-extract_lib_feat", (Arg.Set extract_lib_feat), "Extract features of libs for harmless unsoundness");
   ("-top_location", (Arg.Set top_location), "Treat unknown locations as top locations");
@@ -151,4 +173,5 @@ let opts =
    "Output directory (default: sparrow-out)");
   ("-int_overflow", (Arg.Set int_overflow), "Consider integer overflow");
   ]
+  @ unsoundness_opts
   @ datalog_opts
