@@ -83,7 +83,7 @@ let make_top_mem locset =
       Mem.add l TaintDom.Val.top mem) locset Mem.bot
 
 let print_datalog_alarms alarms =
-  let oc = open_out (!Options.outdir ^ "/datalog/IntOverflowAlarm.facts") in
+  let oc = open_out (!Options.outdir ^ "/datalog/TaintAlarms.facts") in
   let fmt = F.formatter_of_out_channel oc in
   List.iter (fun alarm ->
       match alarm.src with
