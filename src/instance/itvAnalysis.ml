@@ -126,7 +126,8 @@ let inspect_aexp_bo : InterCfg.node -> AlarmExp.t -> Mem.t -> query list -> quer
               status = status; desc = desc; src = None }) lst
     | Strncpy (e1, e2, e3, loc)
     | Memcpy (e1, e2, e3, loc)
-    | Memmove (e1, e2, e3, loc) ->
+    | Memmove (e1, e2, e3, loc)
+    | BufferOverrunLib ("strncmp", [e1; e2; e3], loc) ->
         let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
         let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e2 mem in
         let e3_1 = Cil.BinOp (Cil.MinusA, e3, Cil.one, Cil.intType) in
@@ -136,6 +137,14 @@ let inspect_aexp_bo : InterCfg.node -> AlarmExp.t -> Mem.t -> query list -> quer
         List.map (fun (status,a,desc) ->
             { node = node; exp = aexp; loc = loc; allocsite = a;
               status = status; desc = desc; src = None }) (lst1@lst2)
+    | BufferOverrunLib ("memchr", [e1; _; e3], loc) ->
+        let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
+        let e3_1 = Cil.BinOp (Cil.MinusA, e3, Cil.one, Cil.intType) in
+        let v3 = ItvSem.eval (InterCfg.Node.get_pid node) e3_1 mem in
+        let lst1 = check_bo v1 (Some v3) in
+        List.map (fun (status,a,desc) ->
+            { node = node; exp = aexp; loc = loc; allocsite = a;
+              status = status; desc = desc; src = None }) lst1
     | _ -> []) @ queries
 
 let inspect_aexp_nd : InterCfg.node -> AlarmExp.t -> Mem.t -> query list -> query list

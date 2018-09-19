@@ -23,6 +23,7 @@ type t =
   | Strncpy of exp * exp * exp * location
   | Memcpy of exp * exp * exp * location
   | Memmove of exp * exp * exp * location
+  | BufferOverrunLib of string * exp list * location
   | AllocSize of string * exp * location
   | Printf of string * exp * location
 
@@ -36,6 +37,7 @@ let to_string t =
   | Memcpy (e1, e2, e3, _) -> "memcpy ("^(CilHelper.s_exp e1)^", "^(CilHelper.s_exp e2)^", "^(CilHelper.s_exp e3)^")"
   | Memmove (e1, e2, e3, _) -> "memmove ("^(CilHelper.s_exp e1)^", "^(CilHelper.s_exp e2)^", "^(CilHelper.s_exp e3)^")"
   | Strcat (e1, e2, _) -> "strcat ("^(CilHelper.s_exp e1)^", "^(CilHelper.s_exp e2)^")"
+  | BufferOverrunLib (f, el, _) -> F.sprintf "%s(%s)" f (String.concat ", " (List.map CilHelper.s_exp el))
   | AllocSize (f, e, _) -> F.sprintf "%s(%s)" f (CilHelper.s_exp e)
   | Printf (f, e, _) -> F.sprintf "%s(%s)" f (CilHelper.s_exp e)
 
@@ -48,6 +50,7 @@ let location_of = function
   | Memcpy (_, _, _, l)
   | Memmove (_, _, _, l)
   | Strcat (_, _, l)
+  | BufferOverrunLib (_, _, l)
   | AllocSize (_, _, l)
   | Printf (_, _, l) -> l
 
@@ -101,7 +104,7 @@ and c_exp : Cil.exp -> Cil.location -> t list
 
 and c_exps exps loc = List.fold_left (fun q e -> q @ (c_exp e loc)) [] exps
 
-let query_lib = ["strcpy"; "memcpy"; "memmove"; "strncpy"; "strcat"]
+let query_lib = ["strcpy"; "memcpy"; "memmove"; "strncpy"; "strcat"; "memchr"; "strncmp"]
 
 let c_lib f es loc =
   match f.vname with
@@ -110,6 +113,8 @@ let c_lib f es loc =
   | "memmove" -> (Memmove (List.nth es 0, List.nth es 1, List.nth es 2, loc))::(c_exps es loc)
   | "strncpy" -> (Strncpy (List.nth es 0, List.nth es 1, List.nth es 2, loc))::(c_exps es loc)
   | "strcat" -> (Strcat (List.nth es 0, List.nth es 1, loc)) :: (c_exps es loc)
+  | "memchr"
+  | "strncmp" -> (BufferOverrunLib (f.vname, [List.nth es 0; List.nth es 1; List.nth es 2], loc))::(c_exps es loc)
   | _ -> []
 
 let c_lib_taint f es loc =

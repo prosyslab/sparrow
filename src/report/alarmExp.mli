@@ -18,6 +18,7 @@ type t =
   | Strncpy of Cil.exp * Cil.exp * Cil.exp * Cil.location
   | Memcpy of Cil.exp * Cil.exp * Cil.exp *  Cil.location
   | Memmove of Cil.exp * Cil.exp * Cil.exp * Cil.location
+  | BufferOverrunLib of string * Cil.exp list * Cil.location
   | AllocSize of string * Cil.exp * Cil.location
   | Printf of string * Cil.exp * Cil.location
 
