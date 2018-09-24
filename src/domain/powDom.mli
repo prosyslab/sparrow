@@ -33,7 +33,7 @@ sig
   val diff : t -> t -> t
 
   val choose : t -> elt
-
+  val pop : t -> elt * t
   val remove : elt -> t -> t
 
   val is_empty : t -> bool

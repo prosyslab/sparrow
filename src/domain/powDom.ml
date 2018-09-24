@@ -35,7 +35,7 @@ sig
   val diff : t -> t -> t
 
   val choose : t -> elt
-
+  val pop : t -> elt * t
   val remove : elt -> t -> t
 
   val is_empty : t -> bool
@@ -127,6 +127,7 @@ struct
   let diff = BatSet.diff
 
   let choose = BatSet.choose
+  let pop = BatSet.pop
 
   let remove = BatSet.remove
 
@@ -248,6 +249,12 @@ struct
   let choose = function
     | V s -> PowCPO.choose s
     | Top -> raise (Failure "Error: choose")
+
+  let pop = function
+    | V s ->
+      let e, s = PowCPO.pop s in
+      e, V s
+    | Top -> raise (Failure "Error: pop")
 
   let remove e = function
     | V s -> V (PowCPO.remove e s)

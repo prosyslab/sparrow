@@ -25,6 +25,7 @@ sig
 
   val create            : ?size : int -> unit -> t
   val nb_node           : t -> int
+  val nb_edge           : t -> int
   val nb_loc            : t -> int
   val nodesof           : t -> node BatSet.t
 
@@ -69,6 +70,7 @@ struct
     let succ g n = I.succ g.graph n
     let pred g n = I.pred g.graph n
     let nb_vertex g = I.nb_vertex g.graph
+    let nb_edge g = I.nb_edges g.graph
     let pred_e g n = I.pred g.graph n |> List.map (fun p -> (p, Hashtbl.find g.label (p,n), n))
     let fold_vertex f g a = I.fold_vertex f g.graph a
     let fold_edges f g a = I.fold_edges f g.graph a
@@ -105,6 +107,7 @@ struct
   let succ n dug = try G.succ dug n with _ -> []
   let pred n dug = try G.pred dug n with _ -> []
   let nb_node dug = G.nb_vertex dug
+  let nb_edge dug = G.nb_edge dug
 
   let remove_node : node -> t -> t
   =fun n dug -> G.remove_vertex dug n

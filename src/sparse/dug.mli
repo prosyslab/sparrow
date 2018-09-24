@@ -18,6 +18,7 @@ sig
 
   val create            : ?size : int -> unit -> t
   val nb_node           : t -> int
+  val nb_edge           : t -> int
   val nb_loc            : t -> int
   val nodesof           : t -> node BatSet.t
 

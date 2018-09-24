@@ -84,7 +84,10 @@ let make_top_mem locset =
   PowLoc.fold (fun l mem ->
       Mem.add l TaintDom.Val.top mem) locset Mem.bot
 
-let print_datalog_fact alarms =
+let print_datalog_fact spec global dug alarms =
+  RelSyntax.print global.icfg;
+  Provenance.print global.relations;
+  RelDUGraph.print global dug alarms;
   let oc = open_out (!Options.outdir ^ "/datalog/TaintAlarms.facts") in
   let fmt = F.formatter_of_out_channel oc in
   List.iter (fun alarm ->
@@ -95,15 +98,15 @@ let print_datalog_fact alarms =
   F.pp_print_flush fmt ();
   close_out oc
 
-let post_process spec (global, _, inputof, outputof) =
+let post_process spec itvdug (global, _, inputof, outputof) =
   let alarms = StepManager.stepf true "Generate Alarm Report"
       (inspect_alarm global spec) inputof
   in
   (if !Options.extract_datalog_fact_full then
-     print_datalog_fact alarms);
+     print_datalog_fact spec global itvdug alarms);
   (global, inputof, outputof, alarms)
 
-let do_analysis (global, itvinputof) =
+let do_analysis (global, itvdug, itvinputof) =
   let global = { global with table = itvinputof } in
   let locset = get_locset global.mem in
   let spec =
@@ -118,4 +121,4 @@ let do_analysis (global, itvinputof) =
   let _ = Options.pfs := 100 in
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global
   |> opt !Options.marshal_out marshal_out
-  |> post_process spec
+  |> post_process spec itvdug

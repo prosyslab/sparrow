@@ -340,24 +340,30 @@ let get_locset mem =
 module LMap = BatMap.Make(Loc)
 module NMap = BatMap.Make(Node)
 
-let print_datalog_fact spec global dug =
+(* connect InterCfg.start_node to nodes that do not have predecessors *)
+let connect_from_start g =
+  DUGraph.fold_node (fun node l ->
+      if DUGraph.pred node g = [] && node <> InterCfg.start_node then node :: l
+      else l) g []
+  |> List.fold_left (fun g n -> DUGraph.add_edge InterCfg.start_node n g) g
+
+let print_datalog_fact spec global dug alarms =
   RelSyntax.print global.icfg;
   Provenance.print global.relations;
-  let oc = open_out (!Options.outdir ^ "/datalog/DUEdge.facts") in
-  let fmt = Format.formatter_of_out_channel oc in
-  DUGraph.iter_edges_e (fun src dst locset ->
-      PowLoc.iter (fun l ->
-          Format.fprintf fmt "%a\t%a\t%a\n" Node.pp src Loc.pp l Node.pp dst)
-        locset) dug;
-  close_out oc;
-  (if not !Options.extract_datalog_fact_full then exit 0)
+  RelDUGraph.print global dug alarms
 
 let post_process spec (global, dug, inputof, outputof) =
   let alarms = StepManager.stepf true "Generate Alarm Report"
       (inspect_alarm global spec) inputof
   in
-  (if !Options.extract_datalog_fact then print_datalog_fact spec global dug);
-  (global, inputof, outputof, alarms)
+  (if !Options.extract_datalog_fact then
+     let dug = connect_from_start dug in
+     let alarms = List.rev_map
+         (fun q -> { q with src = Some (InterCfg.start_node, Cil.locUnknown) })
+         alarms
+     in
+     print_datalog_fact spec global dug alarms);
+  (global, dug, inputof, outputof, alarms)
 
 let do_analysis global =
   let _ = prerr_memory_usage () in
@@ -378,4 +384,4 @@ let do_analysis global =
   in
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global
   |> opt !Options.marshal_out marshal_out
-  |> post_process spec
+  |> cond !Options.taint (fun (g,d,i,o) -> (g,d,i,o,[])) (post_process spec)
