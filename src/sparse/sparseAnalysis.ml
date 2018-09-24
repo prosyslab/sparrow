@@ -34,8 +34,8 @@ struct
   module Dom = Sem.Dom
   module AccessAnalysis = AccessAnalysis.Make (Sem)
   module Access = AccessAnalysis.Access
-  module DUGraph = Dug.Make (Dom)
-  module SsaDug = SsaDug.Make (DUGraph) (Access)
+  module DUGraph = Dug.Make (Access)
+  module SsaDug = SsaDug.Make (DUGraph)
   module Worklist = Worklist.Make (DUGraph)
   module Table = MapDom.MakeCPO (Node) (Sem.Dom)
   module Spec = Sem.Spec

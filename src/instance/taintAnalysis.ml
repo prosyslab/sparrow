@@ -88,7 +88,7 @@ let print_datalog_fact spec global dug alarms =
   RelSyntax.print global.icfg;
   Provenance.print global.relations;
   RelDUGraph.print global dug alarms;
-  let oc = open_out (!Options.outdir ^ "/datalog/TaintAlarms.facts") in
+  let oc = open_out (!Options.outdir ^ "/datalog/Alarms.facts") in
   let fmt = F.formatter_of_out_channel oc in
   List.iter (fun alarm ->
       match alarm.src with

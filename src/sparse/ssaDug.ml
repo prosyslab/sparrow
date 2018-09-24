@@ -28,8 +28,7 @@ sig
   val to_json_inter     : DUGraph.t -> Access.t -> Yojson.Safe.json
 end
 
-module Make (DUGraph : Dug.S) (Access: Access.S
-  with type Loc.t = DUGraph.Loc.t and type PowLoc.t = DUGraph.PowLoc.t) =
+module Make (DUGraph : Dug.S) =
 struct
   module DUGraph = DUGraph
   type node = BasicDom.Node.t
@@ -42,7 +41,7 @@ struct
   type loc = Loc.t
 
   (** Def-use graph construction *)
-  module Access = Access
+  module Access = DUGraph.Access
   type phi_points = PowLoc.t NodeMap.t
   type access_map = PowLoc.t IntraNodeMap.t
   type access_map_inv = IntraNodeSet.t LocMap.t
@@ -347,7 +346,7 @@ struct
   =fun (global,access,locset) ->
     let nodes = InterCfg.nodesof global.icfg in
     let access = Access.restrict_access access locset in
-    DUGraph.create ~size:(List.length nodes) ()
+    DUGraph.create ~size:(List.length nodes) ~access ()
     |> draw_intraedges (global,access,locset)
     |> draw_interedges (global,access,locset)
 

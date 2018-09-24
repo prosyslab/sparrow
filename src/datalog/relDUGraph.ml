@@ -17,7 +17,7 @@ let rec fix next reachable works g =
     in
     fix next reachable works g
 
-let reachability alarms g =
+let optimize_reachability alarms g =
   let node_set =
     List.fold_left (fun set alarm -> PowNode.add alarm.Report.node set)
       PowNode.empty alarms
@@ -35,10 +35,14 @@ let reachability alarms g =
       && PowNode.mem n reachable_from_node then g
       else G.remove_node n g) g g
 
+let optimize_inter_edge g =
+  g
+
 let optimize global alarms g =
   L.info "%d nodes and %d edges before optimization\n" (G.nb_node g) (G.nb_edge g);
-  let g = reachability alarms g in
+  let g = optimize_reachability alarms g in
   L.info "%d nodes and %d edges after reachability\n" (G.nb_node g) (G.nb_edge g);
+  let g = optimize_inter_edge g in
   g
 
 let print global dug alarms =
@@ -47,7 +51,10 @@ let print global dug alarms =
   let oc = open_out (!Options.outdir ^ "/datalog/DUEdge.facts") in
   let fmt = Format.formatter_of_out_channel oc in
   G.iter_edges_e (fun src dst locset ->
-      PowLoc.iter (fun l ->
-          Format.fprintf fmt "%a\t%a\t%a\n" Node.pp src Loc.pp l Node.pp dst)
-        locset) dug;
+      if Node.equal src InterCfg.start_node && PowLoc.is_empty locset then
+        Format.fprintf fmt "%a\tdummy\t%a\n" Node.pp src Node.pp dst
+      else
+        PowLoc.iter (fun l ->
+            Format.fprintf fmt "%a\t%a\t%a\n" Node.pp src Loc.pp l Node.pp dst)
+          locset) dug;
   close_out oc

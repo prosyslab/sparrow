@@ -21,9 +21,9 @@ sig
   type node = BasicDom.Node.t
   module Loc : AbsDom.SET
   module PowLoc : PowDom.CPO with type elt = Loc.t
+  module Access : Access.S with type Loc.t = Loc.t and type PowLoc.t = PowLoc.t
 
-
-  val create            : ?size : int -> unit -> t
+  val create            : ?size : int -> ?access : Access.t -> unit -> t
   val nb_node           : t -> int
   val nb_edge           : t -> int
   val nb_loc            : t -> int
@@ -39,14 +39,19 @@ sig
   val add_absloc        : node -> Loc.t -> node -> t -> t
   val add_abslocs       : node -> PowLoc.t -> node -> t -> t
 
+  val access            : t -> Access.t
+
 (** {2 Iterator } *)
 
   val fold_node         : (node -> 'a -> 'a) -> t -> 'a -> 'a
   val fold_edges        : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
+  val fold_edges_e      : (node -> node -> PowLoc.t -> 'a -> 'a) -> t -> 'a -> 'a
   val iter_node         : (node -> unit) -> t -> unit
   val iter_edges        : (node -> node -> unit) -> t -> unit
   val iter_edges_e      : (node -> node -> PowLoc.t -> unit) -> t -> unit
+  val fold_pred         : (node -> 'a ->'a) -> t -> node -> 'a -> 'a
   val fold_succ         : (node -> 'a ->'a) -> t -> node -> 'a -> 'a
+  val iter_succ         : (node -> unit) -> t -> node -> unit
 
 (** {2 Print } *)
 
@@ -54,11 +59,12 @@ sig
   val to_json           : t -> Yojson.Safe.json
 end
 
-module Make (Dom : InstrumentedMem.S) =
+module Make (Access : Access.S) =
 struct
   type node = BasicDom.Node.t
-  module PowLoc = Dom.PowA
-  module Loc = Dom.A
+  module PowLoc = Access.PowLoc
+  module Loc = Access.Loc
+  module Access = Access
   type loc = Loc.t
   type locset = PowLoc.t
   module G =
@@ -72,15 +78,23 @@ struct
     let nb_vertex g = I.nb_vertex g.graph
     let nb_edge g = I.nb_edges g.graph
     let pred_e g n = I.pred g.graph n |> List.map (fun p -> (p, Hashtbl.find g.label (p,n), n))
+    let mem_vertex g n = I.mem_vertex g.graph n
+    let mem_edge g n1 n2 = I.mem_edge g.graph n1 n2
     let fold_vertex f g a = I.fold_vertex f g.graph a
     let fold_edges f g a = I.fold_edges f g.graph a
+    let fold_edges_e f g a =
+      I.fold_edges (fun s d ->
+          let locset = Hashtbl.find g.label (s, d) in
+          f s d locset) g.graph a
     let iter_vertex f g = I.iter_vertex f g.graph
     let iter_edges f g = I.iter_edges f g.graph
+    let fold_pred f g a = I.fold_pred f g.graph a
     let iter_edges_e f g =
       I.iter_edges (fun s d ->
           let locset = Hashtbl.find g.label (s, d) in
           f s d locset) g.graph
     let fold_succ f g a = I.fold_succ f g.graph a
+    let iter_succ f g = I.iter_succ f g.graph
 
     let remove_vertex g n = I.remove_vertex g.graph n; g
     let add_edge_e g (s,locs,d) =
@@ -99,48 +113,54 @@ struct
         add_edge_e g (s, def, d)
   end
 
-  type t = G.t
+  type t = { graph : G.t; access : Access.t }
 
-  let create ?(size=0) () = G.create ~size ()
-  let nodesof dug = G.fold_vertex BatSet.add dug BatSet.empty
+  let create ?(size=0) ?(access=Access.empty) () =
+    { graph = G.create ~size (); access }
+  let nodesof dug = G.fold_vertex BatSet.add dug.graph BatSet.empty
 
-  let succ n dug = try G.succ dug n with _ -> []
-  let pred n dug = try G.pred dug n with _ -> []
-  let nb_node dug = G.nb_vertex dug
-  let nb_edge dug = G.nb_edge dug
+  let access dug = dug.access
+  let succ n dug = try G.succ dug.graph n with _ -> []
+  let pred n dug = try G.pred dug.graph n with _ -> []
+  let nb_node dug = G.nb_vertex dug.graph
+  let nb_edge dug = G.nb_edge dug.graph
 
-  let remove_node : node -> t -> t
-  =fun n dug -> G.remove_vertex dug n
+  let remove_node n dug = { dug with graph = G.remove_vertex dug.graph n }
 
-  let add_edge : node -> node -> t -> t
-  =fun src dst dug -> G.add_edge dug src dst
+  let add_edge src dst dug = { dug with graph = G.add_edge dug.graph src dst }
 
   let remove_edge : node -> node -> t -> t
-  =fun src dst dug -> try G.remove_edge dug src dst with _ -> dug
+  =fun src dst dug -> try { dug with graph = G.remove_edge dug.graph src dst } with _ -> dug
 
   let get_abslocs : node -> node -> t -> locset
-  =fun src dst dug -> try G.find_label dug src dst with _ -> PowLoc.empty
+  =fun src dst dug -> try G.find_label dug.graph src dst with _ -> PowLoc.empty
+
+  let mem_node n g = G.mem_vertex g.graph n
 
   let mem_duset : loc -> locset -> bool
   =fun x duset -> PowLoc.mem x duset
 
-  let add_edge_e dug e = G.add_edge_e dug e
+  let add_edge_e dug e = { dug with graph = G.add_edge_e dug.graph e }
 
   let add_absloc : node -> Loc.t -> node -> t -> t
   =fun src x dst dug ->
-    G.modify_edge_def (PowLoc.singleton x) dug src dst (PowLoc.add x)
+    { dug with graph = G.modify_edge_def (PowLoc.singleton x) dug.graph src dst (PowLoc.add x) }
 
   let add_abslocs : node -> locset -> node -> t -> t
   =fun src xs dst dug ->
     if PowLoc.is_empty xs then dug else
-    G.modify_edge_def xs dug src dst (PowLoc.union xs)
+      { dug with graph = G.modify_edge_def xs dug.graph src dst (PowLoc.union xs) }
 
-  let fold_node = G.fold_vertex
-  let fold_edges = G.fold_edges
-  let iter_node = G.iter_vertex
-  let iter_edges = G.iter_edges
-  let iter_edges_e = G.iter_edges_e
-  let fold_succ = G.fold_succ
+  let fold_node f g a = G.fold_vertex f g.graph a
+  let fold_edges f g a = G.fold_edges f g.graph a
+  let fold_edges_e f g a = G.fold_edges_e f g.graph a
+  let iter_node f g = G.iter_vertex f g.graph
+  let iter_vertex f g = G.iter_vertex f g.graph
+  let iter_edges f g = G.iter_edges f g.graph
+  let iter_edges_e f g = G.iter_edges_e f g.graph
+  let fold_pred f g a = G.fold_pred f g.graph a
+  let fold_succ f g a = G.fold_succ f g.graph a
+  let iter_succ f g = G.iter_succ f g.graph
 
   let nb_loc dug =
     fold_edges (fun src dst size ->

@@ -20,8 +20,7 @@ sig
   val to_json_inter     : DUGraph.t -> Access.t -> Yojson.Safe.json
 end
 
-module Make (DUGraph : Dug.S) (Access: Access.S
-    with type Loc.t = DUGraph.Loc.t and type PowLoc.t = DUGraph.PowLoc.t): S
-  with type Access.t = Access.t
-  and type DUGraph.t = DUGraph.t
-  and type PowLoc.t = DUGraph.PowLoc.t
+module Make (DUGraph : Dug.S) : S
+  with type DUGraph.t = DUGraph.t
+   and type Access.t = DUGraph.Access.t
+   and type PowLoc.t = DUGraph.PowLoc.t

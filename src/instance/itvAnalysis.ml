@@ -20,13 +20,15 @@ open ArrayBlk
 open AlarmExp
 open Report
 
+module L = Logging
+module F = Format
+
 let analysis = Spec.Interval
 module Analysis = SparseAnalysis.Make(ItvSem)
 module Table = Analysis.Table
 module Spec = Analysis.Spec
 module DUGraph = Analysis.DUGraph
 module Node = InterCfg.Node
-module L = Logging
 
 let print_abslocs_info locs =
   let lvars = BatSet.filter Loc.is_lvar locs in
@@ -348,20 +350,29 @@ let connect_from_start g =
   |> List.fold_left (fun g n -> DUGraph.add_edge InterCfg.start_node n g) g
 
 let print_datalog_fact spec global dug alarms =
+  let dug = connect_from_start dug in
+  let alarms = List.rev_map
+      (fun q -> { q with src = Some (InterCfg.start_node, Cil.locUnknown) })
+      alarms
+  in
   RelSyntax.print global.icfg;
   Provenance.print global.relations;
-  RelDUGraph.print global dug alarms
+  RelDUGraph.print global dug alarms;
+  let oc = open_out (!Options.outdir ^ "/datalog/Alarms.facts") in
+  let fmt = F.formatter_of_out_channel oc in
+  List.iter (fun alarm ->
+      match alarm.src with
+      | Some (src_node, _) ->
+        F.fprintf fmt "%a\t%a\n" Node.pp src_node Node.pp alarm.node
+      | _ -> ()) alarms;
+  F.pp_print_flush fmt ();
+  close_out oc
 
 let post_process spec (global, dug, inputof, outputof) =
   let alarms = StepManager.stepf true "Generate Alarm Report"
       (inspect_alarm global spec) inputof
   in
   (if !Options.extract_datalog_fact then
-     let dug = connect_from_start dug in
-     let alarms = List.rev_map
-         (fun q -> { q with src = Some (InterCfg.start_node, Cil.locUnknown) })
-         alarms
-     in
      print_datalog_fact spec global dug alarms);
   (global, dug, inputof, outputof, alarms)
 
