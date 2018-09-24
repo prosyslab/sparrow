@@ -27,14 +27,13 @@ end
 module ProcSet = BatSet.Make(Proc)
 type pid = Proc.t
 module Node = struct
-  type t = Proc.t * IntraCfg.Node.t [@@deriving compare]
+  type t = Proc.t * IntraCfg.Node.t [@@deriving compare, eq]
   let to_string (pid,node) = pid ^ "-" ^ IntraCfg.Node.to_string node
   let to_json x = `String (to_string x)
   let make pid node = (pid,node)
   let get_pid (pid,node) = pid
   let get_cfgnode (pid,node) = node
   let hash = Hashtbl.hash
-  let equal (p1, n1) (p2, n2) = p1 = p2 && IntraCfg.Node.equal n1 n2
   let pp fmt (p, n) = Format.fprintf fmt "%a-%a" Proc.pp p IntraCfg.Node.pp n
 end
 
