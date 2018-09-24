@@ -769,8 +769,15 @@ let process_gvar fd lv i loc entry g =
   | (_, Some (SingleInit exp as init)) ->               (* e.g., int global = 1; *)
     process_init fd lv init loc entry g
   | (_, Some (CompoundInit (typ, ilist) as init)) ->    (* e.g., int global = { 1, 2 }; *)
+    let length = List.length ilist in
+    (if length > 1000 then
+       Logging.warn "WARN: too large global array initialization (%d) %@ %s\n"
+         (List.length ilist) (CilHelper.s_location loc));
     let (node, g) = process_gvardecl fd lv loc entry g in
-    process_init fd lv init loc node g
+    if length < !Options.unsound_skip_global_array_init then
+      process_init fd lv init loc node g
+    else
+      node, g
 
 let get_main_dec globals =
   List.fold_left (fun s g ->
@@ -798,60 +805,69 @@ let generate_cmd_args fd loc g =
   let g = g |> add_cmd arg_node arg_cmd |> add_cmd opt_node opt_cmd |> add_edge Node.ENTRY arg_node |> add_edge arg_node opt_node in
   (opt_node, g)
 
+let ignore_function fd =
+  List.map (fun str -> Str.regexp (".*" ^ str ^ ".*"))
+    !Options.unsound_skip_function
+  |> List.exists (fun re -> Str.string_match re fd.svar.vname 0)
+
 let init fd loc =
-  let regexps = List.map (fun str -> Str.regexp (".*" ^ str ^ ".*"))
-      !Options.unsound_skip_function
-  in
   if (!Options.unsound_noreturn_function &&
-      Cil.hasAttribute "noreturn" fd.svar.vattr) ||
-     (List.exists (fun re -> Str.string_match re fd.svar.vname 0) regexps)
+      Cil.hasAttribute "noreturn" fd.svar.vattr) || ignore_function fd
   then
     add_edge Node.ENTRY Node.EXIT (empty fd)
   else
-  let entry = Node.fromCilStmt (List.nth fd.sallstmts 0) in
-  let g =
-    (* add nodes *)
-    (list_fold (fun s ->
-        add_node_with_cmd (Node.fromCilStmt s) (Cmd.fromCilStmt s.skind)
-      ) fd.sallstmts
-    >>>
-    (* add edges *)
-    list_fold (fun stmt ->
-        list_fold (fun succ ->
-          add_edge (Node.fromCilStmt stmt) (Node.fromCilStmt succ)
-        ) stmt.succs
-      ) fd.sallstmts
-    ) (empty fd) in
-  let (term, g) =
-    if fd.svar.vname = "main" && List.length fd.sformals >= 2 then
-      generate_cmd_args fd loc g
-    else (Node.ENTRY, g)
-  in
-  (* generate alloc cmds for static allocations *)
-  let (term, g) = generate_allocs fd fd.slocals term g in
-  let g = add_edge term entry g in
-  let nodes = nodesof g in
-  let lasts = List.filter (fun n -> succ n g = []) nodes in
-  g
-  |> list_fold (fun last -> add_edge last Node.EXIT) lasts
-  |> generate_assumes
-  |> flatten_instructions
-  |> remove_if_loop
-  |> transform_allocs fd           (* generate alloc cmds for dynamic allocations *)
-  |> transform_string_allocs fd    (* generate salloc (string alloc) cmds *)
-  |> remove_empty_nodes
-  |> insert_return_nodes
-  |> insert_return_before_exit
+    let entry = Node.fromCilStmt (List.nth fd.sallstmts 0) in
+    let g =
+      (* add nodes *)
+      (list_fold (fun s ->
+           add_node_with_cmd (Node.fromCilStmt s) (Cmd.fromCilStmt s.skind)
+         ) fd.sallstmts
+       >>>
+       (* add edges *)
+       list_fold (fun stmt ->
+           list_fold (fun succ ->
+               add_edge (Node.fromCilStmt stmt) (Node.fromCilStmt succ)
+             ) stmt.succs
+         ) fd.sallstmts
+      ) (empty fd) in
+    let (term, g) =
+      if fd.svar.vname = "main" && List.length fd.sformals >= 2 then
+        generate_cmd_args fd loc g
+      else (Node.ENTRY, g)
+    in
+    (* generate alloc cmds for static allocations *)
+    let (term, g) = generate_allocs fd fd.slocals term g in
+    let g = add_edge term entry g in
+    let nodes = nodesof g in
+    let lasts = List.filter (fun n -> succ n g = []) nodes in
+    g
+    |> list_fold (fun last -> add_edge last Node.EXIT) lasts
+    |> generate_assumes
+    |> flatten_instructions
+    |> remove_if_loop
+    |> transform_allocs fd           (* generate alloc cmds for dynamic allocations *)
+    |> transform_string_allocs fd    (* generate salloc (string alloc) cmds *)
+    |> remove_empty_nodes
+    |> insert_return_nodes
+    |> insert_return_before_exit
+
+let ignore_file regexps loc =
+  List.exists (fun re -> Str.string_match re loc.file 0) regexps
 
 let generate_global_proc globals fd =
   let entry = Node.ENTRY in
+  let regexps = List.map (fun str -> Str.regexp (".*" ^ str ^ ".*"))
+      !Options.unsound_skip_file
+  in
   let (term, g) =
     List.fold_left (fun (node, g) x ->
         match x with
-          Cil.GVar (var, init, loc) ->
+        | Cil.GVar (var, init, loc) when not (ignore_file regexps loc) ->
           process_gvar fd (Cil.var var) init loc node g
-        | Cil.GVarDecl (var, loc) -> process_gvardecl fd (Cil.var var) loc node g
-        | Cil.GFun (fundec, loc) -> process_fundecl fd fundec loc node g
+        | Cil.GVarDecl (var, loc) when not (ignore_file regexps loc) ->
+          process_gvardecl fd (Cil.var var) loc node g
+        | Cil.GFun (fundec, loc) when not (ignore_file regexps loc) ->
+          process_fundecl fd fundec loc node g
         | _ -> (node, g)) (entry, empty fd) globals
   in
   let (main_dec, main_loc) =

@@ -54,8 +54,10 @@ let top_location = ref false
 let unsound_recursion = ref false
 let unsound_alloc = ref false
 let unsound_const_string = ref false
+let unsound_skip_file = ref []
 let unsound_noreturn_function = ref false
 let unsound_skip_function = ref []
+let unsound_skip_global_array_init = ref max_int
 let bugfinder = ref 0
 
 (* datalog *)
@@ -111,7 +113,14 @@ let unsoundness_opts =
      "Unsoundly ignore functions whose attributes conatin \"__noreturn__\"")
   ; ("-unsound_skip_function",
      Arg.String (fun s -> unsound_skip_function := s::!unsound_skip_function),
-     "Unsoundly ignore functions whose names contain the given argument") ]
+     "Unsoundly ignore functions whose names contain the given argument")
+  ; ("-unsound_skip_file",
+     Arg.String (fun s -> unsound_skip_file := s::!unsound_skip_file),
+     "Unsoundly ignore files whose names contain the given argument")
+  ; ("-unsound_skip_global_array_init",
+     Arg.Set_int unsound_skip_global_array_init,
+     "Unsoundly ignore global array inits larger than the given argument") ]
+
 
 let datalog_opts =
   [ ("-extract_datalog_fact", (Arg.Set extract_datalog_fact),

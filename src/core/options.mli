@@ -47,6 +47,8 @@ val unsound_alloc : bool ref
 val unsound_const_string : bool ref
 val unsound_noreturn_function : bool ref
 val unsound_skip_function : string list ref
+val unsound_skip_file : string list ref
+val unsound_skip_global_array_init : int ref
 
 (** {2 Main Analysis } *)
 
