@@ -24,6 +24,9 @@ let analysis = Spec.Interval
 module Analysis = SparseAnalysis.Make(ItvSem)
 module Table = Analysis.Table
 module Spec = Analysis.Spec
+module DUGraph = Analysis.DUGraph
+module Node = InterCfg.Node
+module L = Logging
 
 let print_abslocs_info locs =
   let lvars = BatSet.filter Loc.is_lvar locs in
@@ -304,21 +307,21 @@ let generate_with_mem : Global.t * Mem.t * target -> query list
  * Marshaling *
  * ********** *)
 
-let marshal_in : Global.t -> Global.t * Table.t * Table.t
-= fun global ->
+let marshal_in global =
   let filename = Filename.basename global.file.fileName in
   let global = MarshalManager.input (filename ^ ".itv.global") in
+  let dug = MarshalManager.input (filename ^ ".itv.dug") in
   let input = MarshalManager.input (filename ^ ".itv.input") in
   let output = MarshalManager.input (filename ^ ".itv.output") in
-  (global,input,output)
+  (global, dug, input, output)
 
-let marshal_out : Global.t * Table.t * Table.t -> Global.t * Table.t * Table.t
-= fun (global,input,output) ->
+let marshal_out (global, dug, input, output) =
   let filename = Filename.basename global.file.fileName in
   MarshalManager.output (filename ^ ".itv.global") global;
+  MarshalManager.output (filename ^ ".itv.dug") dug;
   MarshalManager.output (filename ^ ".itv.input") input;
   MarshalManager.output (filename ^ ".itv.output") output;
-  (global,input,output)
+  (global, dug, input, output)
 
 let inspect_alarm : Global.t -> Spec.t -> Table.t -> Report.query list
 = fun global _ inputof ->
@@ -334,8 +337,29 @@ let get_locset mem =
     |> BatSet.fold (fun a -> PowLoc.add (Loc.of_allocsite a)) (Val.allocsites_of_val v)
   ) mem PowLoc.empty
 
-let do_analysis : Global.t -> Global.t * Table.t * Table.t * Report.query list
-= fun global ->
+module LMap = BatMap.Make(Loc)
+module NMap = BatMap.Make(Node)
+
+let print_datalog_fact spec global dug =
+  RelSyntax.print global.icfg;
+  Provenance.print global.relations;
+  let oc = open_out (!Options.outdir ^ "/datalog/DUEdge.facts") in
+  let fmt = Format.formatter_of_out_channel oc in
+  DUGraph.iter_edges_e (fun src dst locset ->
+      PowLoc.iter (fun l ->
+          Format.fprintf fmt "%a\t%a\t%a\n" Node.pp src Loc.pp l Node.pp dst)
+        locset) dug;
+  close_out oc;
+  (if not !Options.extract_datalog_fact_full then exit 0)
+
+let post_process spec (global, dug, inputof, outputof) =
+  let alarms = StepManager.stepf true "Generate Alarm Report"
+      (inspect_alarm global spec) inputof
+  in
+  (if !Options.extract_datalog_fact then print_datalog_fact spec global dug);
+  (global, inputof, outputof, alarms)
+
+let do_analysis global =
   let _ = prerr_memory_usage () in
   let locset = get_locset global.mem in
   let locset_fs = PartialFlowSensitivity.select global locset in
@@ -354,5 +378,4 @@ let do_analysis : Global.t -> Global.t * Table.t * Table.t * Report.query list
   in
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global
   |> opt !Options.marshal_out marshal_out
-  |> StepManager.stepf true "Generate Alarm Report" (fun (global,inputof,outputof) ->
-      (global,inputof,outputof,inspect_alarm global spec inputof))
+  |> post_process spec

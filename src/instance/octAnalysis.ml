@@ -199,21 +199,21 @@ let manual_packing : Global.t * ItvDom.Table.t -> PackConf.t
  * Marshaling *
  * ********** *)
 
-let marshal_in : Global.t -> Global.t * Table.t * Table.t
-= fun global ->
+let marshal_in global =
   let filename = Filename.basename global.file.fileName in
   let global = MarshalManager.input (filename ^ ".oct.global") in
+  let dug = MarshalManager.input (filename ^ ".oct.dug") in
   let input = MarshalManager.input (filename ^ ".oct.input") in
   let output = MarshalManager.input (filename ^ ".oct.output") in
-  (global,input,output)
+  (global, dug, input,output)
 
-let marshal_out : Global.t * Table.t * Table.t -> Global.t * Table.t * Table.t
-= fun (global,input,output) ->
+let marshal_out (global, dug, input, output) =
   let filename = Filename.basename global.file.fileName in
   MarshalManager.output (filename ^ ".oct.global") global;
+  MarshalManager.output (filename ^ ".oct.dug") dug;
   MarshalManager.output (filename ^ ".oct.input") input;
   MarshalManager.output (filename ^ ".oct.output") output;
-  (global,input,output)
+  (global, dug, input, output)
 
 let do_analysis : Global.t * ItvDom.Table.t -> Global.t * Table.t * Table.t * Report.query list
 = fun (global, itvinputof) ->
@@ -234,4 +234,5 @@ let do_analysis : Global.t * ItvDom.Table.t -> Global.t * Table.t * Table.t * Re
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global
   |> opt !Options.marshal_out marshal_out
   |> StepManager.stepf true "Generate Alarm Report"
-    (fun (global,inputof,outputof) -> (global,inputof,outputof,inspect_alarm global spec inputof))
+    (fun (global,_,inputof,outputof) ->
+       (global,inputof,outputof,inspect_alarm global spec inputof))

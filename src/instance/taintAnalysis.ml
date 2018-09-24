@@ -16,16 +16,18 @@ module Mem = TaintDom.Mem
 let marshal_in global =
   let filename = Filename.basename global.file.fileName in
   let global = MarshalManager.input (filename ^ ".taint.global") in
+  let dug = MarshalManager.input (filename ^ ".taint.dug") in
   let input = MarshalManager.input (filename ^ ".taint.input") in
   let output = MarshalManager.input (filename ^ ".taint.output") in
-  (global,input,output)
+  (global, dug, input, output)
 
-let marshal_out (global,input,output) =
+let marshal_out (global, dug, input, output) =
   let filename = Filename.basename global.file.fileName in
   MarshalManager.output (filename ^ ".taint.global") global;
+  MarshalManager.output (filename ^ ".taint.dug") dug;
   MarshalManager.output (filename ^ ".taint.input") input;
   MarshalManager.output (filename ^ ".taint.output") output;
-  (global,input,output)
+  (global, dug, input, output)
 
 let inspect_aexp node aexp itvmem mem queries =
   match aexp with
@@ -82,7 +84,7 @@ let make_top_mem locset =
   PowLoc.fold (fun l mem ->
       Mem.add l TaintDom.Val.top mem) locset Mem.bot
 
-let print_datalog_alarms alarms =
+let print_datalog_fact alarms =
   let oc = open_out (!Options.outdir ^ "/datalog/TaintAlarms.facts") in
   let fmt = F.formatter_of_out_channel oc in
   List.iter (fun alarm ->
@@ -93,12 +95,12 @@ let print_datalog_alarms alarms =
   F.pp_print_flush fmt ();
   close_out oc
 
-let post_process spec (global, inputof, outputof) =
+let post_process spec (global, _, inputof, outputof) =
   let alarms = StepManager.stepf true "Generate Alarm Report"
       (inspect_alarm global spec) inputof
   in
   (if !Options.extract_datalog_fact_full then
-     print_datalog_alarms alarms);
+     print_datalog_fact alarms);
   (global, inputof, outputof, alarms)
 
 let do_analysis (global, itvinputof) =

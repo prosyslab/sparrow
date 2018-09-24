@@ -215,7 +215,7 @@ let do_analysis (global,itvinputof) =
     ; Spec.premem = Mem.top OctImpactDom.packconf }
   in
   Analysis.perform spec global
-  |> (fun (g, i,o) -> (g, itvinputof, i, o))
+  |> (fun (g, _, i, o) -> (g, itvinputof, i, o))
 
 (* ********** *
  * Marshaling *
@@ -242,4 +242,3 @@ let packing : Global.t * ItvAnalysis.Table.t -> PackConf.t
   |> StepManager.stepf_cond !Options.marshal_in true "Oct Impact Analysis" marshal_in do_analysis
   |> opt !Options.marshal_out marshal_out
   |> inspect_alarm
-

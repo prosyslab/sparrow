@@ -24,8 +24,9 @@ module type S =
 sig
   module Dom : InstrumentedMem.S
   module Table : MapDom.CPO with type t = MapDom.MakeCPO(BasicDom.Node)(Dom).t and type A.t = BasicDom.Node.t and type B.t = Dom.t
+  module DUGraph : Dug.S with type PowLoc.t = Dom.PowA.t
   module Spec : Spec.S with type Dom.t = Dom.t and type Dom.A.t = Dom.A.t and type Dom.PowA.t = Dom.PowA.t
-  val perform : Spec.t -> Global.t -> Global.t * Table.t * Table.t
+  val perform : Spec.t -> Global.t -> Global.t * DUGraph.t * Table.t * Table.t
 end
 
 module MakeWithAccess (Sem:AccessSem.S) =
@@ -197,15 +198,6 @@ struct
       |> Yojson.Safe.pretty_to_channel stdout;
       exit 0
     end
-    else if !Options.extract_datalog_fact && Spec.is_interval spec then
-      let oc = open_out (!Options.outdir ^ "/datalog/DUEdge.facts") in
-      let fmt = Format.formatter_of_out_channel oc in
-      DUGraph.iter_edges_e (fun src dst locset ->
-          PowLoc.iter (fun l ->
-              Format.fprintf fmt "%a\t%a\t%a\n"
-                Node.pp src PowLoc.A.pp l Node.pp dst) locset) dug;
-      close_out oc;
-      (if not !Options.extract_datalog_fact_full then exit 0)
     else
     begin
       prerr_memory_usage ();
@@ -257,8 +249,7 @@ struct
     L.info ~level:1 "#total abstract locations  = %d\n" (PowLoc.cardinal spec.Spec.locset);
     L.info ~level:1 "#flow-sensitive abstract locations  = %d\n" (PowLoc.cardinal spec.Spec.locset_fs)
 
-  let perform : Spec.t -> Global.t -> Global.t * Table.t * Table.t
-  =fun spec global ->
+  let perform spec global =
     print_spec spec;
     let access = StepManager.stepf false "Access Analysis" (AccessAnalysis.perform global spec.Spec.locset (Sem.run Strong spec)) spec.Spec.premem in
     let dug = StepManager.stepf false "Def-use graph construction" SsaDug.make (global, access, spec.Spec.locset_fs) in
@@ -268,7 +259,7 @@ struct
     |> StepManager.stepf false "Fixpoint iteration with widening" (widening spec dug)
     |> finalize spec global dug access
     |> StepManager.stepf_opt !Options.narrow false "Fixpoint iteration with narrowing" (narrowing spec dug)
-    |> (fun (_,global,inputof,outputof) -> (global, inputof, outputof))
+    |> (fun (_,global,inputof,outputof) -> (global, dug, inputof, outputof))
 end
 
 module Make (Sem:AbsSem.S) = MakeWithAccess (AccessSem.Make (Sem))

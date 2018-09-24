@@ -58,9 +58,6 @@ let print_pgm_info global =
   let json = InterCfg.to_json_simple global.icfg in
   Yojson.Safe.pretty_to_channel oc json;
   close_out oc;
-  if !Options.extract_datalog_fact then begin
-    RelSyntax.print global.icfg
-  end;
   global
 
 let print_il file =
@@ -100,9 +97,6 @@ let extract_feature : Global.t -> Global.t
   else if !Options.extract_lib_feat then
     let _ = UnsoundLib.extract_feature global |> UnsoundLib.print_feature in
     exit 0
-  else if !Options.extract_datalog_fact then
-    let _ = Provenance.print global.relations in
-    global
   else global
 
 let mk_outdir dirname =
