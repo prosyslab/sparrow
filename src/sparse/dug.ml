@@ -83,10 +83,10 @@ struct
     let fold_succ f g a = I.fold_succ f g.graph a
 
     let remove_vertex g n = I.remove_vertex g.graph n; g
-    let add_edge g s d = I.add_edge g.graph s d; g
     let add_edge_e g (s,locs,d) =
       Hashtbl.replace g.label (s,d) locs;
-      add_edge g s d
+      I.add_edge g.graph s d; g
+    let add_edge g s d = add_edge_e g (s,PowLoc.empty,d)
     let remove_edge g s d = I.remove_edge g.graph s d; Hashtbl.remove g.label (s,d); g
     let find_label g s d = Hashtbl.find g.label (s,d)
     let modify_edge_def def g s d f =
