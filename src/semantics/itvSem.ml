@@ -276,16 +276,14 @@ let sparrow_print spec pid exps mem loc =
     let vs = eval_list spec pid exps mem in
     let vs_str = string_of_list Val.to_string vs in
     let exps_str = string_of_list CilHelper.s_exp exps in
-    prerr_endline
-      ("sparrow_print (" ^ exps_str ^ " @ " ^ CilHelper.s_location loc ^ ") : "
-       ^ vs_str)
+    Logging.info "sparrow_print (%s %@ %s) : %s\n" exps_str
+      (CilHelper.s_location loc) vs_str
 
 let sparrow_dump mem loc =
   if !Options.verbose < 1 then ()
   else
-    prerr_endline
-      ("sparrow_dump (" ^ CilHelper.s_location loc ^ ") : \n"
-       ^ Mem.to_string mem)
+    Logging.info "sparrow_dump (%s) : \n%a\n" (CilHelper.s_location loc)
+      Mem.pp mem
 
 let return_struct_type f =
   match f.vtype with
