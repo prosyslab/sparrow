@@ -88,15 +88,7 @@ let print_datalog_fact spec global dug alarms =
   RelSyntax.print global.icfg;
   Provenance.print global.relations;
   RelDUGraph.print global dug alarms;
-  let oc = open_out (!Options.outdir ^ "/datalog/Alarms.facts") in
-  let fmt = F.formatter_of_out_channel oc in
-  List.iter (fun alarm ->
-      match alarm.src with
-      | Some (src_node, _) ->
-        F.fprintf fmt "%a\t%a\n" Node.pp src_node Node.pp alarm.node
-      | _ -> ()) alarms;
-  F.pp_print_flush fmt ();
-  close_out oc
+  RelDUGraph.print_alarm alarms
 
 let post_process spec itvdug (global, _, inputof, outputof) =
   let alarms = StepManager.stepf true "Generate Alarm Report"
