@@ -23,7 +23,7 @@ let test_suites =
         ; "basic/global_static_struct2.c"; "basic/local_dynamic_struct.c"
         ; "basic/local_static_struct.c"; "basic/struct_pointer.c"
         ; "interval/prune_const.c"; "interval/strncpy.c"
-        ; "interval/memcpy.c" ] }
+        ; "interval/memcpy.c"; "interval/memset.c" ] }
   ; { opt = "-narrow"; files = [ "narrowing/narrow.c" ] }
   ; { opt = "-inline alloc -unsound_alloc"
     ; files = [ "unsoundness/unsound_alloc.c" ] }

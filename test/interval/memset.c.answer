@@ -1,0 +1,23 @@
+interval/memset.c
+To inline : []
+Excluded variable-arguments functions : []
+Excluded recursive functions : []
+Excluded too large functions : []
+#Procs : 2
+#Nodes : 21
+#Nodes in def-use graph : 14
+#Locs on def-use graph : 15
+
+= Alarms =
+1. memset.c:11 {main} UnProven
+  buf[*p] @main-15:  offset: [20, 20], size: [10, 10] UnProven, allocsite: main-8
+2. memset.c:12 {main} UnProven
+  *(p+10) @main-16:  offset: [10, 10], size: [10, 10] UnProven, allocsite: main-8
+3. memset.c:16 {main} UnProven
+  s.arr[10] @main-18:  offset: [10, 10], size: [10, 10] UnProven, allocsite: main-11
+
+#queries                 : 4
+#queries mod alarm point : 3
+#proven                  : 0
+#unproven                : 3
+#bot-involved            : 0

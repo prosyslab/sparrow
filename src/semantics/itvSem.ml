@@ -575,6 +575,21 @@ let rec model_strchr mode spec node pid (lvo, exps) (mem, global) =
       (mem, global)
   | _, _ -> (mem, global)
 
+let model_memset mode spec pid (lvo, exps) (mem, global) =
+  match exps with
+  | buf::v::_ -> begin
+    let arr = eval ~spec pid buf mem in
+    let init = eval ~spec pid v mem in
+    let locs = Val.all_locs arr in
+    let mem = update Weak spec global locs init mem in
+    match lvo with
+    | Some lv ->
+      let mem = update mode spec global (eval_lv ~spec pid lv mem) arr mem in
+      (mem, global)
+    | _ -> (mem, global)
+  end
+  | _ -> (mem, global)
+
 let sparrow_array_init mode spec node pid exps (mem, global) =
   match List.nth exps 0, List.nth exps 1 with
   | arr, Cil.Const (Cil.CInt64 (_, _, _)) ->
@@ -787,12 +802,13 @@ let scaffolded_functions mode spec node pid (lvo,f,exps) (mem, global) =
     | "sprintf" -> model_sprintf mode spec pid (lvo, exps) (mem, global)
     | "scanf" -> model_scanf mode spec pid exps (mem, global)
     | "getenv" -> model_input mode spec node pid lvo (mem, global)
-    | "strdup" -> model_strdup mode spec node (lvo, exps) (mem, global)
+    | "strdup" | "strndup" -> model_strdup mode spec node (lvo, exps) (mem, global)
     | "gettext" -> model_assign mode spec pid (lvo, exps) (mem, global)
     | "getpwent" -> model_getpwent mode spec node pid lvo f (mem,global)
     | "strcpy" -> model_strcpy mode spec node pid exps (mem, global)
     | "strcat" -> model_strcat mode spec node pid exps (mem, global)
     | "strchr" | "strrchr" -> model_strchr mode spec node pid (lvo, exps) (mem, global)
+    | "memset" -> model_memset mode spec pid (lvo, exps) (mem, global)
     | s when List.mem s mem_alloc_libs -> model_alloc_one mode spec pid lvo f (mem, global)
     | s when ApiSem.ApiMap.mem f.vname ApiSem.api_map ->
       let api_type = ApiSem.ApiMap.find f.vname ApiSem.api_map in
