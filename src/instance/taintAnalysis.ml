@@ -37,7 +37,9 @@ let inspect_aexp node aexp itvmem mem queries =
     let taint = TaintSem.eval pid e itvmem mem |> TaintDom.Val.user_input in
     TaintDom.UserInput.fold (fun (src_node, src_loc) queries ->
         let size_ovfl = TaintSem.eval pid e itvmem mem |> TaintDom.Val.int_overflow |> TaintDom.IntOverflow.is_bot |> not in
-        let status = if size_ovfl then UnProven else Proven in
+        let status =
+          if size_ovfl && not (Itv.is_finite size_itv) then UnProven
+          else Proven in
         let desc = "size = " ^ Itv.to_string size_itv
                    ^ ", source = " ^ Node.to_string src_node ^ " @ "
                    ^ CilHelper.s_location src_loc
