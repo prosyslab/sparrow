@@ -24,5 +24,4 @@ bin/sparrow*
 sparrow-out
 
 # vim swp files
-.*.swp
-.*.swo
+.*.sw?
