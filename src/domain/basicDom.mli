@@ -21,6 +21,7 @@ module Allocsite : sig
   val allocsite_of_node : Node.t -> t
   val allocsite_of_string : Node.t -> t
   val is_string_allocsite : t -> bool
+  val is_global_allocsite : t -> bool
   val is_ext_allocsite : t -> bool
   val is_cmd_arg : t -> bool
   val allocsite_of_ext : string option -> t

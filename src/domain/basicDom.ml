@@ -36,25 +36,37 @@ end
 
 module IntAllocsite =
 struct
-  type t = Node.t * is_string [@@deriving compare]
-  and is_string = bool
+  type t = Node.t * is_string
+  and is_string = bool [@@deriving compare]
 
+  let is_global_allocsite (node, _) =
+    Proc.equal (Node.get_pid node) (InterCfg.global_proc)
   let to_string (node,_) = Node.to_string node
   let pp fmt x = Format.fprintf fmt "%s" (to_string x)
 end
 
 module Allocsite =
 struct
-  type t = Internal of IntAllocsite.t | External of ExtAllocsite.t [@@deriving compare]
-  let allocsite_of_node : Node.t -> t
-  = fun n -> Internal (n,false)
-  let allocsite_of_string : Node.t -> t
-  = fun n -> Internal (n,true)
+  type t = Internal of IntAllocsite.t
+         | External of ExtAllocsite.t [@@deriving compare]
+  let allocsite_of_node n = Internal (n, false)
+  let allocsite_of_string n = Internal (n, true)
 
-  let is_node_allocsite = function Internal (_,false) -> true | _ -> false
-  let is_string_allocsite = function Internal (_,true) -> true | _ -> false
-  let is_ext_allocsite = function External _ -> true | _ -> false
-  let is_cmd_arg = function External e -> ExtAllocsite.is_cmd_arg e | _ -> false
+  let is_node_allocsite = function
+    | Internal (_,false) -> true
+    | _ -> false
+  let is_string_allocsite = function
+    | Internal (_,true) -> true
+    | _ -> false
+  let is_global_allocsite = function
+    | Internal a -> IntAllocsite.is_global_allocsite a
+    | _ -> false
+  let is_ext_allocsite = function
+    | External _ -> true
+    | _ -> false
+  let is_cmd_arg = function
+    | External e -> ExtAllocsite.is_cmd_arg e
+    | _ -> false
 
   let allocsite_of_ext = function
     | None -> External (ExtAllocsite.input)
@@ -71,8 +83,10 @@ end
 
 module Loc =
 struct
-  type t = GVar of string * Cil.typ | LVar of Proc.t * string * Cil.typ
-         | Allocsite of Allocsite.t | Field of t * field * Cil.typ
+  type t = GVar of string * Cil.typ
+         | LVar of Proc.t * string * Cil.typ
+         | Allocsite of Allocsite.t
+         | Field of t * field * Cil.typ
   and field = string
 
   let rec compare x y =
@@ -90,11 +104,14 @@ struct
         else c
       else c
     | _, _ -> Pervasives.compare (tag_of_t x) (tag_of_t y)
-  and tag_of_t = function GVar _ -> 0 | LVar _ -> 1 | Allocsite _ -> 2 | Field _ -> 3
+  and tag_of_t = function
+    | GVar _ -> 0 | LVar _ -> 1 | Allocsite _ -> 2 | Field _ -> 3
   let equal = [%compare.equal : t]
   let hash = Hashtbl.hash
 
-  let typ = function GVar (_, t) | LVar (_, _, t) | Field (_, _, t) -> Some t | _ -> None
+  let typ = function
+    | GVar (_, t) | LVar (_, _, t) | Field (_, _, t) -> Some t
+    | _ -> None
 
   let rec to_string = function
     | GVar (g, _) -> g
@@ -108,48 +125,49 @@ struct
   let null = GVar ("NULL", Cil.voidPtrType)
 
   let is_null x = (x = null)
-  let is_var : t -> bool = function
+  let is_var = function
     | GVar _ | LVar _ -> true
     | _ -> false
 
-  let is_gvar : t -> bool = function
+  let is_gvar = function
     | GVar _ -> true
     | _ -> false
 
-  let is_lvar : t -> bool = function
+  let is_lvar = function
     | LVar _ -> true
     | _ -> false
 
-  let is_allocsite : t -> bool = function
+  let is_allocsite = function
     | Allocsite _ -> true
     | _ -> false
 
-  let is_string_allocsite : t -> bool = function
+  let is_string_allocsite = function
     | Allocsite a -> Allocsite.is_string_allocsite a
     | _ -> false
 
-  let is_ext_allocsite : t -> bool = function
+  let is_ext_allocsite = function
     | Allocsite a -> Allocsite.is_ext_allocsite a
     | _ -> false
 
-  let is_field : t -> bool = function
+  let is_field = function
     | Field _ -> true
     | _ -> false
 
-  let is_local_of : Proc.t -> t -> bool = fun p x ->
+  let is_local_of p x =
     match x with
-    | LVar (p',_,_) -> p = p'
+    | LVar (p',_,_) -> Proc.equal p p'
     | _ -> false
 
-  let get_proc : t -> Proc.t
-  = function LVar (p, _, _) -> p | _ -> raise Not_found
+  let get_proc = function
+    | LVar (p, _, _) -> p
+    | _ -> raise Not_found
 
   let of_gvar x typ = GVar (x,typ)
   let of_lvar p x typ = LVar (p,x,typ)
-  let of_allocsite : Allocsite.t -> t = fun x -> Allocsite x
+  let of_allocsite x = Allocsite x
   let return_var pid typ = LVar (pid, "__return__", typ)
 
-  let append_field x f typ = Field (x,f,typ)
+  let append_field x f typ = Field (x, f, typ)
 end
 
 module PowLoc =
@@ -162,7 +180,7 @@ struct
     | Cil.Ne when Cil.isZero e -> remove Loc.null x
     | _ -> x
   let null = singleton Loc.null
-  let append_field : t -> Cil.fieldinfo -> t = fun ls f ->
+  let append_field ls f =
     let add_appended l acc =
       if Loc.is_ext_allocsite l then add l acc
       else if Loc.is_null l || Loc.is_string_allocsite l then acc
