@@ -182,8 +182,25 @@ let to_json_simple g =
   BatMap.fold (fun cfg json ->
       let cfg_json = IntraCfg.to_json_simple cfg in
       match json, cfg_json with
-      | `Assoc l1, `Assoc l2 -> `Assoc (l1 @ l2)
-      | _ -> failwith "Invalid format") g.cfgs (`Assoc [])
+      | `Assoc [], _ -> cfg_json
+      | `Assoc l1, `Assoc l2 ->
+        let nodes1 = List.assoc "nodes" l1 in
+        let nodes2 = List.assoc "nodes" l2 in
+        let edges1 = List.assoc "edges" l1 in
+        let edges2 = List.assoc "edges" l2 in
+        let nodes =
+          match nodes1, nodes2 with
+          | `Assoc l1, `Assoc l2 -> `Assoc (l1 @ l2)
+          | _ -> failwith "Invalid format"
+        in
+        let edges =
+          match edges1, edges2 with
+          | `List l1, `List l2 -> `List (l1 @ l2)
+          | _ -> failwith "Invalid format"
+        in
+        `Assoc [ ("nodes", nodes)
+               ; ("edges", edges) ]
+      | _, _ -> failwith "Invalid format") g.cfgs (`Assoc [])
 
 let print_json : out_channel -> t -> unit
 = fun chan g ->

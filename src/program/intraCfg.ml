@@ -55,7 +55,7 @@ module NodeSet = BatSet.Make(Node)
 
 module Cmd = struct
   type t =
-  | Cinstr of instr list
+  | Cinstr of instr list * location
   | Cif of exp * block * block * location
   | CLoop of location
   (* final graph has the following cmds only *)
@@ -71,20 +71,27 @@ module Cmd = struct
             (string option * string * lval) list *
             (string option * string * exp) list *
             string list * location
-  | Cskip of location
+  | Cskip of tag * location
   and alloc = Array of exp | Struct of compinfo
   and static = bool
   and branch = bool
+  and tag = None | ReturnNode | Branch | LoopHead
 
   let fromCilStmt = function
-    | Instr instrs -> Cinstr instrs
+    | (Instr instrs) as s -> Cinstr (instrs, Cil.get_stmtLoc s)
     | If (exp,b1,b2,loc) -> Cif (exp,b1,b2,loc)
     | Loop (_,loc,_,_) -> CLoop loc
     | Return (expo,loc) -> Creturn (expo,loc)
-    | s -> Cskip (Cil.get_stmtLoc s)
+    | s -> Cskip (None, Cil.get_stmtLoc s)
+
+  let string_of_tag = function
+    | None -> ""
+    | ReturnNode -> "ReturnNode"
+    | Branch -> "Branch"
+    | LoopHead -> "LoopHead"
 
   let to_string = function
-    | Cinstr instrs -> s_instrs instrs
+    | Cinstr (instrs, _) -> s_instrs instrs
     | Cset (lv,e,_) -> "set("^s_lv lv^","^s_exp e^")"
     | Cexternal (lv,_) -> "extern("^s_lv lv^")"
     | Calloc (lv, Array e,_,_) -> "alloc("^s_lv lv^",["^s_exp e^"])"
@@ -105,7 +112,7 @@ module Cmd = struct
     | Cskip _ -> "skip"
 
   let to_json = function
-    | Cinstr _ -> `List []
+    | Cinstr (_, _) -> `List []
     | Cset (lv, e, _) ->
       `List
         [ `String "set"
@@ -160,11 +167,14 @@ module Cmd = struct
         [ `String "assume"
         ; `Bool b
         ; `String (s_exp e) ]
-    | Cskip _ ->
-      `List [ `String "skip" ]
+    | Cskip (tag, _) ->
+      `List [ `String "skip"; `String (string_of_tag tag) ]
     | _ -> `Null
 
   let location_of = function
+    | Cinstr (_, l)
+    | Cif (_, _, _, l)
+    | CLoop l
     | Cset (_,_,l)
     | Cexternal (_,l)
     | Calloc (_,_,_,l)
@@ -173,7 +183,7 @@ module Cmd = struct
     | Ccall (_,_,_,l)
     | Creturn (_,l) -> l
     | Cassume (_,_,l) -> l
-    | Cskip l -> l
+    | Cskip (_, l) -> l
     | _ -> Cil.locUnknown
 end
 
@@ -247,10 +257,12 @@ let add_node n g = { g with graph = G.add_vertex g.graph n }
 
 let find_cmd n g =
   try
-    if n = Node.ENTRY || n = Node.EXIT then Cmd.Cskip Cil.locUnknown
-    else BatMap.find n g.cmd_map
+    BatMap.find n g.cmd_map
   with _ ->
-    raise (Failure ("Can't find cmd of " ^ Node.to_string n))
+    if n = Node.ENTRY || n = Node.EXIT then
+      Cmd.Cskip (Cmd.None, Cil.locUnknown)
+    else
+      raise (Failure ("Can't find cmd of " ^ Node.to_string n))
 
 let add_cmd n c g = { g with cmd_map = BatMap.add n c g.cmd_map }
 
@@ -349,8 +361,8 @@ let generate_assumes g =
 let remove_if_loop g =
   fold_node (fun n g ->
       match find_cmd n g with
-      | Cmd.Cif (_, _, _, l)
-      | Cmd.CLoop l -> add_cmd n (Cmd.Cskip l) g
+      | Cmd.Cif (_, _, _, l) -> add_cmd n (Cmd.Cskip (Cmd.Branch, l)) g
+      | Cmd.CLoop l -> add_cmd n (Cmd.Cskip (Cmd.LoopHead, l)) g
       | _ -> g
     ) g g
 
@@ -370,7 +382,7 @@ let remove_empty_nodes g =
 let flatten_instructions g =
   fold_node (fun n g ->
       match find_cmd n g with
-      | Cmd.Cinstr instrs when instrs <> [] ->
+      | Cmd.Cinstr (instrs, _) when instrs <> [] ->
         let cmds =
           List.map (fun i ->
               match i with
@@ -392,7 +404,19 @@ let flatten_instructions g =
         |> list_fold (fun p -> add_edge p first) preds
         |> list_fold (fun s -> add_edge last s) succs
         |> remove_node n
-      | Cmd.Cinstr [] -> add_cmd n (Cmd.Cskip Cil.locUnknown) g
+      | Cmd.Cinstr ([], loc) ->
+        if Cil.compareLoc loc Cil.locUnknown = 0 then
+          let pred_locs =
+            pred n g
+            |> List.map (fun n -> find_cmd n g |> Cmd.location_of)
+            |> List.filter (fun loc -> Cil.compareLoc loc Cil.locUnknown <> 0)
+          in
+          if pred_locs = [] then
+            add_cmd n (Cmd.Cskip (Cmd.None, Cil.locUnknown)) g
+          else
+            add_cmd n (Cmd.Cskip (Cmd.None, List.nth pred_locs 0)) g
+        else
+          add_cmd n (Cmd.Cskip (Cmd.None, loc)) g
       | _ -> g
     ) g g
 
@@ -417,7 +441,7 @@ let make_init_loop fd lv exp loc entry f g =
   let g = add_cmd init_node init_cmd g in
   (* while (i < exp) *)
   let skip_node = Node.make () in
-  let g = add_cmd skip_node (Cmd.Cskip loc) g in
+  let g = add_cmd skip_node (Cmd.Cskip (Cmd.LoopHead, loc)) g in
   let g = add_edge init_node skip_node g in
   let g = add_edge entry init_node g in
   let assume_node = Node.make () in
@@ -580,7 +604,7 @@ let transform_string_allocs fd g =
          | (_, []) -> g
          | (e, l) ->
            let (empty_node, last_node) = (Node.make (), Node.make ()) in
-           let g = add_cmd empty_node (Cmd.Cskip loc) g in
+           let g = add_cmd empty_node (Cmd.Cskip (Cmd.None, loc)) g in
            let (node, g) = generate_sallocs l loc empty_node g in
            let cmd = Cmd.Cset (lv, e, loc) in
            let g = add_cmd last_node cmd g in
@@ -591,7 +615,7 @@ let transform_string_allocs fd g =
          | (_, []) -> g
          | (e, l) ->
            let (empty_node, last_node) = (Node.make (), Node.make ()) in
-           let g = add_cmd empty_node (Cmd.Cskip loc) g in
+           let g = add_cmd empty_node (Cmd.Cskip (Cmd.None, loc)) g in
            let (node, g) = generate_sallocs l loc empty_node g in
            let cmd = Cmd.Cassume (e, b, loc) in
            let g = add_cmd last_node cmd g in
@@ -608,7 +632,7 @@ let transform_string_allocs fd g =
            (_, []) -> g
          | (el, l) ->
            let (empty_node, last_node) = (Node.make (), Node.make ()) in
-           let g = add_cmd empty_node (Cmd.Cskip loc) g in
+           let g = add_cmd empty_node (Cmd.Cskip (Cmd.None, loc)) g in
            let (node, g) = generate_sallocs l loc empty_node g in
            let cmd = Cmd.Ccall (lv, f, el, loc) in
            let g = add_cmd last_node cmd g in
@@ -619,7 +643,7 @@ let transform_string_allocs fd g =
          | (_, []) -> g
          | (e, l) ->
            let (empty_node, last_node) = (Node.make (), Node.make ()) in
-           let g = add_cmd empty_node (Cmd.Cskip loc) g in
+           let g = add_cmd empty_node (Cmd.Cskip (Cmd.None, loc)) g in
            let (node, g) = generate_sallocs l loc empty_node g in
            let cmd = Cmd.Creturn (Some e, loc) in
            let g = add_cmd last_node cmd g in
@@ -696,11 +720,11 @@ let insert_return_nodes g =
         let r = returnof c g in
         let n = Node.make () in
         remove_edge c r g
-        |> add_cmd n (Cmd.Cskip loc)
+        |> add_cmd n (Cmd.Cskip (Cmd.ReturnNode, loc))
         |> add_edge c n
       | Cmd.Ccall (_, _, _, loc) ->
         let r = returnof c g in
-        add_new_node c (Cmd.Cskip loc) r g
+        add_new_node c (Cmd.Cskip (Cmd.ReturnNode, loc)) r g
       | _ -> g
     ) g (nodesof g)
 
@@ -811,10 +835,15 @@ let ignore_function fd =
   |> List.exists (fun re -> Str.string_match re fd.svar.vname 0)
 
 let init fd loc =
+  let g =
+    empty fd
+    |> add_node_with_cmd Node.ENTRY (Cmd.Cskip (Cmd.None, loc))
+    |> add_node_with_cmd Node.EXIT (Cmd.Cskip (Cmd.None, loc))
+  in
   if (!Options.unsound_noreturn_function &&
       Cil.hasAttribute "noreturn" fd.svar.vattr) || ignore_function fd
   then
-    add_edge Node.ENTRY Node.EXIT (empty fd)
+    add_edge Node.ENTRY Node.EXIT g
   else
     let entry = Node.fromCilStmt (List.nth fd.sallstmts 0) in
     let g =
@@ -829,7 +858,7 @@ let init fd loc =
                add_edge (Node.fromCilStmt stmt) (Node.fromCilStmt succ)
              ) stmt.succs
          ) fd.sallstmts
-      ) (empty fd) in
+      ) g in
     let (term, g) =
       if fd.svar.vname = "main" && List.length fd.sformals >= 2 then
         generate_cmd_args fd loc g
@@ -1017,13 +1046,17 @@ let to_json g =
           ("edges", edges)]
 
 let to_json_simple g =
-  let nodes = G.fold_vertex (fun v l ->
+  let nodes = `Assoc (G.fold_vertex (fun v l ->
       let cmd = find_cmd v g in
       let loc = Cmd.location_of cmd |> CilHelper.s_location in
       let item = `Assoc
           [ ("cmd", Cmd.to_json cmd)
           ; ("loc", `String loc) ]
       in
-      (g.fd.svar.vname ^ "-" ^ Node.to_string v, item)::l) g.graph []
+      (g.fd.svar.vname ^ "-" ^ Node.to_string v, item)::l) g.graph [])
   in
-  `Assoc nodes
+  let edges =
+    `List (G.fold_edges (fun v1 v2 edges ->
+        (`List [`String (get_pid g ^ "-" ^ Node.to_string v1)
+               ;`String (get_pid g ^ "-" ^ Node.to_string v2) ])::edges) g.graph []) in
+  `Assoc [("nodes", nodes); ("edges", edges)]

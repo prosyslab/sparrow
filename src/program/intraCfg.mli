@@ -20,7 +20,7 @@ module NodeSet : BatSet.S with type elt = Node.t
 
 module Cmd : sig
   type t =
-  | Cinstr of Cil.instr list
+  | Cinstr of Cil.instr list * Cil.location
   | Cif of Cil.exp * Cil.block * Cil.block * Cil.location
   | CLoop of Cil.location
   (* final graph has the following cmds only *)
@@ -36,10 +36,11 @@ module Cmd : sig
             (string option * string * Cil.lval) list *
             (string option * string * Cil.exp) list *
             string list * Cil.location
-  | Cskip of Cil.location
+  | Cskip of tag * Cil.location
   and alloc = Array of Cil.exp | Struct of Cil.compinfo
   and static = bool
   and branch = bool
+  and tag = None | ReturnNode | Branch | LoopHead
 
   val fromCilStmt : Cil.stmtkind -> t
   val to_string : t -> string
