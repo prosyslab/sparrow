@@ -173,13 +173,14 @@ end
 module PowLoc =
 struct
   include PowDom.MakeCPO (Loc)
+  let null = singleton Loc.null
 
   let prune op x e =
     match op with
-      Cil.Eq when Cil.isZero e -> singleton Loc.null
+      Cil.Eq when Cil.isZero e -> meet x null
     | Cil.Ne when Cil.isZero e -> remove Loc.null x
     | _ -> x
-  let null = singleton Loc.null
+
   let append_field ls f =
     let add_appended l acc =
       if Loc.is_ext_allocsite l then add l acc

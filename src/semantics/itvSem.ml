@@ -70,6 +70,7 @@ let lookup locs mem =
   Mem.lookup locs mem
 
 let update mode spec global locs v mem =
+  let locs = PowLoc.remove Loc.null locs in
   if can_strong_update mode spec global locs then Mem.strong_update locs v mem
   else Mem.weak_update locs v mem
 
