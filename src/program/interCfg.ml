@@ -68,11 +68,18 @@ let get_callees : Node.t -> t -> ProcSet.t
 let global_proc = "_G_"
 let start_node = Node.make global_proc IntraCfg.Node.entry
 
+let ignore_file regexps loc =
+  List.exists (fun re -> Str.string_match re loc.file 0) regexps
+
 let gen_cfgs file =
+  let regexps = List.map (fun str -> Str.regexp (".*" ^ str ^ ".*"))
+      !Options.unsound_skip_file
+  in
   BatMap.add global_proc (IntraCfg.generate_global_proc file.Cil.globals (Cil.emptyFunction global_proc))
     (list_fold (fun g m ->
       match g with
-      | Cil.GFun (f,loc) -> BatMap.add f.svar.vname (IntraCfg.init f loc) m
+      | Cil.GFun (f,loc) when not (ignore_file regexps loc) ->
+        BatMap.add f.svar.vname (IntraCfg.init f loc) m
       | _ -> m
     ) file.Cil.globals BatMap.empty)
 
