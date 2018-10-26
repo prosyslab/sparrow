@@ -74,9 +74,8 @@ let sparrow_print pid exps itvmem mem loc =
     let vs = eval_list pid exps itvmem mem in
     let vs_str = string_of_list Val.to_string vs in
     let exps_str = string_of_list CilHelper.s_exp exps in
-    prerr_endline
-      ("sparrow_print (" ^ exps_str ^ " @ " ^ CilHelper.s_location loc ^ ") : "
-       ^ vs_str)
+    Logging.info "sparrow_print (%s %@ %s) : %s\n" exps_str
+      (CilHelper.s_location loc) vs_str
 
 (* argc, argv *)
 let sparrow_arg mode node exps loc itvmem (mem,global) =
