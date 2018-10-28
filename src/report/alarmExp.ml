@@ -129,20 +129,25 @@ let c_lib_taint f es loc =
   | "snprintf" | "vsnprintf" -> [Printf (f.vname, List.nth es 2, loc)]
   | _ -> []
 
-let rec collect : IntraCfg.cmd -> t list
-=fun cmd ->
-  match cmd with
+let collect_interval = function
   | Cmd.Cset (lv,e,loc) -> (c_lv lv loc) @ (c_exp e loc)
   | Cmd.Cexternal (lv,loc) -> c_lv lv loc
-  | Cmd.Calloc (lv,Array e,_,loc) when !Options.taint ->
-    [AllocSize ("malloc", e, loc)]
   | Cmd.Calloc (lv,Array e,_,loc) -> (c_lv lv loc) @ (c_exp e loc)
   | Cmd.Csalloc (lv,_,loc) -> c_lv lv loc
   | Cmd.Cassume (e,_,loc) -> c_exp e loc
   | Cmd.Creturn (Some e, loc) -> c_exp e loc
   | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) when List.mem f.vname query_lib -> c_lib f es loc
-  | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) when !Options.taint ->
-    c_lib_taint f es loc
   | Cmd.Ccall (None,e,es,loc) -> (c_exp e loc) @ (c_exps es loc)
   | Cmd.Ccall (Some lv,e,es,loc) -> (c_lv lv loc) @ (c_exp e loc) @ (c_exps es loc)
+  | _ -> []
+
+let collect_taint = function
+  | Cmd.Calloc (lv,Array e,_,loc) -> [AllocSize ("malloc", e, loc)]
+  | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) -> c_lib_taint f es loc
+  | _ -> []
+
+let collect analysis cmd =
+  match analysis with
+  | Spec.Interval | Octagon -> collect_interval cmd
+  | Taint -> collect_taint cmd
   | _ -> []

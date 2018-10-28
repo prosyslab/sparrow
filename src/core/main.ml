@@ -84,12 +84,12 @@ let finalize t0 =
 let octagon_analysis (global,_,itvinputof,_,_) =
   StepManager.stepf true "Oct Sparse Analysis" OctAnalysis.do_analysis
     (global,itvinputof)
-  |> (fun (global,_,_,alarm) -> (global, alarm))
+  |> (fun (global,_,_,alarms) -> (global, alarms))
 
-let taint_analysis (global,itvdug,itvinputof,_,_) =
+let taint_analysis (global,itvdug,itvinputof,_,itvalarms) =
   StepManager.stepf true "Taint Sparse Analysis" TaintAnalysis.do_analysis
     (global,itvdug,itvinputof)
-  |> (fun (global,_,_,alarm) -> (global, alarm))
+  |> (fun (global,_,_,alarms) -> (global,itvalarms@alarms))
 
 let extract_feature : Global.t -> Global.t
 = fun global ->
@@ -101,21 +101,12 @@ let extract_feature : Global.t -> Global.t
     exit 0
   else global
 
-let mk_outdir dirname =
-  if Sys.file_exists dirname && Sys.is_directory dirname then ()
-  else if Sys.file_exists dirname && not (Sys.is_directory dirname) then
-    let _ = L.error "Error: %s already exists." dirname in
-    exit 1
-  else
-    Unix.mkdir dirname 0o755
-
 let initialize () =
   Printexc.record_backtrace true;
   (* process arguments *)
   let usageMsg = "Usage: sparrow [options] source-files" in
   Arg.parse Options.opts Frontend.args usageMsg;
-  mk_outdir !Options.outdir;
-  mk_outdir (!Options.outdir ^ "/datalog");
+  FileManager.mk_outdir ();
   L.init (if !Options.debug then L.DEBUG else L.INFO);
   L.info "%s\n" (String.concat " " !Frontend.files);
   Profiler.start_logger ();
@@ -124,23 +115,18 @@ let initialize () =
 let main () =
   let t0 = Sys.time () in
   initialize ();
-  try
-    StepManager.stepf true "Front-end" Frontend.parse ()
-    |> Frontend.makeCFGinfo
-    |> opt !Options.il print_il
-    |> init_analysis
-    |> print_pgm_info
-    |> opt !Options.cfg print_cfg
-    |> extract_feature
-    |> StepManager.stepf true "Itv Sparse Analysis" ItvAnalysis.do_analysis
-    |> case [ (!Options.oct, octagon_analysis);
-              (!Options.taint, taint_analysis) ]
-      (fun (global,_,_,_,alarm) -> (global, alarm))
-    |> (fun (global, alarm) -> Report.print global alarm)
-    |> (fun () -> finalize t0)
-  with exc ->
-    L.error "\n%s\n" (Printexc.to_string exc);
-    L.error "%s\n" (Printexc.get_backtrace ());
-    exit 1
+  StepManager.stepf true "Front-end" Frontend.parse ()
+  |> Frontend.makeCFGinfo
+  |> opt !Options.il print_il
+  |> init_analysis
+  |> print_pgm_info
+  |> opt !Options.cfg print_cfg
+  |> extract_feature
+  |> StepManager.stepf true "Itv Sparse Analysis" ItvAnalysis.do_analysis
+  |> case [ (!Options.oct, octagon_analysis)
+          ; (!Options.taint, taint_analysis) ]
+    (fun (global,_,_,_,alarm) -> (global, alarm))
+  |> (fun (global, alarm) -> Report.print global alarm)
+  |> (fun () -> finalize t0)
 
 let _ = main ()

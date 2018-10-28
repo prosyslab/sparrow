@@ -45,7 +45,6 @@ let optimize_inter_edge global old_g =
         G.add_abslocs src locset dst new_g
       else if (InterCfg.is_callnode src global.Global.icfg)
            && (InterCfg.is_entry dst) then
-        let preds = G.pred src old_g in
         new_g
       else
         new_g) old_g (G.create ())
@@ -97,7 +96,8 @@ let optimize global alarms g =
 (*   let g = optimize_inter_edge global g in *)
   g
 
-let print global dug alarms =
+let print analysis global dug alarms =
+  let dug = G.copy dug in
   let alarms = Report.get alarms Report.UnProven in
   let dug = optimize global alarms dug in
   let (true_branch, false_branch) =
@@ -110,12 +110,12 @@ let print global dug alarms =
             else (true_branch, false_branch)) cfg (true_branch, false_branch))
       global.Global.icfg (PowNode.empty, PowNode.empty)
   in
-  let dirname = !Options.outdir ^ "/datalog/" in
-  let oc_edge = open_out (dirname ^ "DUEdge.facts") in
-  let oc_tc = open_out (dirname ^ "TrueCond.facts") in
-  let oc_tb = open_out (dirname ^ "TrueBranch.facts") in
-  let oc_fc = open_out (dirname ^ "FalseCond.facts") in
-  let oc_fb = open_out (dirname ^ "FalseBranch.facts") in
+  let dirname = (FileManager.analysis_dir analysis) ^ "/datalog" in
+  let oc_edge = open_out (dirname ^ "/DUEdge.facts") in
+  let oc_tc = open_out (dirname ^ "/TrueCond.facts") in
+  let oc_tb = open_out (dirname ^ "/TrueBranch.facts") in
+  let oc_fc = open_out (dirname ^ "/FalseCond.facts") in
+  let oc_fb = open_out (dirname ^ "/FalseBranch.facts") in
   let fmt_edge = Format.formatter_of_out_channel oc_edge in
   let fmt_tc = Format.formatter_of_out_channel oc_tc in
   let fmt_tb = Format.formatter_of_out_channel oc_tb in
@@ -141,9 +141,10 @@ module AlarmSet = Set.Make(struct
     type t = Node.t * Node.t [@@deriving compare]
   end)
 
-let print_alarm alarms =
+let print_alarm analysis alarms =
   let alarms = Report.get alarms Report.UnProven in
-  let oc = open_out (!Options.outdir ^ "/datalog/Alarm.facts") in
+  let dirname = (FileManager.analysis_dir analysis) ^ "/datalog" in
+  let oc = open_out (dirname ^ "/Alarm.facts") in
   let fmt = F.formatter_of_out_channel oc in
   ignore(List.fold_left (fun set alarm ->
       match alarm.Report.src with

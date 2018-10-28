@@ -13,10 +13,10 @@ open Global
 open BasicDom
 open Vocab
 open ItvDom
-open ItvSem
 open IntraCfg
 open IntraCfg.Cmd
 
+module Dom = ItvSem.Dom
 module AccessSem = AccessSem.Make(ItvSem)
 module AccessAnalysis = AccessAnalysis.Make(AccessSem)
 module Access = ItvSem.Dom.Access
@@ -380,7 +380,7 @@ let add_used_inside_loops loc feat =
 let check_op op = op = Lt || op = Gt || op = Le || op = Ge || op = Eq || op = Ne
 
 let extract_set pid (lv,e) mem global feature =
-  let locs = eval_lv pid lv mem in
+  let locs = ItvSem.eval_lv pid lv mem in
   try
     feature
     |> (if is_const e then PowLoc.fold add_assign_const locs else id)
@@ -411,16 +411,16 @@ let extract_assume node pid e mem global feature =
       (match cond with
       | BinOp (op,Lval x,e,_) when check_op op ->
        begin
-        let locs = eval_lv pid x mem in
+        let locs = ItvSem.eval_lv pid x mem in
         (if is_const e then PowLoc.fold add_prune_by_const locs else id)
         >>> (if is_var e then PowLoc.fold add_prune_by_var locs else id)
        end
-      | UnOp (LNot,Lval x,_) -> PowLoc.fold add_prune_by_not (eval_lv pid x mem)
+      | UnOp (LNot,Lval x,_) -> PowLoc.fold add_prune_by_not (ItvSem.eval_lv pid x mem)
       | _ -> id)
     end)
 
 let extract_alloc node pid (lv,e) mem global feature =
-  let locs_lv = eval_lv pid lv mem in
+  let locs_lv = ItvSem.eval_lv pid lv mem in
   let locs_e = Access.Info.useof (AccessSem.accessof global node sem_fun mem) in
   feature
   |> (PowLoc.fold add_pass_to_alloc locs_e)
@@ -429,7 +429,7 @@ let extract_alloc node pid (lv,e) mem global feature =
 let extract_call_realloc node pid (lvo,fe,el) mem global feature =
   match lvo, (simplify_exp fe) with
   | Some lv, Lval (Var f, NoOffset) when f.vname = "realloc" ->
-    let locs_lv = eval_lv pid lv mem in
+    let locs_lv = ItvSem.eval_lv pid lv mem in
     let locs_e =
       Access.Info.useof (
         list_fold (fun e access ->
@@ -459,7 +459,7 @@ let extract_call node pid (lvo,fe,el) mem global feature =
   |> extract_call_realloc node pid (lvo,fe,el) mem global
 
 let extract_used_index pid mem cmd feature =
-  let queries = AlarmExp.collect cmd in
+  let queries = AlarmExp.collect Spec.Interval cmd in
     list_fold (fun q ->
       let locs =
         Access.Info.useof
@@ -473,7 +473,7 @@ let extract_used_index pid mem cmd feature =
     ) queries feature
 
 let extract_used_buf pid mem cmd feature =
-  let queries = AlarmExp.collect cmd in
+  let queries = AlarmExp.collect Spec.Interval cmd in
     list_fold (fun q ->
       let locs =
         Access.Info.useof
@@ -528,7 +528,7 @@ let extract2 : InterCfg.t -> Mem.t -> Global.t -> InterCfg.Node.t -> feature -> 
   let pid = InterCfg.Node.get_pid node in
   match InterCfg.cmdof icfg node with
   | Cset (lv,e,_) ->
-    let locs_lv = eval_lv pid lv mem in
+    let locs_lv = ItvSem.eval_lv pid lv mem in
     let locs_e  = Access.Info.useof (accessof_eval pid e mem) in
     let e = simplify_exp e in
     (match lv,e with
@@ -563,7 +563,7 @@ let build_copy_graph icfg mem =
      (match lv,(simplify_exp e) with
       | (Var x,NoOffset), Lval (Var y,NoOffset) ->
         let pid = InterCfg.Node.get_pid n in
-        let lhs = PowLoc.choose (eval_lv pid lv mem) in
+        let lhs = PowLoc.choose (ItvSem.eval_lv pid lv mem) in
         let rhs = PowLoc.choose (Access.Info.useof (accessof_eval pid e mem)) in
           G.add_edge g rhs lhs
       | _ -> g)

@@ -215,7 +215,9 @@ let print_raw dirname =
   close_out oc_exp_json;
   close_out oc_exp_text
 
-let print icfg =
-  let dirname = !Options.outdir ^ "/datalog" in
+let print analysis icfg =
+  Hashtbl.reset exp_map;
+  Hashtbl.reset lv_map;
+  let dirname = (FileManager.analysis_dir analysis) ^ "/datalog" in
   print_relation dirname icfg;
   print_raw dirname

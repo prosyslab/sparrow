@@ -75,17 +75,17 @@ module Cmd = struct
   and alloc = Array of exp | Struct of compinfo
   and static = bool
   and branch = bool
-  and tag = None | ReturnNode | Branch | LoopHead
+  and tag = Unknown | ReturnNode | Branch | LoopHead
 
   let fromCilStmt = function
     | (Instr instrs) as s -> Cinstr (instrs, Cil.get_stmtLoc s)
     | If (exp,b1,b2,loc) -> Cif (exp,b1,b2,loc)
     | Loop (_,loc,_,_) -> CLoop loc
     | Return (expo,loc) -> Creturn (expo,loc)
-    | s -> Cskip (None, Cil.get_stmtLoc s)
+    | s -> Cskip (Unknown, Cil.get_stmtLoc s)
 
   let string_of_tag = function
-    | None -> ""
+    | Unknown -> ""
     | ReturnNode -> "ReturnNode"
     | Branch -> "Branch"
     | LoopHead -> "LoopHead"
@@ -260,7 +260,7 @@ let find_cmd n g =
     BatMap.find n g.cmd_map
   with _ ->
     if n = Node.ENTRY || n = Node.EXIT then
-      Cmd.Cskip (Cmd.None, Cil.locUnknown)
+      Cmd.Cskip (Cmd.Unknown, Cil.locUnknown)
     else
       raise (Failure ("Can't find cmd of " ^ Node.to_string n))
 
@@ -412,11 +412,11 @@ let flatten_instructions g =
             |> List.filter (fun loc -> Cil.compareLoc loc Cil.locUnknown <> 0)
           in
           if pred_locs = [] then
-            add_cmd n (Cmd.Cskip (Cmd.None, Cil.locUnknown)) g
+            add_cmd n (Cmd.Cskip (Cmd.Unknown, Cil.locUnknown)) g
           else
-            add_cmd n (Cmd.Cskip (Cmd.None, List.nth pred_locs 0)) g
+            add_cmd n (Cmd.Cskip (Cmd.Unknown, List.nth pred_locs 0)) g
         else
-          add_cmd n (Cmd.Cskip (Cmd.None, loc)) g
+          add_cmd n (Cmd.Cskip (Cmd.Unknown, loc)) g
       | _ -> g
     ) g g
 
@@ -604,7 +604,7 @@ let transform_string_allocs fd g =
          | (_, []) -> g
          | (e, l) ->
            let (empty_node, last_node) = (Node.make (), Node.make ()) in
-           let g = add_cmd empty_node (Cmd.Cskip (Cmd.None, loc)) g in
+           let g = add_cmd empty_node (Cmd.Cskip (Cmd.Unknown, loc)) g in
            let (node, g) = generate_sallocs l loc empty_node g in
            let cmd = Cmd.Cset (lv, e, loc) in
            let g = add_cmd last_node cmd g in
@@ -615,7 +615,7 @@ let transform_string_allocs fd g =
          | (_, []) -> g
          | (e, l) ->
            let (empty_node, last_node) = (Node.make (), Node.make ()) in
-           let g = add_cmd empty_node (Cmd.Cskip (Cmd.None, loc)) g in
+           let g = add_cmd empty_node (Cmd.Cskip (Cmd.Unknown, loc)) g in
            let (node, g) = generate_sallocs l loc empty_node g in
            let cmd = Cmd.Cassume (e, b, loc) in
            let g = add_cmd last_node cmd g in
@@ -632,7 +632,7 @@ let transform_string_allocs fd g =
            (_, []) -> g
          | (el, l) ->
            let (empty_node, last_node) = (Node.make (), Node.make ()) in
-           let g = add_cmd empty_node (Cmd.Cskip (Cmd.None, loc)) g in
+           let g = add_cmd empty_node (Cmd.Cskip (Cmd.Unknown, loc)) g in
            let (node, g) = generate_sallocs l loc empty_node g in
            let cmd = Cmd.Ccall (lv, f, el, loc) in
            let g = add_cmd last_node cmd g in
@@ -643,7 +643,7 @@ let transform_string_allocs fd g =
          | (_, []) -> g
          | (e, l) ->
            let (empty_node, last_node) = (Node.make (), Node.make ()) in
-           let g = add_cmd empty_node (Cmd.Cskip (Cmd.None, loc)) g in
+           let g = add_cmd empty_node (Cmd.Cskip (Cmd.Unknown, loc)) g in
            let (node, g) = generate_sallocs l loc empty_node g in
            let cmd = Cmd.Creturn (Some e, loc) in
            let g = add_cmd last_node cmd g in
@@ -837,8 +837,8 @@ let ignore_function fd =
 let init fd loc =
   let g =
     empty fd
-    |> add_node_with_cmd Node.ENTRY (Cmd.Cskip (Cmd.None, loc))
-    |> add_node_with_cmd Node.EXIT (Cmd.Cskip (Cmd.None, loc))
+    |> add_node_with_cmd Node.ENTRY (Cmd.Cskip (Cmd.Unknown, loc))
+    |> add_node_with_cmd Node.EXIT (Cmd.Cskip (Cmd.Unknown, loc))
   in
   if (!Options.unsound_noreturn_function &&
       Cil.hasAttribute "noreturn" fd.svar.vattr) || ignore_function fd

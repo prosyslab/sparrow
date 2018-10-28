@@ -9,6 +9,17 @@
 (*                                                                     *)
 (***********************************************************************)
 type analysis = Pre | Interval | OctagonImpact | Octagon | Taint
+
+let string_of_analysis = function
+  | Pre -> "Pre"
+  | Interval -> "Interval"
+  | OctagonImpact -> "OctagonImpact"
+  | Octagon -> "Octagon"
+  | Taint -> "Taint"
+
+let pp_analysis fmt analysis =
+  Format.fprintf fmt "%s" (string_of_analysis analysis)
+
 module type S =
 sig
   module Dom : InstrumentedMem.S

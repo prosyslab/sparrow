@@ -184,7 +184,7 @@ let generate (global, itvinputof, itv_queries, inputof) =
     let ptrmem = ItvAnalysis.Table.find node itvinputof in
     let mem = Table.find node inputof in
     let cmd = InterCfg.cmdof global.icfg node in
-    let aexps = AlarmExp.collect cmd in
+    let aexps = AlarmExp.collect analysis cmd in
     let qs = list_fold (fun aexp ->
       if ptrmem = ItvDom.Mem.bot then id (* dead code *)
       else inspect_aexp node aexp ptrmem mem) aexps qs

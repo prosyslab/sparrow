@@ -9,6 +9,9 @@
 (*                                                                     *)
 (***********************************************************************)
 type analysis = Pre | Interval | OctagonImpact | Octagon | Taint
+val string_of_analysis : analysis -> string
+val pp_analysis : Format.formatter -> analysis -> unit
+
 module type S =
 sig
   module Dom : InstrumentedMem.S

@@ -22,5 +22,5 @@ type t =
   | AllocSize of string * Cil.exp * Cil.location
   | Printf of string * Cil.exp * Cil.location
 
-val collect : IntraCfg.cmd -> t list
+val collect : Spec.analysis -> IntraCfg.cmd -> t list
 val to_string : t -> string

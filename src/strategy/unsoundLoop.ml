@@ -309,7 +309,7 @@ let add_close_left_arr_size_offset global cond_node cfg feat =
   let pid = Node.get_pid cond_node in
   let node = Node.get_cfgnode cond_node in
   let cmd = IntraCfg.find_cmd node cfg in
-  let qs = AlarmExp.collect cmd in
+  let qs = AlarmExp.collect Spec.Interval cmd in
   List.fold_left (fun feat q ->
         match q with
           AlarmExp.ArrayExp (arr, i, _)
@@ -356,7 +356,7 @@ let add_index conds cfg scc feat =
       BatSet.union lvset (collect_lv cond_exp)) BatSet.empty conds in
   let qs = List.fold_left (fun qs node ->
       let cmd = IntraCfg.find_cmd node cfg in
-      qs@(AlarmExp.collect cmd)) [] scc in
+      qs@(AlarmExp.collect Spec.Interval cmd)) [] scc in
   let map = List.fold_left (fun map q ->
         match q with
           AlarmExp.ArrayExp (arr, i, _)
@@ -376,7 +376,7 @@ let add_index conds cfg scc feat =
 let add_out_index conds cfg scc feat =
   let qs = List.fold_left (fun qs node ->
       let cmd = IntraCfg.find_cmd node cfg in
-      qs@(AlarmExp.collect cmd)) [] scc in
+      qs@(AlarmExp.collect Spec.Interval cmd)) [] scc in
   let idx_in_scc = List.fold_left (fun set q ->
         match q with
           AlarmExp.ArrayExp (arr, i, _)
@@ -402,7 +402,7 @@ let add_out_index conds cfg scc feat =
   in
   let qs = List.fold_left (fun qs node ->
       let cmd = IntraCfg.find_cmd node cfg in
-      qs@(AlarmExp.collect cmd)) [] exits_nexts in
+      qs@(AlarmExp.collect Spec.Interval cmd)) [] exits_nexts in
   let idx_out_loop = List.fold_left (fun set q ->
         match q with
           AlarmExp.ArrayExp (arr, i, _)
@@ -426,7 +426,7 @@ let add_init global conds cfg scc feat =
     List.fold_left (fun l n -> l@(IntraCfg.pred n cfg)) entry_prev entry_prev in
    let qs = List.fold_left (fun qs node ->
       let cmd = IntraCfg.find_cmd node cfg in
-      qs@(AlarmExp.collect cmd)) [] scc in
+      qs@(AlarmExp.collect Spec.Interval cmd)) [] scc in
   let idx_in_scc = List.fold_left (fun set q ->
       match q with
         AlarmExp.ArrayExp (_, i, _)
@@ -459,7 +459,7 @@ let add_init global conds cfg scc feat =
 let add_diff_array_access cfg scc feat =
   let qs = List.fold_left (fun qs node ->
       let cmd = IntraCfg.find_cmd node cfg in
-      qs@(AlarmExp.collect cmd)) [] scc in
+      qs@(AlarmExp.collect Spec.Interval cmd)) [] scc in
   let set = List.fold_left (fun set q ->
         match q with
           AlarmExp.ArrayExp (arr, i, _)

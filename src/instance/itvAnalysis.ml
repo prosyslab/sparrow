@@ -276,7 +276,7 @@ let generate : Global.t * Table.t * target -> query list
     prerr_progressbar ~itv:1000 k total;
     let mem = Table.find node inputof in
     let cmd = InterCfg.cmdof global.icfg node in
-    let aexps = AlarmExp.collect cmd in
+    let aexps = AlarmExp.collect analysis cmd in
     let qs = list_fold (fun aexp ->
       if mem = Mem.bot then id (* dead code *)
       else
@@ -296,7 +296,7 @@ let generate_with_mem : Global.t * Mem.t * target -> query list
   let nodes = InterCfg.nodesof global.icfg in
     list_fold (fun node ->
       let cmd = InterCfg.cmdof global.icfg node in
-      let aexps = AlarmExp.collect cmd in
+      let aexps = AlarmExp.collect analysis cmd in
         if mem = Mem.bot then id (* dead code *)
         else
           match target with
@@ -355,15 +355,20 @@ let print_datalog_fact spec global dug alarms =
       (fun q -> { q with src = Some (InterCfg.start_node, Cil.locUnknown) })
       alarms
   in
-  RelSyntax.print global.icfg;
-  Provenance.print global.relations;
-  RelDUGraph.print global dug alarms;
-  RelDUGraph.print_alarm alarms
+  RelSyntax.print analysis global.icfg;
+  Provenance.print analysis global.relations;
+  RelDUGraph.print analysis  global dug alarms;
+  RelDUGraph.print_alarm analysis alarms
 
 let post_process spec (global, dug, inputof, outputof) =
   let alarms = StepManager.stepf true "Generate Alarm Report"
       (inspect_alarm global spec) inputof
   in
+  let report_file =
+    open_out (FileManager.analysis_dir analysis ^ "/report.txt") in
+  let fmt = F.formatter_of_out_channel report_file in
+  Report.print ~fmt:(Some fmt) global alarms;
+  close_out report_file;
   (if !Options.extract_datalog_fact then
      print_datalog_fact spec global dug alarms);
   (global, dug, inputof, outputof, alarms)
@@ -387,4 +392,4 @@ let do_analysis global =
   in
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global
   |> opt !Options.marshal_out marshal_out
-  |> cond !Options.taint (fun (g,d,i,o) -> (g,d,i,o,[])) (post_process spec)
+  |> post_process spec

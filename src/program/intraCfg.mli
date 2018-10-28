@@ -40,7 +40,7 @@ module Cmd : sig
   and alloc = Array of Cil.exp | Struct of Cil.compinfo
   and static = bool
   and branch = bool
-  and tag = None | ReturnNode | Branch | LoopHead
+  and tag = Unknown | ReturnNode | Branch | LoopHead
 
   val fromCilStmt : Cil.stmtkind -> t
   val to_string : t -> string

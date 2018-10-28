@@ -24,6 +24,7 @@ sig
   module Access : Access.S with type Loc.t = Loc.t and type PowLoc.t = PowLoc.t
 
   val create            : ?size : int -> ?access : Access.t -> unit -> t
+  val copy              : t -> t
   val nb_node           : t -> int
   val nb_edge           : t -> int
   val nb_loc            : t -> int
@@ -35,6 +36,7 @@ sig
   val add_edge          : node -> node -> t -> t
   val remove_node       : node -> t -> t
   val get_abslocs       : node -> node -> t -> PowLoc.t
+  val mem_node          : node -> t -> bool
   val mem_duset         : Loc.t -> PowLoc.t -> bool
   val add_absloc        : node -> Loc.t -> node -> t -> t
   val add_abslocs       : node -> PowLoc.t -> node -> t -> t
@@ -72,7 +74,7 @@ struct
     module I = Graph.Imperative.Digraph.ConcreteBidirectional (BasicDom.Node)
     type t = { graph : I.t; label : ((node * node), locset) Hashtbl.t }
     let create ~size () = { graph = I.create ~size (); label = Hashtbl.create (2 * size) }
-
+    let copy g = { graph = I.copy g.graph; label = Hashtbl.copy g.label }
     let succ g n = I.succ g.graph n
     let pred g n = I.pred g.graph n
     let nb_vertex g = I.nb_vertex g.graph
@@ -117,6 +119,7 @@ struct
 
   let create ?(size=0) ?(access=Access.empty) () =
     { graph = G.create ~size (); access }
+  let copy dug = { graph = G.copy dug.graph; access = dug.access }
   let nodesof dug = G.fold_vertex BatSet.add dug.graph BatSet.empty
 
   let access dug = dug.access

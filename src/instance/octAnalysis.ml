@@ -136,7 +136,7 @@ let inspect_alarm : Global.t -> Spec.t -> Table.t -> Report.query list
     let ptrmem = ItvDom.Table.find node spec.Spec.ptrinfo in
     let mem = Table.find node inputof in
     let cmd = InterCfg.cmdof global.icfg node in
-    let aexps = AlarmExp.collect cmd in
+    let aexps = AlarmExp.collect analysis cmd in
     let qs = list_fold (fun aexp ->
       if ptrmem = ItvDom.Mem.bot then id (* dead code *)
       else inspect_aexp spec.Spec.locset node aexp ptrmem mem) aexps qs

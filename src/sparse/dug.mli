@@ -18,6 +18,7 @@ sig
   module Access : Access.S with type Loc.t = Loc.t and type PowLoc.t = PowLoc.t
 
   val create            : ?size : int -> ?access : Access.t -> unit -> t
+  val copy              : t -> t
   val nb_node           : t -> int
   val nb_edge           : t -> int
   val nb_loc            : t -> int
@@ -29,6 +30,7 @@ sig
   val add_edge          : node -> node -> t -> t
   val remove_node       : node -> t -> t
   val get_abslocs       : node -> node -> t -> PowLoc.t
+  val mem_node          : node -> t -> bool
   val mem_duset         : Loc.t -> PowLoc.t -> bool
   val add_absloc        : node -> Loc.t -> node -> t -> t
   val add_abslocs       : node -> PowLoc.t -> node -> t -> t

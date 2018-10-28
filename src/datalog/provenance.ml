@@ -62,8 +62,8 @@ let call analysis icfg node arg_lvars_set prov_list relations =
   else
     relations
 
-let print relations =
-  let dirname = !Options.outdir ^ "/datalog" in
+let print analysis relations =
+  let dirname = (FileManager.analysis_dir analysis) ^ "/datalog/" in
   let oc_prov = open_out (dirname ^ "/provenence.txt") in
   let oc_ptr = open_out (dirname ^ "/PointsTo.facts") in
   let oc_bind = open_out (dirname ^ "/Bind.facts") in

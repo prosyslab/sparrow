@@ -6,6 +6,7 @@ open Report
 open Vocab
 
 module F = Format
+module L = Logging
 
 let analysis = Spec.Taint
 module Analysis = SparseAnalysis.Make(TaintSem)
@@ -65,7 +66,7 @@ let inspect_alarm global spec inputof =
     let ptrmem = ItvDom.Table.find node spec.Spec.ptrinfo in
     let mem = Table.find node inputof in
     let cmd = InterCfg.cmdof global.icfg node in
-    let aexps = AlarmExp.collect cmd in
+    let aexps = AlarmExp.collect analysis cmd in
     let qs = list_fold (fun aexp ->
       if ptrmem = ItvDom.Mem.bot then id (* dead code *)
       else inspect_aexp node aexp ptrmem mem) aexps qs
@@ -87,15 +88,20 @@ let make_top_mem locset =
       Mem.add l TaintDom.Val.top mem) locset Mem.bot
 
 let print_datalog_fact spec global dug alarms =
-  RelSyntax.print global.icfg;
-  Provenance.print global.relations;
-  RelDUGraph.print global dug alarms;
-  RelDUGraph.print_alarm alarms
+  RelSyntax.print analysis global.icfg;
+  Provenance.print analysis global.relations;
+  RelDUGraph.print analysis global dug alarms;
+  RelDUGraph.print_alarm analysis alarms
 
 let post_process spec itvdug (global, _, inputof, outputof) =
   let alarms = StepManager.stepf true "Generate Alarm Report"
       (inspect_alarm global spec) inputof
   in
+  let report_file =
+    open_out (FileManager.analysis_dir analysis ^ "/report.txt") in
+  let fmt = F.formatter_of_out_channel report_file in
+  Report.print ~fmt:(Some fmt) global alarms;
+  close_out report_file;
   (if !Options.extract_datalog_fact_full then
      print_datalog_fact spec global itvdug alarms);
   (global, inputof, outputof, alarms)

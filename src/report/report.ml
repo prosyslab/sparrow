@@ -172,12 +172,16 @@ let print_alarms fmt global queries =
   F.fprintf fmt "#bot-involved            : %d\n" (BatMap.cardinal bot)
 
 
-let print global queries =
+let print ?(fmt=None) global queries =
   if not !Options.noalarm then
-    let _ = prerr_newline () in
-    let report_file = open_out (!Options.outdir ^ "/report.txt") in
-    let file_fmt = F.formatter_of_out_channel report_file in
-    let fmt = Logging.dual_formatter F.err_formatter file_fmt in
-    print_alarms fmt global queries;
-    close_out report_file;
+    match fmt with
+    | None ->
+      let _ = prerr_newline () in
+      let report_file = open_out (!Options.outdir ^ "/report.txt") in
+      let file_fmt = F.formatter_of_out_channel report_file in
+      let fmt = Logging.dual_formatter F.err_formatter file_fmt in
+      print_alarms fmt global queries;
+      close_out report_file
+    | Some fmt ->
+      print_alarms fmt global queries
   else ()
