@@ -93,9 +93,18 @@ let print_datalog_fact spec global dug alarms =
   RelDUGraph.print analysis global dug alarms;
   RelDUGraph.print_alarm analysis alarms
 
+let ignore_function node =
+  BatSet.elements !Options.filter_function
+  |> List.map Str.regexp
+  |> List.exists (fun re -> Str.string_match re (InterCfg.Node.get_pid node) 0)
+
 let post_process spec itvdug (global, _, inputof, outputof) =
   let alarms = StepManager.stepf true "Generate Alarm Report"
       (inspect_alarm global spec) inputof
+               |> List.filter (fun a ->
+                   match a.src with
+                   | Some (n, _) -> (not (ignore_function a.Report.node)) && not (ignore_function n)
+                   | None -> not (ignore_function a.Report.node))
   in
   let report_file =
     open_out (FileManager.analysis_dir analysis ^ "/report.txt") in

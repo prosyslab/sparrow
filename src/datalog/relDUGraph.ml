@@ -14,7 +14,8 @@ let rec fix next reachable works g =
     let (reachable, works) =
       List.fold_left (fun (reachable, works) p ->
           if PowNode.mem p reachable then (reachable, works)
-          else (PowNode.add p reachable, PowNode.add p works)) (reachable, works) succs
+          else (PowNode.add p reachable, PowNode.add p works))
+      (reachable, works) succs
     in
     fix next reachable works g
 
@@ -49,7 +50,9 @@ let optimize_inter_edge global old_g =
       else
         new_g) old_g (G.create ())
 
-module ReachingDef = BatSet.Make(struct type t = Node.t * G.Loc.t [@@deriving compare] end)
+module ReachingDef =
+  BatSet.Make(struct type t = Node.t * G.Loc.t [@@deriving compare] end)
+
 let reachability2 global alarms g =
   let access = G.access g in
   let rec fix works results g =
@@ -142,7 +145,8 @@ module AlarmSet = Set.Make(struct
   end)
 
 let print_alarm analysis alarms =
-  let alarms = Report.get alarms Report.UnProven in
+  let alarms = Report.get alarms Report.UnProven
+  in
   let dirname = (FileManager.analysis_dir analysis) ^ "/datalog" in
   let oc = open_out (dirname ^ "/Alarm.facts") in
   let fmt = F.formatter_of_out_channel oc in

@@ -360,9 +360,41 @@ let print_datalog_fact spec global dug alarms =
   RelDUGraph.print analysis  global dug alarms;
   RelDUGraph.print_alarm analysis alarms
 
+let ignore_file file =
+  BatSet.elements !Options.filter_file
+  |> List.map (fun str ->
+      Str.regexp (".*" ^ str ^ ".*"))
+  |> List.exists (fun re -> Str.string_match re file 0)
+
+let ignore_node node =
+  BatSet.elements !Options.filter_node
+  |> List.map Str.regexp
+  |> List.exists (fun re -> Str.string_match re (InterCfg.Node.to_string node) 0)
+
+let ignore_function node =
+  BatSet.elements !Options.filter_function
+  |> List.map Str.regexp
+  |> List.exists (fun re -> Str.string_match re (InterCfg.Node.get_pid node) 0)
+
+let ignore_allocsite allocsite =
+  BatSet.elements !Options.filter_allocsite
+  |> List.map (fun str ->
+      Str.regexp (".*" ^ str ^ ".*"))
+  |> List.exists (fun re -> Str.string_match re allocsite 0)
+
 let post_process spec (global, dug, inputof, outputof) =
   let alarms = StepManager.stepf true "Generate Alarm Report"
       (inspect_alarm global spec) inputof
+               |> List.filter (fun q ->
+                   match q.Report.allocsite with
+                   | Some a -> not (ignore_allocsite (Allocsite.to_string a))
+                   | None -> true)
+               |> List.filter (fun a ->
+                   not (ignore_file a.Report.loc.file))
+               |> List.filter (fun a ->
+                   not (ignore_function a.Report.node))
+               |> List.filter (fun a ->
+                   not (ignore_node a.Report.node))
   in
   let report_file =
     open_out (FileManager.analysis_dir analysis ^ "/report.txt") in

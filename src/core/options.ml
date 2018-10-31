@@ -76,6 +76,9 @@ let filter_lib = ref false
 let filter_complex_exp = ref false
 let filter_rec = ref false
 let filter_allocsite = ref BatSet.empty
+let filter_file = ref BatSet.empty
+let filter_function = ref BatSet.empty
+let filter_node = ref BatSet.empty
 
 (* Input & OUtput *)
 let outdir = ref "sparrow-out"
@@ -169,6 +172,9 @@ let opts =
        filter_lib := true;
        filter_rec := true)), "Trun on all the filtering options");
   ("-filter_allocsite", (Arg.String (fun s -> filter_allocsite := BatSet.add s !filter_allocsite)), "Filter alarms from a given allocsite");
+  ("-filter_file", (Arg.String (fun s -> filter_file := BatSet.add s !filter_file)), "Filter alarms from a given file");
+  ("-filter_function", (Arg.String (fun s -> filter_function := BatSet.add s !filter_function)), "Filter alarms from a given file");
+  ("-filter_node", (Arg.String (fun s -> filter_node := BatSet.add s !filter_node)), "Filter alarms from a given file");
   ("-filter_complex_exp", (Arg.Set filter_complex_exp), "Filter alarms from complex expressions (e.g., bitwise)");
   ("-filter_extern", (Arg.Set filter_extern), "Filter alarms from external allocsites");
   ("-filter_global", (Arg.Set filter_global), "Filter alarms from the global area");
