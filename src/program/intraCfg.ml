@@ -169,7 +169,8 @@ module Cmd = struct
         ; `String (s_exp e) ]
     | Cskip (tag, _) ->
       `List [ `String "skip"; `String (string_of_tag tag) ]
-    | _ -> `Null
+    | _ ->
+      `List [ `String "skip"; `String "" ]
 
   let location_of = function
     | Cinstr (_, l)
