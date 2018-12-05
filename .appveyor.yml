@@ -1,11 +1,13 @@
-image: ubuntu
+image: ubuntu1804
 
 build: off
 
 install:
-  - sudo apt-get update
-  - sudo apt-get install ocaml ocaml-native-compilers camlp4-extra opam -y
+  - sudo apt install -y software-properties-common
+  - sudo add-apt-repository ppa:avsm/ppa
+  - sudo apt install opam -y
   - ./build.sh
+  - eval $(opam env)
 
 test_script:
   - make test

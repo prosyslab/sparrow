@@ -12,6 +12,7 @@ before_install:
 
 install:
   - ./build.sh
+  - eval $(opam env)
 
 script:
   - make test
