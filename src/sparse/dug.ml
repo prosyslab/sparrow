@@ -9,7 +9,6 @@
 (*                                                                     *)
 (***********************************************************************)
 open Vocab
-open Yojson.Safe
 open Global
 open IntraCfg
 open InterCfg
@@ -58,7 +57,7 @@ sig
 (** {2 Print } *)
 
   val to_dot            : t -> string
-  val to_json           : t -> Yojson.Safe.json
+  val to_json           : t -> Yojson.Safe.t
 end
 
 module Make (Access : Access.S) =
@@ -189,8 +188,7 @@ struct
     ) dug ""
     ^ "}"
 
-  let to_json : t -> json
-  = fun g ->
+  let to_json g =
     let nodes = `List (fold_node (fun v nodes ->
                   (`String (BasicDom.Node.to_string v))::nodes) g [])
     in

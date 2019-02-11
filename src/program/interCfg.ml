@@ -12,7 +12,6 @@
 
 open Vocab
 open Cil
-open Yojson.Safe
 open IntraCfg.Cmd
 
 module Proc =
@@ -179,8 +178,7 @@ let remove_node : node -> t -> t
 let print : out_channel -> t -> unit
 =fun chan g -> BatMap.iter (fun pid cfg -> IntraCfg.print_dot chan cfg) g.cfgs
 
-let to_json : t -> json
-= fun g ->
+let to_json g =
   `Assoc (
     BatMap.foldi (fun pid cfg json ->
       (pid, IntraCfg.to_json cfg)::json) g.cfgs [])
@@ -209,8 +207,7 @@ let to_json_simple g =
                ; ("edges", edges) ]
       | _, _ -> failwith "Invalid format") g.cfgs (`Assoc [])
 
-let print_json : out_channel -> t -> unit
-= fun chan g ->
+let print_json chan g =
   Yojson.Safe.pretty_to_channel chan (to_json g)
 
 (*

@@ -8,7 +8,6 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
-open Yojson.Safe
 open Vocab
 open BasicDom
 open InterCfg
@@ -88,13 +87,11 @@ let get_leaf_procs : t -> PowProc.t
         then PowProc.add fid
         else id) pids PowProc.bot
 
-let to_json : t -> json
-= fun g ->
+let to_json g =
   `Assoc
       [ ("callgraph", CallGraph.to_json g.callgraph);
         ("cfgs", InterCfg.to_json g.icfg)
       ]
 
-let print_json : out_channel -> t -> unit
-= fun chan g ->
+let print_json chan g =
   Yojson.Safe.pretty_to_channel chan (to_json g)

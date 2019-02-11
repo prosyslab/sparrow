@@ -10,7 +10,7 @@
 (***********************************************************************)
 open Vocab
 open BasicDom
-open Yojson.Safe
+open Yojson
 open InterCfg
 
 module G =
@@ -61,8 +61,7 @@ let is_rec : t -> InterCfg.pid -> bool = fun callgraph pid ->
     List.mem pid trans
   with _ -> true (* conservative answer for exceptional cases (e.g., unreachable functions) *)
 
-let to_json : t -> json
-= fun g ->
+let to_json g =
   let nodes = `List (G.fold_vertex (fun v nodes ->
             (`String (Proc.to_string v))::nodes) g.graph [])
   in

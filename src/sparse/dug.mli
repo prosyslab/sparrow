@@ -52,7 +52,7 @@ sig
 (** {2 Print } *)
 
   val to_dot            : t -> string
-  val to_json           : t -> Yojson.Safe.json
+  val to_json           : t -> Yojson.Safe.t
 end
 
 module Make (Access : Access.S) : S

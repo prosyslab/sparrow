@@ -16,8 +16,8 @@ sig
   type node = BasicDom.Node.t
   type loc
   val make              : ?skip_nodes : BasicDom.Node.t BatSet.t -> Global.t * Access.t * PowLoc.t -> DUGraph.t
-  val to_json_intra     : DUGraph.t -> Access.t -> Yojson.Safe.json
-  val to_json_inter     : DUGraph.t -> Access.t -> Yojson.Safe.json
+  val to_json_intra     : DUGraph.t -> Access.t -> Yojson.Safe.t
+  val to_json_inter     : DUGraph.t -> Access.t -> Yojson.Safe.t
 end
 
 module Make (DUGraph : Dug.S) : S

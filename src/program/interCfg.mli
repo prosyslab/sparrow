@@ -69,5 +69,5 @@ val nodes_of_pid : t -> pid -> Node.t list
 
 (** {2 Print } *)
 
-val to_json : t -> Yojson.Safe.json
-val to_json_simple : t -> Yojson.Safe.json
+val to_json : t -> Yojson.Safe.t
+val to_json_simple : t -> Yojson.Safe.t

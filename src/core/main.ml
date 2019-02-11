@@ -68,8 +68,7 @@ let print_il file =
     Cil.dumpFile !Cil.printerForMaincil stdout "" global.file);
   exit 0
 
-let print_cfg : Global.t -> Global.t
-= fun global ->
+let print_cfg global =
   `Assoc
     [ ("callgraph", CallGraph.to_json global.callgraph);
       ("cfgs", InterCfg.to_json global.icfg)]

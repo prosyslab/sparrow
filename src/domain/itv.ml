@@ -177,7 +177,7 @@ let pp fmt = function
   | Bot -> Format.fprintf fmt "bot"
   | V (l, u) -> Format.fprintf fmt "[%a, %a]" Integer.pp l Integer.pp u
 
-let to_json : t -> Yojson.Safe.json = fun itv ->
+let to_json itv =
   `String (to_string itv)
 
 let is_bot : t -> bool = function

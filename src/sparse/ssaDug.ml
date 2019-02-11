@@ -9,7 +9,6 @@
 (*                                                                     *)
 (***********************************************************************)
 open Vocab
-open Yojson.Safe
 open Global
 open IntraCfg
 open InterCfg
@@ -24,8 +23,8 @@ sig
   type node = BasicDom.Node.t
   type loc
   val make              : ?skip_nodes : BasicDom.Node.t BatSet.t -> Global.t * Access.t * PowLoc.t -> DUGraph.t
-  val to_json_intra     : DUGraph.t -> Access.t -> Yojson.Safe.json
-  val to_json_inter     : DUGraph.t -> Access.t -> Yojson.Safe.json
+  val to_json_intra     : DUGraph.t -> Access.t -> Yojson.Safe.t
+  val to_json_inter     : DUGraph.t -> Access.t -> Yojson.Safe.t
 end
 
 module Make (DUGraph : Dug.S) =
@@ -350,8 +349,7 @@ struct
     |> draw_intraedges (global,access,locset)
     |> draw_interedges (global,access,locset)
 
-  let to_json_intra : DUGraph.t -> Access.t -> json
-  = fun g access ->
+  let to_json_intra g access =
     let nodes = `List (DUGraph.fold_node (fun v nodes ->
                   (`String (Node.to_string v))::nodes) g [])
     in
@@ -373,8 +371,7 @@ struct
     in
     `Assoc [("nodes", nodes); ("edges", edges)]
 
-    let to_json_inter : DUGraph.t -> Access.t -> json
-    = fun g access ->
+    let to_json_inter g access =
       let nodes = `List (DUGraph.fold_node (fun v nodes ->
                     (`String (Node.to_string v))::nodes) g [])
       in
