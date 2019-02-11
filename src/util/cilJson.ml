@@ -1,4 +1,4 @@
-type t = Yojson.Safe.json
+type t = Yojson.Safe.t
 
 let rec of_lhost = function
   | Cil.Var v -> `List [`String "Var"; `String v.vname]
@@ -7,14 +7,12 @@ let rec of_lhost = function
 and of_offset = function
   | Cil.NoOffset -> `Null
   | Cil.Field (f, offset) ->
-    `List [`String "Field"; `String f.fname; of_offset offset]
-  | Cil.Index (e, offset) ->
-    `List [`String "Index"; of_exp e; of_offset offset]
+      `List [`String "Field"; `String f.fname; of_offset offset]
+  | Cil.Index (e, offset) -> `List [`String "Index"; of_exp e; of_offset offset]
 
 and of_lval (lhost, offset) = `List [of_lhost lhost; of_offset offset]
 
-and of_const = function
-  | _ -> `Int 0
+and of_const = function _ -> `Int 0
 
 and of_exp = function
   | Cil.Const c -> `List [`String "Const"; of_const c]

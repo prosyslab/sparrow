@@ -10,19 +10,19 @@
 (***********************************************************************)
 (** Global information *)
 
-type t = {
-  file : Cil.file;
-  icfg : InterCfg.t;
-  callgraph : CallGraph.t;
-  dump : BasicDom.Dump.t;
-  mem : ItvDom.Mem.t;
-  table : ItvDom.Table.t;
-  relations : RelSemantics.Set.t;
-}
+type t =
+  { file: Cil.file
+  ; icfg: InterCfg.t
+  ; callgraph: CallGraph.t
+  ; dump: BasicDom.Dump.t
+  ; mem: ItvDom.Mem.t
+  ; table: ItvDom.Table.t
+  ; relations: RelSemantics.Set.t }
 
 val init : Cil.file -> t
 
 val is_rec : InterCfg.pid -> t -> bool
+
 val is_undef : InterCfg.pid -> t -> bool
 
 val remove_unreachable_functions : t -> t

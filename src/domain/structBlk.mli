@@ -9,11 +9,19 @@
 (*                                                                     *)
 (***********************************************************************)
 (** Struct domain *)
+
 module Struct : AbsDom.SET with type t = string
+
 module PowStruct : PowDom.CPO with type elt = Struct.t
+
 include MapDom.LAT with type A.t = BasicDom.Loc.t and type B.t = PowStruct.t
+
 val make : BasicDom.PowLoc.t -> Cil.compinfo -> t
+
 val extern : unit -> t
+
 val append_field : t -> Cil.fieldinfo -> BasicDom.PowLoc.t
+
 val pow_loc_of_struct : t -> BasicDom.PowLoc.t
+
 val to_string : t -> string

@@ -11,41 +11,46 @@
 (** Signature for abstract domain *)
 
 (** Signature of set *)
-module type SET =
-sig
+module type SET = sig
   type t
+
   val to_string : t -> string
+
   val compare : t -> t -> int
+
   val pp : Format.formatter -> t -> unit
 end
 
-module type HASHABLE_SET =
-sig
+module type HASHABLE_SET = sig
   include SET
-  val equal     : t -> t -> bool
-  val hash      : t -> int
+
+  val equal : t -> t -> bool
+
+  val hash : t -> int
 end
 
 (** Signature of CPO *)
-module type CPO =
-sig
+module type CPO = sig
   include SET
 
   val le : t -> t -> bool
+
   val eq : t -> t -> bool
 
   val bot : t
 
   val join : t -> t -> t
+
   val meet : t -> t -> t
 
   val widen : t -> t -> t
+
   val narrow : t -> t -> t
 end
 
 (** Signature of lattice *)
-module type LAT =
-sig
+module type LAT = sig
   include CPO
+
   val top : t
 end

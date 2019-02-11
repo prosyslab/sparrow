@@ -9,6 +9,7 @@
 (*                                                                     *)
 (***********************************************************************)
 (** Alarm Cil.expression *)
+
 type t =
   | ArrayExp of Cil.lval * Cil.exp * Cil.location
   | DerefExp of Cil.exp * Cil.location
@@ -16,11 +17,12 @@ type t =
   | Strcpy of Cil.exp * Cil.exp * Cil.location
   | Strcat of Cil.exp * Cil.exp * Cil.location
   | Strncpy of Cil.exp * Cil.exp * Cil.exp * Cil.location
-  | Memcpy of Cil.exp * Cil.exp * Cil.exp *  Cil.location
+  | Memcpy of Cil.exp * Cil.exp * Cil.exp * Cil.location
   | Memmove of Cil.exp * Cil.exp * Cil.exp * Cil.location
   | BufferOverrunLib of string * Cil.exp list * Cil.location
   | AllocSize of string * Cil.exp * Cil.location
   | Printf of string * Cil.exp * Cil.location
 
 val collect : Spec.analysis -> IntraCfg.cmd -> t list
+
 val to_string : t -> string

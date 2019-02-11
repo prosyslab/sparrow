@@ -16,9 +16,11 @@ type t
 val empty : t
 
 val callees : InterCfg.pid -> t -> BasicDom.PowProc.t
+
 val trans_callees : InterCfg.pid -> t -> BasicDom.PowProc.t
 
 val add_edge : InterCfg.pid -> InterCfg.pid -> t -> t
+
 val remove_function : InterCfg.pid -> t -> t
 
 val is_rec : t -> InterCfg.pid -> bool

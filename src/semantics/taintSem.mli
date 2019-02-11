@@ -9,6 +9,16 @@
 (*                                                                     *)
 (***********************************************************************)
 (** Abstract semantics of taint analysis *)
-include AbsSem.S with type Dom.t = TaintDom.Mem.t and type Dom.A.t = BasicDom.Loc.t and type Dom.PowA.t = BasicDom.PowLoc.t
 
-val eval : BasicDom.Proc.t -> Cil.exp -> ItvDom.Mem.t -> TaintDom.Mem.t -> TaintDom.Val.t
+include
+  AbsSem.S
+  with type Dom.t = TaintDom.Mem.t
+   and type Dom.A.t = BasicDom.Loc.t
+   and type Dom.PowA.t = BasicDom.PowLoc.t
+
+val eval :
+     BasicDom.Proc.t
+  -> Cil.exp
+  -> ItvDom.Mem.t
+  -> TaintDom.Mem.t
+  -> TaintDom.Val.t

@@ -13,18 +13,16 @@ let mkdir dirname =
   else if Sys.file_exists dirname && not (Sys.is_directory dirname) then
     let _ = L.error "Error: %s already exists." dirname in
     exit 1
-  else
-    Unix.mkdir dirname 0o755
+  else Unix.mkdir dirname 0o755
 
 let mk_outdir () =
   let sub_dirs = [analysis_dir Spec.Interval] in
   let sub_dirs =
-    if !Options.taint then sub_dirs@[analysis_dir Spec.Taint]
-    else sub_dirs
+    if !Options.taint then sub_dirs @ [analysis_dir Spec.Taint] else sub_dirs
   in
   let sub_dirs =
     if !Options.extract_datalog_fact then
-      sub_dirs@(List.map (fun x -> x ^ "/datalog") sub_dirs)
+      sub_dirs @ List.map (fun x -> x ^ "/datalog") sub_dirs
     else sub_dirs
   in
   List.iter mkdir (!Options.outdir :: sub_dirs)
