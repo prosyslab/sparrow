@@ -871,7 +871,8 @@ let init fd loc =
     let nodes = nodesof g in
     let lasts = List.filter (fun n -> succ n g = []) nodes in
     g
-    |> list_fold (fun last -> add_edge last Node.EXIT) lasts
+    |> list_fold (function Node.EXIT -> id | last -> add_edge last Node.EXIT)
+    lasts
     |> generate_assumes
     |> flatten_instructions
     |> remove_if_loop

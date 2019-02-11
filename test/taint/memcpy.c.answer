@@ -11,13 +11,16 @@ Excluded too large functions : []
 #Locs on def-use graph : 7
 
 = Alarms =
-1. memcpy.c:6 {main} UnProven
+1. memcpy.c:5 {main} UnProven
+  memcpy ((void *)StartOf(buf), (void *)*(argv+1), 6) @main-10:  offset: [5, 5], size: [1, +oo] UnProven, allocsite: __extern__arg
+  *(argv+1) @main-10:  offset: [1, 1], size: [1, +oo] UnProven, allocsite: __extern__argv
+2. memcpy.c:6 {main} UnProven
   printf(StartOf(buf)) @main-12:  source = main-6 @ memcpy.c:3 UnProven
-2. memcpy.c:7 {main} UnProven
+3. memcpy.c:7 {main} UnProven
   printf(p) @main-13:  source = main-6 @ memcpy.c:3 UnProven
 
-#queries                 : 2
-#queries mod alarm point : 2
+#queries                 : 5
+#queries mod alarm point : 3
 #proven                  : 0
-#unproven                : 2
+#unproven                : 3
 #bot-involved            : 0

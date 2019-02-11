@@ -15,8 +15,8 @@ Excluded too large functions : []
   printf(StartOf(buf)) @main-13:  source = main-9 @ fgetc.c:5 UnProven
   printf(StartOf(buf)) @main-13:  source = main-11 @ fgetc.c:6 UnProven
 
-#queries                 : 2
-#queries mod alarm point : 1
-#proven                  : 0
+#queries                 : 4
+#queries mod alarm point : 3
+#proven                  : 2
 #unproven                : 1
 #bot-involved            : 0

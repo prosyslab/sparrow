@@ -14,8 +14,8 @@ Excluded too large functions : []
 1. strtok.c:6 {main} UnProven
   printf(p) @main-7:  source = main-4 @ strtok.c:3 UnProven
 
-#queries                 : 1
-#queries mod alarm point : 1
-#proven                  : 0
+#queries                 : 2
+#queries mod alarm point : 2
+#proven                  : 1
 #unproven                : 1
 #bot-involved            : 0

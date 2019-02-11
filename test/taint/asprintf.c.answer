@@ -11,11 +11,13 @@ Excluded too large functions : []
 #Locs on def-use graph : 3
 
 = Alarms =
-1. asprintf.c:5 {main} UnProven
+1. asprintf.c:4 {main} UnProven
+  *(argv+1) @main-8:  offset: [1, 1], size: [1, +oo] UnProven, allocsite: __extern__argv
+2. asprintf.c:5 {main} UnProven
   sprintf(fmt) @main-9:  source = main-4 @ asprintf.c:1 UnProven
 
-#queries                 : 1
-#queries mod alarm point : 1
+#queries                 : 2
+#queries mod alarm point : 2
 #proven                  : 0
-#unproven                : 1
+#unproven                : 2
 #bot-involved            : 0
