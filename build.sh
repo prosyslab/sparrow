@@ -14,6 +14,8 @@ for installed_switch in $(opam switch list --short); do
 done
 if [ "$switch_exists" = "no" ]; then
   opam switch create $SPARROW_OPAM_SWITCH $OCAML_VERSION
+else
+  opam switch $SPARROW_OPAM_SWITCH
 fi
 
 eval $(SHELL=bash opam config env --switch=$SPARROW_OPAM_SWITCH)
