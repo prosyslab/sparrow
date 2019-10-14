@@ -105,7 +105,7 @@ let initialize () =
   Printexc.record_backtrace true ;
   (* process arguments *)
   let usageMsg = "Usage: sparrow [options] source-files" in
-  Arg.parse Options.opts Frontend.args usageMsg ;
+  Arg.parse_dynamic Options.options Frontend.parse_arg usageMsg ;
   FileManager.mk_outdir () ;
   L.init (if !Options.debug then L.DEBUG else L.INFO) ;
   L.info "%s\n" (String.concat " " !Frontend.files) ;
@@ -115,13 +115,18 @@ let initialize () =
 let main () =
   let t0 = Sys.time () in
   initialize () ;
-  StepManager.stepf true "Front-end" Frontend.parse ()
-  |> Frontend.makeCFGinfo |> opt !Options.il print_il |> init_analysis
-  |> print_pgm_info |> opt !Options.cfg print_cfg |> extract_feature
-  |> StepManager.stepf true "Itv Sparse Analysis" ItvAnalysis.do_analysis
-  |> case [(!Options.oct, octagon_analysis); (!Options.taint, taint_analysis)]
-       (fun (global, _, _, _, alarm) -> (global, alarm) )
-  |> (fun (global, alarm) -> Report.print global alarm)
-  |> fun () -> finalize t0
+  match !Options.task with
+  | Options.Capture ->
+      Capture.run ()
+  | _ ->
+      StepManager.stepf true "Front-end" Frontend.parse ()
+      |> Frontend.makeCFGinfo |> opt !Options.il print_il |> init_analysis
+      |> print_pgm_info |> opt !Options.cfg print_cfg |> extract_feature
+      |> StepManager.stepf true "Itv Sparse Analysis" ItvAnalysis.do_analysis
+      |> case
+           [(!Options.oct, octagon_analysis); (!Options.taint, taint_analysis)]
+           (fun (global, _, _, _, alarm) -> (global, alarm))
+      |> (fun (global, alarm) -> Report.print global alarm)
+      |> fun () -> finalize t0
 
 let _ = main ()

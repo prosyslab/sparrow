@@ -10,6 +10,14 @@
 (***********************************************************************)
 (** Commandline options *)
 
+type task = All | Capture | Analyze
+
+val task : task ref
+
+val skip_build : bool ref
+
+val build_commands : string list ref
+
 (** {2 Intermediate Represenation } *)
 
 val il : bool ref
@@ -136,4 +144,8 @@ val marshal_out : bool ref
 
 (** {2 Options lists } *)
 
+val options : (string * Arg.spec * string) list ref
+
 val opts : (string * Arg.spec * string) list
+
+val capture_opts : (string * Arg.spec * string) list

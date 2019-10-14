@@ -10,6 +10,15 @@
 (***********************************************************************)
 open Arg
 
+type task = All | Capture | Analyze
+
+let task = ref All
+
+(* Capture *)
+let skip_build = ref false
+
+let build_commands = ref []
+
 (* IL *)
 let il = ref false
 
@@ -157,7 +166,8 @@ let unsoundness_opts =
     , Arg.Set unsound_noreturn_function
     , "Unsoundly ignore functions whose attributes conatin \"__noreturn__\"" )
   ; ( "-unsound_skip_function"
-    , Arg.String (fun s -> unsound_skip_function := s :: !unsound_skip_function)
+    , Arg.String
+        (fun s -> unsound_skip_function := s :: !unsound_skip_function)
     , "Unsoundly ignore functions whose names contain the given argument" )
   ; ( "-unsound_skip_file"
     , Arg.String (fun s -> unsound_skip_file := s :: !unsound_skip_file)
@@ -174,7 +184,7 @@ let datalog_opts =
     , Arg.Unit
         (fun () ->
           extract_datalog_fact := true ;
-          extract_datalog_fact_full := true )
+          extract_datalog_fact_full := true)
     , "Extract extensive datalog facts" ) ]
 
 let opts =
@@ -236,7 +246,7 @@ let opts =
           filter_extern := true ;
           filter_global := true ;
           filter_lib := true ;
-          filter_rec := true )
+          filter_rec := true)
     , "Trun on all the filtering options" )
   ; ( "-filter_allocsite"
     , Arg.String (fun s -> filter_allocsite := BatSet.add s !filter_allocsite)
@@ -278,3 +288,7 @@ let opts =
     , "Output directory (default: sparrow-out)" )
   ; ("-int_overflow", Arg.Set int_overflow, "Consider integer overflow") ]
   @ unsoundness_opts @ datalog_opts
+
+let capture_opts = [("-skip-build", Arg.Set skip_build, "Skip build")]
+
+let options = ref opts

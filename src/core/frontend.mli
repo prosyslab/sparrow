@@ -17,6 +17,8 @@ val marshal_file : string ref
 
 val args : string -> unit
 
+val parse_arg : string -> unit
+
 val parse : unit -> Cil.file
 
 val makeCFGinfo : Cil.file -> Cil.file

@@ -21,7 +21,9 @@ let files = ref []
 let marshal_file = ref ""
 
 let args f =
-  if Sys.file_exists f then
+  if !Options.task = Options.Capture then
+    Options.build_commands := !Options.build_commands @ [f]
+  else if Sys.file_exists f then
     if Filename.check_suffix f ".i" || Filename.check_suffix f ".c" then
       files := f :: !files
     else
@@ -30,6 +32,19 @@ let args f =
   else
     let _ = prerr_endline ("Error: " ^ f ^ ": No such file") in
     exit 1
+
+let parse_arg arg =
+  if !Arg.current = 1 then
+    match arg with
+    | "capture" ->
+        Options.options := Options.capture_opts ;
+        Options.task := Options.Capture
+    | "analyze" ->
+        Options.options := Options.opts ;
+        Options.task := Options.Analyze
+    | _ ->
+        args arg
+  else args arg
 
 let parseOneFile fname =
   (* PARSE and convert to CIL *)
@@ -40,7 +55,8 @@ let parseOneFile fname =
 
 let parse () =
   match List.map parseOneFile !files with
-  | [one] -> one
+  | [one] ->
+      one
   | [] ->
       prerr_endline "Error: No arguments are given" ;
       exit 1
@@ -59,7 +75,8 @@ let makeCFGinfo f =
           Cil.prepareCFG fd ;
           (* jc: blockinggraph depends on this "true" arg *)
           ignore (Cil.computeCFGInfo fd true)
-      | _ -> () ) ;
+      | _ ->
+          ()) ;
   f
 
 (* true if the given function has variable number of arguments *)
@@ -69,7 +86,8 @@ let is_varargs fid file =
       match global with
       | GFun (fd, _) when fd.svar.vname = fid -> (
         match fd.svar.vtype with TFun (_, _, b_va, _) -> b_va | _ -> b )
-      | _ -> b )
+      | _ ->
+          b)
     false
 
 let inline global =
@@ -86,7 +104,8 @@ let inline global =
                  (fun regexp -> Str.string_match regexp fd.svar.vname 0)
                  regexps ->
             fd.svar.vname :: to_inline
-        | _ -> to_inline )
+        | _ ->
+            to_inline)
       f.globals []
   in
   let varargs_procs = List.filter (fun fid -> is_varargs fid f) to_inline in
@@ -99,7 +118,7 @@ let inline global =
         try
           List.length (InterCfg.nodes_of_pid global.icfg fid)
           > !Options.inline_size
-        with _ -> false )
+        with _ -> false)
       to_inline
   in
   let to_exclude = varargs_procs @ recursive_procs @ large_procs in
