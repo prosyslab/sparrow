@@ -4,6 +4,8 @@ PKG apron
 PKG apron.octMPQ
 PKG batteries
 PKG cil
+PKG clangml
+PKG clangml.show
 PKG lymp
 PKG ocamlgraph
 PKG ppx_compare

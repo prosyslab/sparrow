@@ -12,11 +12,15 @@
 
 type task = All | Capture | Analyze
 
+type frontend = Clang | Cil
+
 val task : task ref
 
 val skip_build : bool ref
 
 val build_commands : string list ref
+
+val frontend : frontend ref
 
 (** {2 Intermediate Represenation } *)
 

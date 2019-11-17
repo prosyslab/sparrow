@@ -49,7 +49,10 @@ let parse_arg arg =
 let parseOneFile fname =
   (* PARSE and convert to CIL *)
   if !Cilutil.printStages then ignore (E.log "Parsing %s\n" fname) ;
-  let cil = F.parse fname () in
+  let cil =
+    if !Options.frontend = Options.Cil then F.parse fname ()
+    else ClangFrontend.parse fname
+  in
   if not (Feature.enabled "epicenter") then Rmtmps.removeUnusedTemps cil ;
   cil
 

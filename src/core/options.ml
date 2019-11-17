@@ -12,12 +12,16 @@ open Arg
 
 type task = All | Capture | Analyze
 
+type frontend = Clang | Cil
+
 let task = ref All
 
 (* Capture *)
 let skip_build = ref false
 
 let build_commands = ref []
+
+let frontend = ref Cil
 
 (* IL *)
 let il = ref false
@@ -188,7 +192,11 @@ let datalog_opts =
     , "Extract extensive datalog facts" ) ]
 
 let opts =
-  [ ("-il", Arg.Set il, "Show the input program in IL")
+  [ ( "-frontend"
+    , Arg.String
+        (fun s -> if s = "clang" then frontend := Clang else frontend := Cil)
+    , "Frontend" )
+  ; ("-il", Arg.Set il, "Show the input program in IL")
   ; ("-cfg", Arg.Set cfg, "Print Cfg")
   ; ("-dug", Arg.Set dug, "Print Def-Use graph")
   ; ("-noalarm", Arg.Set noalarm, "Do not print alarms")
@@ -289,6 +297,11 @@ let opts =
   ; ("-int_overflow", Arg.Set int_overflow, "Consider integer overflow") ]
   @ unsoundness_opts @ datalog_opts
 
-let capture_opts = [("-skip-build", Arg.Set skip_build, "Skip build")]
+let capture_opts =
+  [ ("-skip-build", Arg.Set skip_build, "Skip build")
+  ; ( "-frontend"
+    , Arg.String
+        (fun s -> if s == "clang" then frontend := Clang else frontend := Cil)
+    , "Frontend" ) ]
 
 let options = ref opts
