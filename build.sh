@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 NCPU="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
-OCAML_VERSION="4.07.1+flambda"
+OCAML_VERSION="4.08.0+flambda"
 SPARROW_OPAM_SWITCH=sparrow-"$OCAML_VERSION"
 opam init --compiler=$OCAML_VERSION -j $NCPU --no-setup --yes
 

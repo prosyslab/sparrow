@@ -58,19 +58,19 @@ let partition queries =
 let sort_queries queries =
   List.sort
     (fun a b ->
-      if Pervasives.compare a.loc.file b.loc.file = 0 then
-        if Pervasives.compare a.loc.line b.loc.line = 0 then
-          Pervasives.compare a.exp b.exp
-        else Pervasives.compare a.loc.line b.loc.line
-      else Pervasives.compare a.loc.file b.loc.file )
+      if Stdlib.compare a.loc.file b.loc.file = 0 then
+        if Stdlib.compare a.loc.line b.loc.line = 0 then
+          Stdlib.compare a.exp b.exp
+        else Stdlib.compare a.loc.line b.loc.line
+      else Stdlib.compare a.loc.file b.loc.file )
     queries
 
 let sort_partition queries =
   List.sort
     (fun (a, _) (b, _) ->
-      if Pervasives.compare a.file b.file = 0 then
-        Pervasives.compare a.line b.line
-      else Pervasives.compare a.file b.file )
+      if Stdlib.compare a.file b.file = 0 then
+        Stdlib.compare a.line b.line
+      else Stdlib.compare a.file b.file )
     queries
 
 let get_status queries =
