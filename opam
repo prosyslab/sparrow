@@ -20,7 +20,7 @@ remove: [
 ]
 
 depends: [
-  "ocaml" {>="4.06.0"}
+  "ocaml" {>="4.08.0"}
   "ocamlfind" {build}
   "batteries" {>= "2.3.1"}
   "cil" {>= "1.7.3"}
