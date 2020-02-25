@@ -66,11 +66,11 @@ module AbsOct = struct
                     if s = d then g
                     else if Check.check_path path_checker s d then
                       G.add_edge g s d
-                    else g )
-                  g g )
-              g g
-          , c
-          , d )
+                    else g)
+                  g g)
+              g g,
+            c,
+            d )
 
   let cardinal = function Bot -> -1 | V (g, _, _) -> G.nb_edges g
 
@@ -89,13 +89,13 @@ module AbsOct = struct
   let get_pack idx size = function
     | Bot -> None
     | V (o, c, _) -> (
-      try
-        let e, _ = D.shortest_path o size idx in
-        Some
-          (List.fold_left
-             (fun s e -> s |> Pack.add (G.E.src e) |> Pack.add (G.E.dst e))
-             Pack.bot e)
-      with _ -> None )
+        try
+          let e, _ = D.shortest_path o size idx in
+          Some
+            (List.fold_left
+               (fun s e -> s |> Pack.add (G.E.src e) |> Pack.add (G.E.dst e))
+               Pack.bot e)
+        with _ -> None )
 
   (* x := c *)
   let set_const x = function
@@ -154,7 +154,7 @@ module AbsOct = struct
         && ( try
                G.fold_edges
                  (fun s d b ->
-                   if G.mem_edge x s d then true else raise Not_found )
+                   if G.mem_edge x s d then true else raise Not_found)
                  y true
              with Not_found -> false )
         && PowOctLoc.le c2 c1
@@ -163,7 +163,7 @@ module AbsOct = struct
     G.fold_edges
       (fun s d o1 ->
         if PowOctLoc.mem s d1 && PowOctLoc.mem d d1 then o1
-        else G.add_edge o1 s d )
+        else G.add_edge o1 s d)
       o2 o1
 
   let join x y =
@@ -208,7 +208,7 @@ module AbsOct = struct
     | V (x, _, _) ->
         G.fold_edges
           (fun s d str ->
-            str ^ Node.to_string d ^ " - " ^ Node.to_string s ^ "\n" )
+            str ^ Node.to_string d ^ " - " ^ Node.to_string s ^ "\n")
           x ""
 
   let pp fmt = function
@@ -216,7 +216,7 @@ module AbsOct = struct
     | V (x, _, _) ->
         G.iter_edges
           (fun s d ->
-            Format.fprintf fmt "@[<hov 2>%a - %a,@]" Node.pp s Node.pp d )
+            Format.fprintf fmt "@[<hov 2>%a - %a,@]" Node.pp s Node.pp d)
           x
 end
 
@@ -265,7 +265,7 @@ module Relation = struct
     List.fold_left
       (fun packconf l ->
         let pack = list_fold Pack.add l Pack.empty in
-        PackConf.add pack packconf )
+        PackConf.add pack packconf)
       PackConf.empty clist
 end
 

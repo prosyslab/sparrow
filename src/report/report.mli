@@ -14,14 +14,15 @@ type target = BO | ND | DZ
 
 type status = Proven | UnProven | BotAlarm
 
-type query =
-  { node: InterCfg.node
-  ; exp: AlarmExp.t
-  ; loc: Cil.location
-  ; allocsite: BasicDom.Allocsite.t option
-  ; src: (InterCfg.node * Cil.location) option
-  ; status: status
-  ; desc: string }
+type query = {
+  node : InterCfg.node;
+  exp : AlarmExp.t;
+  loc : Cil.location;
+  allocsite : BasicDom.Allocsite.t option;
+  src : (InterCfg.node * Cil.location) option;
+  status : status;
+  desc : string;
+}
 
 type part_unit = Cil.location
 

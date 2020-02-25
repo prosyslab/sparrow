@@ -53,11 +53,11 @@ module Val = struct
     (itv_of_val x, pow_loc_of_val x, a, struct_of_val x, pow_proc_of_val x)
 
   let external_value allocsite =
-    ( Itv.top
-    , PowLoc.bot
-    , ArrayBlk.extern allocsite
-    , StructBlk.extern ()
-    , PowProc.bot )
+    ( Itv.top,
+      PowLoc.bot,
+      ArrayBlk.extern allocsite,
+      StructBlk.extern (),
+      PowProc.bot )
 
   let itv_top = (Itv.top, PowLoc.bot, ArrayBlk.bot, StructBlk.bot, PowProc.bot)
 

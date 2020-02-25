@@ -15,7 +15,7 @@ open Vocab
  * Widening threshold *
  * ****************** *)
 
-let threshold = BatSet.of_list [0; 1; 16; 64]
+let threshold = BatSet.of_list [ 0; 1; 16; 64 ]
 
 (* ************************ *
  * Integer = Z + {-oo, +oo} *
@@ -63,8 +63,7 @@ module Integer = struct
       if eq y x then y
       else
         let filtered = BatSet.filter (fun k -> le (Int k) y) threshold in
-        if BatSet.is_empty filtered then MInf
-        else Int (BatSet.max_elt filtered)
+        if BatSet.is_empty filtered then MInf else Int (BatSet.max_elt filtered)
     else x
 
   let upper_widen x y =
@@ -72,14 +71,12 @@ module Integer = struct
       if eq x y then y
       else
         let filtered = BatSet.filter (fun k -> le y (Int k)) threshold in
-        if BatSet.is_empty filtered then PInf
-        else Int (BatSet.min_elt filtered)
+        if BatSet.is_empty filtered then PInf else Int (BatSet.min_elt filtered)
     else x
 
   let lower_narrow x y =
     if le x y then
-      if eq x MInf || BatSet.exists (fun k -> x = Int k) threshold then y
-      else x
+      if eq x MInf || BatSet.exists (fun k -> x = Int k) threshold then y else x
     else
       invalid_arg
         ( "itv.ml: Integer.lower_narrow (x, y). y < x : " ^ to_string y ^ " < "
@@ -87,8 +84,7 @@ module Integer = struct
 
   let upper_narrow x y =
     if le y x then
-      if eq x PInf || BatSet.exists (fun k -> x = Int k) threshold then y
-      else x
+      if eq x PInf || BatSet.exists (fun k -> x = Int k) threshold then y else x
     else invalid_arg "itv.ml: Integer.upper_narrow (x, y). x < y"
 
   let plus x y =
@@ -141,8 +137,8 @@ module Integer = struct
   let max4 x y z w = max (max x y) (max z w)
 end
 
-(** {6 Main definitions of interval} *)
 open Integer
+(** {6 Main definitions of interval} *)
 
 type t = V of Integer.t * Integer.t | Bot [@@deriving compare]
 
@@ -420,14 +416,14 @@ let itv_of_type = function
   | Cil.TInt (Cil.IUChar, _) -> of_ints 0 255
   | Cil.TInt (Cil.IUShort, _) -> of_ints 0 65535
   | Cil.TInt (Cil.IUInt, _)
-   |Cil.TInt (Cil.ILong, _)
-   |Cil.TInt (Cil.IULongLong, _) ->
+  | Cil.TInt (Cil.ILong, _)
+  | Cil.TInt (Cil.IULongLong, _) ->
       of_ints 0 4294967295
   | Cil.TInt (Cil.IChar, _) -> of_ints (-128) 255
   | Cil.TInt (Cil.IShort, _) -> of_ints (-32768) 32767
   | Cil.TInt (Cil.IInt, _)
-   |Cil.TInt (Cil.IULong, _)
-   |Cil.TInt (Cil.ILongLong, _) ->
+  | Cil.TInt (Cil.IULong, _)
+  | Cil.TInt (Cil.ILongLong, _) ->
       of_ints (-2147483648) 2147483648
   | _ -> top
 
@@ -437,8 +433,8 @@ let cast from_typ to_typ itv =
     | Bot -> Bot
     | _ ->
         let from_size, to_size =
-          ( (try CilHelper.byteSizeOf from_typ |> of_int with _ -> top)
-          , try CilHelper.byteSizeOf to_typ |> of_int with _ -> top )
+          ( (try CilHelper.byteSizeOf from_typ |> of_int with _ -> top),
+            try CilHelper.byteSizeOf to_typ |> of_int with _ -> top )
         in
         if CilHelper.is_unsigned from_typ && CilHelper.is_unsigned to_typ then
           if from_size <= to_size then itv
@@ -447,8 +443,7 @@ let cast from_typ to_typ itv =
           then itv
           else top (* possibly overflow *)
         else if
-          (not (CilHelper.is_unsigned from_typ))
-          && CilHelper.is_unsigned to_typ
+          (not (CilHelper.is_unsigned from_typ)) && CilHelper.is_unsigned to_typ
         then
           if from_size <= to_size then absolute itv
           else if

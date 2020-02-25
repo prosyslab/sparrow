@@ -21,206 +21,209 @@ module AccessAnalysis = AccessAnalysis.Make (AccessSem)
 module Access = ItvSem.Dom.Access
 
 let accessof_eval pid e mem =
-  Dom.init_access () ;
+  Dom.init_access ();
   let _ = ItvSem.eval pid e mem in
   Dom.return_access ()
 
 type locset = PowLoc.t
 
-type feature =
-  { (* global variable: done. *)
-    gvars: locset
-  ; (* local variable: done. *)
-    lvars: locset
-  ; (* local variables of _G_ : done *)
-    lvars_in_G: locset
-  ; (* structure fields : done *)
-    fields: locset
-  ; (* TODO *)
-    ptr_type: locset
-  ; (* allocsites : done *)
-    allocsites: locset
-  ; (* TODO *)
-    static_array: locset
-  ; (* external allocsites : done *)
-    ext_allocsites: locset
-  ; (* defined at single-site: done.*)
-    single_defs: locset
-  ; (* e.g. x = (c1 + c2): done. *)
-    assign_const: locset
-  ; (* e.g., x = sizeof(...): done *)
-    assign_sizeof: locset
-  ; (* make_prune_simple worked: done *)
-    prune_simple: locset
-  ; (* e.g., x < c: done *)
-    prune_by_const: locset
-  ; (* e.g., x < y: done *)
-    prune_by_var: locset
-  ; (* e.g., !x: done *)
-    prune_by_not: locset
-  ; (* e.g., malloc(x): done *)
-    pass_to_alloc: locset
-  ; (* e.g., y = x; malloc(y): done *)
-    pass_to_alloc2: locset
-  ; (* e.g., y = x; malloc(y): done *)
-    pass_to_alloc_clos: locset
-  ; (* e.g., realloc(x): done *)
-    pass_to_realloc: locset
-  ; (* e.g., y = x; realloc(y): done *)
-    pass_to_realloc2: locset
-  ; (* e.g., y = x; realloc(y): done *)
-    pass_to_realloc_clos: locset
-  ; (* e.g., buf = x; done *)
-    pass_to_buf: locset
-  ; (* x := malloc(...): done *)
-    return_from_alloc: locset
-  ; (* y := malloc(...); x = y: done *)
-    return_from_alloc2: locset
-  ; (* y := malloc(...); x = y: done *)
-    return_from_alloc_clos: locset
-  ; (* x := malloc(...): done *)
-    return_from_realloc: locset
-  ; (* y := malloc(...); x = y: done *)
-    return_from_realloc2: locset
-  ; (* y := malloc(...); x = y: done *)
-    return_from_realloc_clos: locset
-  ; (* e.g., x = x + 1: done *)
-    inc_itself_by_one: locset
-  ; (* e.g., x = x + y *)
-    inc_itself_by_var: locset
-  ; (* e.g., x = x + 1 (x is a pointer): done *)
-    incptr_itself_by_one: locset
-  ; (* e.g., x = x + c (where c > 1): done *)
-    inc_itself_by_const: locset
-  ; (* e.g., x = x + c (x is a pointer) (where c > 1): done *)
-    incptr_itself_by_const: locset
-  ; (* e.g., x = y + 1 : done *)
-    inc: locset
-  ; (* e.g., x = y - 1 : done *)
-    dec: locset
-  ; (* e.g., x = x - y : done *)
-    dec_itself: locset
-  ; (* e.g., x = x - c : done *)
-    (* TODO *)
-    dec_itself_by_const: locset
-  ; (* e.g., x = x * 2 : done *)
-    mul_itself_by_const: locset
-  ; (* e.g., x = x * y : done *)
-    (* TODO *)
-    mul_itself_by_var: locset
-  ; (* e.g., arr[x]: done *)
-    used_as_array_index: locset
-  ; (* e.g., x[i] : done *)
-    used_as_array_buf: locset
-  ; (* modified inside recursive functions : done *)
-    mod_in_rec_fun: locset
-  ; (* modified inside recursive functions *)
-    (* TODO *)
-    read_in_rec_fun: locset
-  ; (* e.g., x = ext_function() : done *)
-    return_from_ext_fun: locset
-  ; (* while (1) { ... x:= ... } : done *)
-    mod_inside_loops: locset
-  ; (* while (1) { ... :=x ... } : done *)
-    used_inside_loops: locset }
+type feature = {
+  (* global variable: done. *)
+  gvars : locset;
+  (* local variable: done. *)
+  lvars : locset;
+  (* local variables of _G_ : done *)
+  lvars_in_G : locset;
+  (* structure fields : done *)
+  fields : locset;
+  (* TODO *)
+  ptr_type : locset;
+  (* allocsites : done *)
+  allocsites : locset;
+  (* TODO *)
+  static_array : locset;
+  (* external allocsites : done *)
+  ext_allocsites : locset;
+  (* defined at single-site: done.*)
+  single_defs : locset;
+  (* e.g. x = (c1 + c2): done. *)
+  assign_const : locset;
+  (* e.g., x = sizeof(...): done *)
+  assign_sizeof : locset;
+  (* make_prune_simple worked: done *)
+  prune_simple : locset;
+  (* e.g., x < c: done *)
+  prune_by_const : locset;
+  (* e.g., x < y: done *)
+  prune_by_var : locset;
+  (* e.g., !x: done *)
+  prune_by_not : locset;
+  (* e.g., malloc(x): done *)
+  pass_to_alloc : locset;
+  (* e.g., y = x; malloc(y): done *)
+  pass_to_alloc2 : locset;
+  (* e.g., y = x; malloc(y): done *)
+  pass_to_alloc_clos : locset;
+  (* e.g., realloc(x): done *)
+  pass_to_realloc : locset;
+  (* e.g., y = x; realloc(y): done *)
+  pass_to_realloc2 : locset;
+  (* e.g., y = x; realloc(y): done *)
+  pass_to_realloc_clos : locset;
+  (* e.g., buf = x; done *)
+  pass_to_buf : locset;
+  (* x := malloc(...): done *)
+  return_from_alloc : locset;
+  (* y := malloc(...); x = y: done *)
+  return_from_alloc2 : locset;
+  (* y := malloc(...); x = y: done *)
+  return_from_alloc_clos : locset;
+  (* x := malloc(...): done *)
+  return_from_realloc : locset;
+  (* y := malloc(...); x = y: done *)
+  return_from_realloc2 : locset;
+  (* y := malloc(...); x = y: done *)
+  return_from_realloc_clos : locset;
+  (* e.g., x = x + 1: done *)
+  inc_itself_by_one : locset;
+  (* e.g., x = x + y *)
+  inc_itself_by_var : locset;
+  (* e.g., x = x + 1 (x is a pointer): done *)
+  incptr_itself_by_one : locset;
+  (* e.g., x = x + c (where c > 1): done *)
+  inc_itself_by_const : locset;
+  (* e.g., x = x + c (x is a pointer) (where c > 1): done *)
+  incptr_itself_by_const : locset;
+  (* e.g., x = y + 1 : done *)
+  inc : locset;
+  (* e.g., x = y - 1 : done *)
+  dec : locset;
+  (* e.g., x = x - y : done *)
+  dec_itself : locset;
+  (* e.g., x = x - c : done *)
+  (* TODO *)
+  dec_itself_by_const : locset;
+  (* e.g., x = x * 2 : done *)
+  mul_itself_by_const : locset;
+  (* e.g., x = x * y : done *)
+  (* TODO *)
+  mul_itself_by_var : locset;
+  (* e.g., arr[x]: done *)
+  used_as_array_index : locset;
+  (* e.g., x[i] : done *)
+  used_as_array_buf : locset;
+  (* modified inside recursive functions : done *)
+  mod_in_rec_fun : locset;
+  (* modified inside recursive functions *)
+  (* TODO *)
+  read_in_rec_fun : locset;
+  (* e.g., x = ext_function() : done *)
+  return_from_ext_fun : locset;
+  (* while (1) { ... x:= ... } : done *)
+  mod_inside_loops : locset;
+  (* while (1) { ... :=x ... } : done *)
+  used_inside_loops : locset;
+}
 
 let empty_feature =
-  { gvars= PowLoc.empty
-  ; lvars= PowLoc.empty
-  ; fields= PowLoc.empty
-  ; ptr_type= PowLoc.empty
-  ; allocsites= PowLoc.empty
-  ; static_array= PowLoc.empty
-  ; ext_allocsites= PowLoc.empty
-  ; single_defs= PowLoc.empty
-  ; assign_const= PowLoc.empty
-  ; assign_sizeof= PowLoc.empty
-  ; prune_simple= PowLoc.empty
-  ; prune_by_const= PowLoc.empty
-  ; prune_by_var= PowLoc.empty
-  ; prune_by_not= PowLoc.empty
-  ; pass_to_alloc= PowLoc.empty
-  ; pass_to_alloc2= PowLoc.empty
-  ; pass_to_alloc_clos= PowLoc.empty
-  ; pass_to_realloc= PowLoc.empty
-  ; pass_to_realloc2= PowLoc.empty
-  ; pass_to_realloc_clos= PowLoc.empty
-  ; pass_to_buf= PowLoc.empty
-  ; return_from_alloc= PowLoc.empty
-  ; return_from_alloc2= PowLoc.empty
-  ; return_from_alloc_clos= PowLoc.empty
-  ; return_from_realloc= PowLoc.empty
-  ; return_from_realloc2= PowLoc.empty
-  ; return_from_realloc_clos= PowLoc.empty
-  ; inc_itself_by_one= PowLoc.empty
-  ; inc_itself_by_var= PowLoc.empty
-  ; incptr_itself_by_one= PowLoc.empty
-  ; inc_itself_by_const= PowLoc.empty
-  ; incptr_itself_by_const= PowLoc.empty
-  ; mul_itself_by_const= PowLoc.empty
-  ; mul_itself_by_var= PowLoc.empty
-  ; used_as_array_index= PowLoc.empty
-  ; mod_in_rec_fun= PowLoc.empty
-  ; read_in_rec_fun= PowLoc.empty
-  ; lvars_in_G= PowLoc.empty
-  ; dec_itself= PowLoc.empty
-  ; dec_itself_by_const= PowLoc.empty
-  ; dec= PowLoc.empty
-  ; inc= PowLoc.empty
-  ; used_as_array_buf= PowLoc.empty
-  ; return_from_ext_fun= PowLoc.empty
-  ; mod_inside_loops= PowLoc.empty
-  ; used_inside_loops= PowLoc.empty }
+  {
+    gvars = PowLoc.empty;
+    lvars = PowLoc.empty;
+    fields = PowLoc.empty;
+    ptr_type = PowLoc.empty;
+    allocsites = PowLoc.empty;
+    static_array = PowLoc.empty;
+    ext_allocsites = PowLoc.empty;
+    single_defs = PowLoc.empty;
+    assign_const = PowLoc.empty;
+    assign_sizeof = PowLoc.empty;
+    prune_simple = PowLoc.empty;
+    prune_by_const = PowLoc.empty;
+    prune_by_var = PowLoc.empty;
+    prune_by_not = PowLoc.empty;
+    pass_to_alloc = PowLoc.empty;
+    pass_to_alloc2 = PowLoc.empty;
+    pass_to_alloc_clos = PowLoc.empty;
+    pass_to_realloc = PowLoc.empty;
+    pass_to_realloc2 = PowLoc.empty;
+    pass_to_realloc_clos = PowLoc.empty;
+    pass_to_buf = PowLoc.empty;
+    return_from_alloc = PowLoc.empty;
+    return_from_alloc2 = PowLoc.empty;
+    return_from_alloc_clos = PowLoc.empty;
+    return_from_realloc = PowLoc.empty;
+    return_from_realloc2 = PowLoc.empty;
+    return_from_realloc_clos = PowLoc.empty;
+    inc_itself_by_one = PowLoc.empty;
+    inc_itself_by_var = PowLoc.empty;
+    incptr_itself_by_one = PowLoc.empty;
+    inc_itself_by_const = PowLoc.empty;
+    incptr_itself_by_const = PowLoc.empty;
+    mul_itself_by_const = PowLoc.empty;
+    mul_itself_by_var = PowLoc.empty;
+    used_as_array_index = PowLoc.empty;
+    mod_in_rec_fun = PowLoc.empty;
+    read_in_rec_fun = PowLoc.empty;
+    lvars_in_G = PowLoc.empty;
+    dec_itself = PowLoc.empty;
+    dec_itself_by_const = PowLoc.empty;
+    dec = PowLoc.empty;
+    inc = PowLoc.empty;
+    used_as_array_buf = PowLoc.empty;
+    return_from_ext_fun = PowLoc.empty;
+    mod_inside_loops = PowLoc.empty;
+    used_inside_loops = PowLoc.empty;
+  }
 
 let prerr_feature feature =
   let l2s locs = PowLoc.to_string locs in
-  prerr_endline "== features for variable ranking ==" ;
-  prerr_endline ("gvars : " ^ l2s feature.gvars) ;
-  prerr_endline ("lvars : " ^ l2s feature.lvars) ;
-  prerr_endline ("fields : " ^ l2s feature.fields) ;
-  prerr_endline ("ptr_type : " ^ l2s feature.ptr_type) ;
-  prerr_endline ("allocsites : " ^ l2s feature.allocsites) ;
-  prerr_endline ("static_array : " ^ l2s feature.static_array) ;
-  prerr_endline ("ext_allocsites : " ^ l2s feature.ext_allocsites) ;
-  prerr_endline ("single_def : " ^ l2s feature.single_defs) ;
-  prerr_endline ("assigned_const : " ^ l2s feature.assign_const) ;
-  prerr_endline ("assigned_sizeof : " ^ l2s feature.assign_sizeof) ;
-  prerr_endline ("prune_simple : " ^ l2s feature.prune_simple) ;
-  prerr_endline ("prune_const : " ^ l2s feature.prune_by_const) ;
-  prerr_endline ("prune_var : " ^ l2s feature.prune_by_var) ;
-  prerr_endline ("prune_not : " ^ l2s feature.prune_by_not) ;
-  prerr_endline ("pass_to_alloc : " ^ l2s feature.pass_to_alloc) ;
-  prerr_endline ("pass_to_alloc2 : " ^ l2s feature.pass_to_alloc2) ;
-  prerr_endline ("pass_to_alloc_clos : " ^ l2s feature.pass_to_alloc_clos) ;
-  prerr_endline ("pass_to_realloc : " ^ l2s feature.pass_to_realloc) ;
-  prerr_endline ("pass_to_realloc2 : " ^ l2s feature.pass_to_realloc2) ;
-  prerr_endline ("pass_to_realloc_clos : " ^ l2s feature.pass_to_realloc_clos) ;
-  prerr_endline ("pass_to_buf : " ^ l2s feature.pass_to_buf) ;
-  prerr_endline ("return_from_alloc : " ^ l2s feature.return_from_alloc) ;
-  prerr_endline ("return_from_alloc2 : " ^ l2s feature.return_from_alloc2) ;
+  prerr_endline "== features for variable ranking ==";
+  prerr_endline ("gvars : " ^ l2s feature.gvars);
+  prerr_endline ("lvars : " ^ l2s feature.lvars);
+  prerr_endline ("fields : " ^ l2s feature.fields);
+  prerr_endline ("ptr_type : " ^ l2s feature.ptr_type);
+  prerr_endline ("allocsites : " ^ l2s feature.allocsites);
+  prerr_endline ("static_array : " ^ l2s feature.static_array);
+  prerr_endline ("ext_allocsites : " ^ l2s feature.ext_allocsites);
+  prerr_endline ("single_def : " ^ l2s feature.single_defs);
+  prerr_endline ("assigned_const : " ^ l2s feature.assign_const);
+  prerr_endline ("assigned_sizeof : " ^ l2s feature.assign_sizeof);
+  prerr_endline ("prune_simple : " ^ l2s feature.prune_simple);
+  prerr_endline ("prune_const : " ^ l2s feature.prune_by_const);
+  prerr_endline ("prune_var : " ^ l2s feature.prune_by_var);
+  prerr_endline ("prune_not : " ^ l2s feature.prune_by_not);
+  prerr_endline ("pass_to_alloc : " ^ l2s feature.pass_to_alloc);
+  prerr_endline ("pass_to_alloc2 : " ^ l2s feature.pass_to_alloc2);
+  prerr_endline ("pass_to_alloc_clos : " ^ l2s feature.pass_to_alloc_clos);
+  prerr_endline ("pass_to_realloc : " ^ l2s feature.pass_to_realloc);
+  prerr_endline ("pass_to_realloc2 : " ^ l2s feature.pass_to_realloc2);
+  prerr_endline ("pass_to_realloc_clos : " ^ l2s feature.pass_to_realloc_clos);
+  prerr_endline ("pass_to_buf : " ^ l2s feature.pass_to_buf);
+  prerr_endline ("return_from_alloc : " ^ l2s feature.return_from_alloc);
+  prerr_endline ("return_from_alloc2 : " ^ l2s feature.return_from_alloc2);
   prerr_endline
-    ("return_from_alloc_clos : " ^ l2s feature.return_from_alloc_clos) ;
-  prerr_endline ("return_from_realloc : " ^ l2s feature.return_from_realloc) ;
-  prerr_endline ("return_from_realloc2 : " ^ l2s feature.return_from_realloc2) ;
+    ("return_from_alloc_clos : " ^ l2s feature.return_from_alloc_clos);
+  prerr_endline ("return_from_realloc : " ^ l2s feature.return_from_realloc);
+  prerr_endline ("return_from_realloc2 : " ^ l2s feature.return_from_realloc2);
   prerr_endline
-    ("return_from_realloc_clos : " ^ l2s feature.return_from_realloc_clos) ;
-  prerr_endline ("inc_itself_by_one : " ^ l2s feature.inc_itself_by_one) ;
-  prerr_endline ("incptr_itself_by_one : " ^ l2s feature.incptr_itself_by_one) ;
-  prerr_endline ("inc_itself_by_const : " ^ l2s feature.inc_itself_by_const) ;
+    ("return_from_realloc_clos : " ^ l2s feature.return_from_realloc_clos);
+  prerr_endline ("inc_itself_by_one : " ^ l2s feature.inc_itself_by_one);
+  prerr_endline ("incptr_itself_by_one : " ^ l2s feature.incptr_itself_by_one);
+  prerr_endline ("inc_itself_by_const : " ^ l2s feature.inc_itself_by_const);
   prerr_endline
-    ("incptr_itself_by_const : " ^ l2s feature.incptr_itself_by_const) ;
-  prerr_endline ("mul_itself_by_const : " ^ l2s feature.mul_itself_by_const) ;
-  prerr_endline ("mul_itself_by_var : " ^ l2s feature.mul_itself_by_var) ;
-  prerr_endline ("dec_itself : " ^ l2s feature.dec_itself) ;
-  prerr_endline ("inc : " ^ l2s feature.inc) ;
-  prerr_endline ("inc_by_var : " ^ l2s feature.inc_itself_by_var) ;
-  prerr_endline ("dec : " ^ l2s feature.dec) ;
-  prerr_endline ("used_as_array_index : " ^ l2s feature.used_as_array_index) ;
-  prerr_endline ("used_as_array_buf : " ^ l2s feature.used_as_array_buf) ;
-  prerr_endline ("mod_in_rec_fun : " ^ l2s feature.mod_in_rec_fun) ;
-  prerr_endline ("lvars_in_G : " ^ l2s feature.lvars_in_G) ;
-  prerr_endline ("returned_from_ext_fun : " ^ l2s feature.return_from_ext_fun) ;
-  prerr_endline ("mod_inside_loops : " ^ l2s feature.mod_inside_loops) ;
+    ("incptr_itself_by_const : " ^ l2s feature.incptr_itself_by_const);
+  prerr_endline ("mul_itself_by_const : " ^ l2s feature.mul_itself_by_const);
+  prerr_endline ("mul_itself_by_var : " ^ l2s feature.mul_itself_by_var);
+  prerr_endline ("dec_itself : " ^ l2s feature.dec_itself);
+  prerr_endline ("inc : " ^ l2s feature.inc);
+  prerr_endline ("inc_by_var : " ^ l2s feature.inc_itself_by_var);
+  prerr_endline ("dec : " ^ l2s feature.dec);
+  prerr_endline ("used_as_array_index : " ^ l2s feature.used_as_array_index);
+  prerr_endline ("used_as_array_buf : " ^ l2s feature.used_as_array_buf);
+  prerr_endline ("mod_in_rec_fun : " ^ l2s feature.mod_in_rec_fun);
+  prerr_endline ("lvars_in_G : " ^ l2s feature.lvars_in_G);
+  prerr_endline ("returned_from_ext_fun : " ^ l2s feature.return_from_ext_fun);
+  prerr_endline ("mod_inside_loops : " ^ l2s feature.mod_inside_loops);
   prerr_endline ("used_inside_loops : " ^ l2s feature.used_inside_loops)
 
 (* simplify expressions:
@@ -262,56 +265,56 @@ and is_var e = match e with Lval (Var _, NoOffset) -> true | _ -> false
 
 let inc_itself_by_one (lv, e) =
   match (lv, e) with
-  | ( (Var x, NoOffset)
-    , BinOp (PlusA, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
+  | ( (Var x, NoOffset),
+      BinOp (PlusA, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
     when x.vname = y.vname && Cil.i64_to_int i = 1 ->
       true
   | _ -> false
 
 let incptr_itself_by_one (lv, e) =
   match (lv, e) with
-  | ( (Var x, NoOffset)
-    , BinOp (PlusPI, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
+  | ( (Var x, NoOffset),
+      BinOp (PlusPI, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
     when x.vname = y.vname && Cil.i64_to_int i = 1 ->
       true
   | _ -> false
 
 let inc_itself_by_const (lv, e) =
   match (lv, e) with
-  | ( (Var x, NoOffset)
-    , BinOp (PlusA, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
+  | ( (Var x, NoOffset),
+      BinOp (PlusA, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
     when x.vname = y.vname && Cil.i64_to_int i > 1 ->
       true
   | _ -> false
 
 let inc_itself_by_var (lv, e) =
   match (lv, e) with
-  | ( (Var x, NoOffset)
-    , BinOp (PlusA, Lval (Var y, NoOffset), Lval (Var z, NoOffset), _) )
+  | ( (Var x, NoOffset),
+      BinOp (PlusA, Lval (Var y, NoOffset), Lval (Var z, NoOffset), _) )
     when x.vname = y.vname ->
       true
   | _ -> false
 
 let incptr_itself_by_const (lv, e) =
   match (lv, e) with
-  | ( (Var x, NoOffset)
-    , BinOp (PlusPI, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
+  | ( (Var x, NoOffset),
+      BinOp (PlusPI, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
     when x.vname = y.vname && Cil.i64_to_int i > 1 ->
       true
   | _ -> false
 
 let mul_itself_by_const (lv, e) =
   match (lv, e) with
-  | ( (Var x, NoOffset)
-    , BinOp (Mult, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
+  | ( (Var x, NoOffset),
+      BinOp (Mult, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
     when x.vname = y.vname && Cil.i64_to_int i > 1 ->
       true
   | _ -> false
 
 let mul_itself_by_var (lv, e) =
   match (lv, e) with
-  | ( (Var x, NoOffset)
-    , BinOp (Mult, Lval (Var y, NoOffset), Lval (Var z, NoOffset), _) )
+  | ( (Var x, NoOffset),
+      BinOp (Mult, Lval (Var y, NoOffset), Lval (Var z, NoOffset), _) )
     when x.vname = y.vname ->
       true
   | _ -> false
@@ -342,95 +345,97 @@ let is_proc_G loc =
   try Loc.get_proc loc = InterCfg.global_proc with _ -> false
 
 let add_assign_const loc feat =
-  {feat with assign_const= PowLoc.add loc feat.assign_const}
+  { feat with assign_const = PowLoc.add loc feat.assign_const }
 
 let add_assign_sizeof loc feat =
-  {feat with assign_sizeof= PowLoc.add loc feat.assign_sizeof}
+  { feat with assign_sizeof = PowLoc.add loc feat.assign_sizeof }
 
 let add_prune_by_const loc feat =
-  {feat with prune_by_const= PowLoc.add loc feat.prune_by_const}
+  { feat with prune_by_const = PowLoc.add loc feat.prune_by_const }
 
 let add_prune_by_var loc feat =
-  {feat with prune_by_var= PowLoc.add loc feat.prune_by_var}
+  { feat with prune_by_var = PowLoc.add loc feat.prune_by_var }
 
 let add_prune_by_not loc feat =
-  {feat with prune_by_not= PowLoc.add loc feat.prune_by_not}
+  { feat with prune_by_not = PowLoc.add loc feat.prune_by_not }
 
 let add_prune_simple loc feat =
-  {feat with prune_simple= PowLoc.add loc feat.prune_simple}
+  { feat with prune_simple = PowLoc.add loc feat.prune_simple }
 
 let add_pass_to_alloc loc feat =
-  {feat with pass_to_alloc= PowLoc.add loc feat.pass_to_alloc}
+  { feat with pass_to_alloc = PowLoc.add loc feat.pass_to_alloc }
 
 let add_return_from_alloc loc feat =
-  {feat with return_from_alloc= PowLoc.add loc feat.return_from_alloc}
+  { feat with return_from_alloc = PowLoc.add loc feat.return_from_alloc }
 
 let add_pass_to_alloc2 loc feat =
-  {feat with pass_to_alloc2= PowLoc.add loc feat.pass_to_alloc2}
+  { feat with pass_to_alloc2 = PowLoc.add loc feat.pass_to_alloc2 }
 
 let add_return_from_alloc2 loc feat =
-  {feat with return_from_alloc2= PowLoc.add loc feat.return_from_alloc2}
+  { feat with return_from_alloc2 = PowLoc.add loc feat.return_from_alloc2 }
 
 let add_pass_to_realloc loc feat =
-  {feat with pass_to_realloc= PowLoc.add loc feat.pass_to_realloc}
+  { feat with pass_to_realloc = PowLoc.add loc feat.pass_to_realloc }
 
 let add_return_from_realloc loc feat =
-  {feat with return_from_realloc= PowLoc.add loc feat.return_from_realloc}
+  { feat with return_from_realloc = PowLoc.add loc feat.return_from_realloc }
 
 let add_pass_to_realloc2 loc feat =
-  {feat with pass_to_realloc2= PowLoc.add loc feat.pass_to_realloc2}
+  { feat with pass_to_realloc2 = PowLoc.add loc feat.pass_to_realloc2 }
 
 let add_return_from_realloc2 loc feat =
-  {feat with return_from_realloc2= PowLoc.add loc feat.return_from_realloc2}
+  { feat with return_from_realloc2 = PowLoc.add loc feat.return_from_realloc2 }
 
 let add_return_from_ext_fun loc feat =
-  {feat with return_from_ext_fun= PowLoc.add loc feat.return_from_ext_fun}
+  { feat with return_from_ext_fun = PowLoc.add loc feat.return_from_ext_fun }
 
 let add_inc_itself_by_one loc feat =
-  {feat with inc_itself_by_one= PowLoc.add loc feat.inc_itself_by_one}
+  { feat with inc_itself_by_one = PowLoc.add loc feat.inc_itself_by_one }
 
 let add_incptr_itself_by_one loc feat =
-  {feat with incptr_itself_by_one= PowLoc.add loc feat.incptr_itself_by_one}
+  { feat with incptr_itself_by_one = PowLoc.add loc feat.incptr_itself_by_one }
 
 let add_inc_itself_by_const loc feat =
-  {feat with inc_itself_by_const= PowLoc.add loc feat.inc_itself_by_const}
+  { feat with inc_itself_by_const = PowLoc.add loc feat.inc_itself_by_const }
 
 let add_inc_itself_by_var loc feat =
-  {feat with inc_itself_by_var= PowLoc.add loc feat.inc_itself_by_var}
+  { feat with inc_itself_by_var = PowLoc.add loc feat.inc_itself_by_var }
 
 let add_incptr_itself_by_const loc feat =
-  {feat with incptr_itself_by_const= PowLoc.add loc feat.incptr_itself_by_const}
+  {
+    feat with
+    incptr_itself_by_const = PowLoc.add loc feat.incptr_itself_by_const;
+  }
 
 let add_mul_itself_by_const loc feat =
-  {feat with mul_itself_by_const= PowLoc.add loc feat.mul_itself_by_const}
+  { feat with mul_itself_by_const = PowLoc.add loc feat.mul_itself_by_const }
 
 let add_mul_itself_by_var loc feat =
-  {feat with mul_itself_by_var= PowLoc.add loc feat.mul_itself_by_var}
+  { feat with mul_itself_by_var = PowLoc.add loc feat.mul_itself_by_var }
 
-let add_inc loc feat = {feat with inc= PowLoc.add loc feat.inc}
+let add_inc loc feat = { feat with inc = PowLoc.add loc feat.inc }
 
 let add_dec_itself loc feat =
-  {feat with dec_itself= PowLoc.add loc feat.dec_itself}
+  { feat with dec_itself = PowLoc.add loc feat.dec_itself }
 
-let add_dec loc feat = {feat with dec= PowLoc.add loc feat.dec}
+let add_dec loc feat = { feat with dec = PowLoc.add loc feat.dec }
 
 let add_used_as_array_index loc feat =
-  {feat with used_as_array_index= PowLoc.add loc feat.used_as_array_index}
+  { feat with used_as_array_index = PowLoc.add loc feat.used_as_array_index }
 
 let add_used_as_array_buf loc feat =
-  {feat with used_as_array_buf= PowLoc.add loc feat.used_as_array_buf}
+  { feat with used_as_array_buf = PowLoc.add loc feat.used_as_array_buf }
 
 let add_mod_in_rec_fun loc feat =
-  {feat with mod_in_rec_fun= PowLoc.add loc feat.mod_in_rec_fun}
+  { feat with mod_in_rec_fun = PowLoc.add loc feat.mod_in_rec_fun }
 
 let add_mod_inside_loops loc feat =
-  {feat with mod_inside_loops= PowLoc.add loc feat.mod_inside_loops}
+  { feat with mod_inside_loops = PowLoc.add loc feat.mod_inside_loops }
 
 let add_used_inside_loops loc feat =
-  {feat with used_inside_loops= PowLoc.add loc feat.used_inside_loops}
+  { feat with used_inside_loops = PowLoc.add loc feat.used_inside_loops }
 
-let check_op op =
-  op = Lt || op = Gt || op = Le || op = Ge || op = Eq || op = Ne
+let check_op op = op = Lt || op = Gt || op = Le || op = Ge || op = Eq || op = Ne
 
 let extract_set pid (lv, e) mem global feature =
   let locs = ItvSem.eval_lv pid lv mem in
@@ -438,8 +443,7 @@ let extract_set pid (lv, e) mem global feature =
     feature
     |> (if is_const e then PowLoc.fold add_assign_const locs else id)
     |> (if is_sizeof e then PowLoc.fold add_assign_sizeof locs else id)
-    |> ( if inc_itself_by_one (lv, e) then
-         PowLoc.fold add_inc_itself_by_one locs
+    |> ( if inc_itself_by_one (lv, e) then PowLoc.fold add_inc_itself_by_one locs
        else id )
     |> ( if incptr_itself_by_one (lv, e) then
          PowLoc.fold add_incptr_itself_by_one locs
@@ -450,23 +454,20 @@ let extract_set pid (lv, e) mem global feature =
     |> ( if inc_itself_by_const (lv, e) then
          PowLoc.fold add_inc_itself_by_const locs
        else id )
-    |> ( if inc_itself_by_var (lv, e) then
-         PowLoc.fold add_inc_itself_by_var locs
+    |> ( if inc_itself_by_var (lv, e) then PowLoc.fold add_inc_itself_by_var locs
        else id )
     |> ( if mul_itself_by_const (lv, e) then
          PowLoc.fold add_mul_itself_by_const locs
        else id )
-    |> ( if mul_itself_by_var (lv, e) then
-         PowLoc.fold add_mul_itself_by_var locs
+    |> ( if mul_itself_by_var (lv, e) then PowLoc.fold add_mul_itself_by_var locs
        else id )
     |> (if dec_itself (lv, e) then PowLoc.fold add_dec_itself locs else id)
     |> (if is_inc (lv, e) then PowLoc.fold add_inc locs else id)
     |> (if is_dec (lv, e) then PowLoc.fold add_dec locs else id)
     |>
-    if Global.is_rec pid global then PowLoc.fold add_mod_in_rec_fun locs
-    else id
+    if Global.is_rec pid global then PowLoc.fold add_mod_in_rec_fun locs else id
   with e ->
-    prerr_endline "extract_set" ;
+    prerr_endline "extract_set";
     raise e
 
 let sem_fun = ItvSem.run AbsSem.Strong ItvSem.Spec.empty
@@ -491,9 +492,7 @@ let extract_assume node pid e mem global feature =
 
 let extract_alloc node pid (lv, e) mem global feature =
   let locs_lv = ItvSem.eval_lv pid lv mem in
-  let locs_e =
-    Access.Info.useof (AccessSem.accessof global node sem_fun mem)
-  in
+  let locs_e = Access.Info.useof (AccessSem.accessof global node sem_fun mem) in
   feature
   |> PowLoc.fold add_pass_to_alloc locs_e
   |> PowLoc.fold add_return_from_alloc locs_lv
@@ -507,7 +506,7 @@ let extract_call_realloc node pid (lvo, fe, el) mem global feature =
           (list_fold
              (fun e access ->
                AccessSem.accessof global node sem_fun mem
-               |> Access.Info.union access )
+               |> Access.Info.union access)
              el Access.Info.empty)
       in
       feature
@@ -544,7 +543,7 @@ let extract_used_index pid mem cmd feature =
              | _ -> Cil.zero (* dummy exp *) )
              mem)
       in
-      PowLoc.fold add_used_as_array_index locs )
+      PowLoc.fold add_used_as_array_index locs)
     queries feature
 
 let extract_used_buf pid mem cmd feature =
@@ -561,7 +560,7 @@ let extract_used_buf pid mem cmd feature =
              | _ -> Cil.zero (* dummy exp *) )
              mem)
       in
-      PowLoc.fold add_used_as_array_buf locs )
+      PowLoc.fold add_used_as_array_buf locs)
     queries feature
 
 let extract_loops pid mem cmd node icfg feature =
@@ -591,7 +590,9 @@ let extract1 icfg mem global node feature =
     |> extract_used_index pid mem cmd
     |> extract_used_buf pid mem cmd
     |> extract_loops pid mem cmd node icfg
-  with e -> prerr_endline "extract1" ; raise e
+  with e ->
+    prerr_endline "extract1";
+    raise e
 
 let traverse1 global =
   let mem = global.mem in
@@ -648,16 +649,16 @@ let build_copy_graph icfg mem =
     (fun n g ->
       match InterCfg.cmdof icfg n with
       | Cset (lv, e, _) -> (
-        match (lv, simplify_exp e) with
-        | (Var x, NoOffset), Lval (Var y, NoOffset) ->
-            let pid = InterCfg.Node.get_pid n in
-            let lhs = PowLoc.choose (ItvSem.eval_lv pid lv mem) in
-            let rhs =
-              PowLoc.choose (Access.Info.useof (accessof_eval pid e mem))
-            in
-            G.add_edge g rhs lhs
-        | _ -> g )
-      | _ -> g )
+          match (lv, simplify_exp e) with
+          | (Var x, NoOffset), Lval (Var y, NoOffset) ->
+              let pid = InterCfg.Node.get_pid n in
+              let lhs = PowLoc.choose (ItvSem.eval_lv pid lv mem) in
+              let rhs =
+                PowLoc.choose (Access.Info.useof (accessof_eval pid e mem))
+              in
+              G.add_edge g rhs lhs
+          | _ -> g )
+      | _ -> g)
     (InterCfg.nodesof icfg) G.empty
 
 let closure global feature =
@@ -685,12 +686,14 @@ let closure global feature =
     if PowLoc.subset succs set then set
     else clos_forward (PowLoc.union set succs)
   in
-  { feature with
-    pass_to_alloc_clos= PowLoc.diff (clos_backward pta) pta
-  ; pass_to_realloc_clos= PowLoc.diff (clos_backward ptra) ptra
-  ; return_from_alloc_clos= PowLoc.diff (clos_forward rfa) rfa
-  ; return_from_realloc_clos= PowLoc.diff (clos_forward rfra) rfra
-  ; pass_to_buf= PowLoc.diff (clos_backward buf) buf }
+  {
+    feature with
+    pass_to_alloc_clos = PowLoc.diff (clos_backward pta) pta;
+    pass_to_realloc_clos = PowLoc.diff (clos_backward ptra) ptra;
+    return_from_alloc_clos = PowLoc.diff (clos_forward rfa) rfa;
+    return_from_realloc_clos = PowLoc.diff (clos_forward rfra) rfra;
+    pass_to_buf = PowLoc.diff (clos_backward buf) buf;
+  }
 
 let extract_feature global locset =
   let access = AccessAnalysis.perform global locset sem_fun global.mem in
@@ -702,20 +705,28 @@ let extract_feature global locset =
   let ext_allocsites = PowLoc.filter Loc.is_ext_allocsite allocsites in
   let single_defs = Access.find_single_defs access in
   let feature =
-    try traverse1 global with e -> prerr_endline "traverse1" ; raise e
+    try traverse1 global
+    with e ->
+      prerr_endline "traverse1";
+      raise e
   in
   (* first iteration *)
   let feature = traverse2 global feature in
   (* second iteration *)
   let feature = closure global feature in
-  { feature with
-    gvars; lvars; fields; allocsites; ext_allocsites; single_defs; lvars_in_G
+  {
+    feature with
+    gvars;
+    lvars;
+    fields;
+    allocsites;
+    ext_allocsites;
+    single_defs;
+    lvars_in_G;
   }
 
 let weight_of l f weights =
-  let getw i =
-    try float_of_string (List.nth weights (i - 1)) with _ -> 0.0
-  in
+  let getw i = try float_of_string (List.nth weights (i - 1)) with _ -> 0.0 in
   let mem = PowLoc.mem in
   0.0
   (* atomic rules *)

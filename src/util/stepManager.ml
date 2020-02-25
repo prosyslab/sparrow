@@ -14,12 +14,11 @@ let line = String.make 80 '-'
 let step s stg i fn =
   let t0 = Sys.time () in
   let to_consol = true in
-  if s then
-    Logging.info ~to_consol "\n\n\n%s\n%s begins...\n%s\n" line stg line
-  else Logging.info ~to_consol "%s begins...\n" stg ;
+  if s then Logging.info ~to_consol "\n\n\n%s\n%s begins...\n%s\n" line stg line
+  else Logging.info ~to_consol "%s begins...\n" stg;
   let v = fn i in
-  if s then Logging.info ~to_consol "\n" ;
-  Logging.info ~to_consol "%s completes: %f\n" stg (Sys.time () -. t0) ;
+  if s then Logging.info ~to_consol "\n";
+  Logging.info ~to_consol "%s completes: %f\n" stg (Sys.time () -. t0);
   v
 
 let stepf s stg fn i = if !Options.verbose >= 1 then step s stg i fn else fn i

@@ -82,6 +82,6 @@ end
 
 module Make (Access : Access.S) :
   S
-  with type Access.t = Access.t
-   and type Loc.t = Access.Loc.t
-   and type PowLoc.t = Access.PowLoc.t
+    with type Access.t = Access.t
+     and type Loc.t = Access.Loc.t
+     and type PowLoc.t = Access.PowLoc.t

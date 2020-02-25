@@ -105,15 +105,14 @@ let prerr_progressbar ?(itv = 1) n total =
     let rec ps f s n =
       if n = 0 then ()
       else (
-        f s ;
+        f s;
         ps f s (n - 1) )
     in
-    prerr_string "\r[" ;
-    ps prerr_string "=" v ;
-    ps prerr_string "." u ;
-    prerr_string
-      ("] (" ^ string_of_int n ^ "/" ^ string_of_int total ^ ")     ") ;
-    if n = total then prerr_newline () ;
+    prerr_string "\r[";
+    ps prerr_string "=" v;
+    ps prerr_string "." u;
+    prerr_string ("] (" ^ string_of_int n ^ "/" ^ string_of_int total ^ ")     ");
+    if n = total then prerr_newline ();
     flush stderr )
   else ()
 

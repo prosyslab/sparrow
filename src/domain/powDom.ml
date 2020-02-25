@@ -93,8 +93,7 @@ module MakeCPO (A : SET) = struct
   let le : t -> t -> bool =
    fun x y -> if x == y then true else BatSet.subset x y
 
-  let eq : t -> t -> bool =
-   fun x y -> if x == y then true else BatSet.equal x y
+  let eq : t -> t -> bool = fun x y -> if x == y then true else BatSet.equal x y
 
   let bot = BatSet.empty
 
@@ -113,7 +112,7 @@ module MakeCPO (A : SET) = struct
   let inter = meet
 
   (* Since module A is finite,  widening is defined as union which is
-     sufficient to guarantee analysis termination.  *)
+     sufficient to guarantee analysis termination. *)
   let widen : t -> t -> t = fun x y -> if x == y then x else BatSet.union x y
 
   let narrow : t -> t -> t = fun x y -> if x == y then x else BatSet.inter x y
@@ -195,9 +194,7 @@ module MakeLAT (A : SET) = struct
   let empty = bot
 
   let join x y =
-    match (x, y) with
-    | V x, V y -> V (PowCPO.join x y)
-    | Top, _ | _, Top -> top
+    match (x, y) with V x, V y -> V (PowCPO.join x y) | Top, _ | _, Top -> top
 
   let union = join
 
@@ -215,7 +212,7 @@ module MakeLAT (A : SET) = struct
   let inter = meet
 
   (* Since module A is finite,  widening is defined as union which is
-     sufficient to guarantee analysis termination.  *)
+     sufficient to guarantee analysis termination. *)
   let widen = join
 
   let narrow = meet
@@ -272,7 +269,5 @@ module MakeLAT (A : SET) = struct
 
   let of_list s = V (PowCPO.of_list s)
 
-  let pp fmt = function
-    | V s -> PowCPO.pp fmt s
-    | _ -> Format.fprintf fmt "top"
+  let pp fmt = function V s -> PowCPO.pp fmt s | _ -> Format.fprintf fmt "top"
 end

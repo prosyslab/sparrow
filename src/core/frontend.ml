@@ -22,7 +22,7 @@ let marshal_file = ref ""
 
 let args f =
   if !Options.task = Options.Capture then
-    Options.build_commands := !Options.build_commands @ [f]
+    Options.build_commands := !Options.build_commands @ [ f ]
   else if Sys.file_exists f then
     if Filename.check_suffix f ".i" || Filename.check_suffix f ".c" then
       files := f :: !files
@@ -37,49 +37,46 @@ let parse_arg arg =
   if !Arg.current = 1 then
     match arg with
     | "capture" ->
-        Options.options := Options.capture_opts ;
+        Options.options := Options.capture_opts;
         Options.task := Options.Capture
     | "analyze" ->
-        Options.options := Options.opts ;
+        Options.options := Options.opts;
         Options.task := Options.Analyze
-    | _ ->
-        args arg
+    | _ -> args arg
   else args arg
 
 let parseOneFile fname =
   (* PARSE and convert to CIL *)
-  if !Cilutil.printStages then ignore (E.log "Parsing %s\n" fname) ;
+  if !Cilutil.printStages then ignore (E.log "Parsing %s\n" fname);
   let cil =
     if !Options.frontend = Options.Cil then F.parse fname ()
     else ClangFrontend.parse fname
   in
-  if not (Feature.enabled "epicenter") then Rmtmps.removeUnusedTemps cil ;
+  if not (Feature.enabled "epicenter") then Rmtmps.removeUnusedTemps cil;
   cil
 
 let parse () =
   match List.map parseOneFile !files with
-  | [one] ->
-      one
+  | [ one ] -> one
   | [] ->
-      prerr_endline "Error: No arguments are given" ;
+      prerr_endline "Error: No arguments are given";
       exit 1
   | files ->
-      Mergecil.ignore_merge_conflicts := true ;
+      Mergecil.ignore_merge_conflicts := true;
       let merged = Stats.time "merge" (Mergecil.merge files) "merged" in
-      if !E.hadErrors then E.s (E.error "There were errors during merging") ;
+      if !E.hadErrors then E.s (E.error "There were errors during merging");
       merged
 
 let makeCFGinfo f =
-  ignore (Partial.calls_end_basic_blocks f) ;
-  ignore (Partial.globally_unique_vids f) ;
+  ignore (Partial.calls_end_basic_blocks f);
+  ignore (Partial.globally_unique_vids f);
   Cil.iterGlobals f (fun glob ->
       match glob with
       | Cil.GFun (fd, _) ->
-          Cil.prepareCFG fd ;
+          Cil.prepareCFG fd;
           (* jc: blockinggraph depends on this "true" arg *)
           ignore (Cil.computeCFGInfo fd true)
-      | _ ->
-          ()) ;
+      | _ -> ());
   f
 
 (* true if the given function has variable number of arguments *)
@@ -88,9 +85,8 @@ let is_varargs fid file =
     (fun b global ->
       match global with
       | GFun (fd, _) when fd.svar.vname = fid -> (
-        match fd.svar.vtype with TFun (_, _, b_va, _) -> b_va | _ -> b )
-      | _ ->
-          b)
+          match fd.svar.vtype with TFun (_, _, b_va, _) -> b_va | _ -> b )
+      | _ -> b)
     false
 
 let inline global =
@@ -107,8 +103,7 @@ let inline global =
                  (fun regexp -> Str.string_match regexp fd.svar.vname 0)
                  regexps ->
             fd.svar.vname :: to_inline
-        | _ ->
-            to_inline)
+        | _ -> to_inline)
       f.globals []
   in
   let varargs_procs = List.filter (fun fid -> is_varargs fid f) to_inline in
@@ -125,14 +120,14 @@ let inline global =
       to_inline
   in
   let to_exclude = varargs_procs @ recursive_procs @ large_procs in
-  L.info "To inline : %s\n" (Vocab.string_of_list Vocab.id to_inline) ;
+  L.info "To inline : %s\n" (Vocab.string_of_list Vocab.id to_inline);
   L.info "Excluded variable-arguments functions : %s\n"
-    (Vocab.string_of_list Vocab.id varargs_procs) ;
+    (Vocab.string_of_list Vocab.id varargs_procs);
   L.info "Excluded recursive functions : %s\n"
-    (Vocab.string_of_list Vocab.id recursive_procs) ;
+    (Vocab.string_of_list Vocab.id recursive_procs);
   L.info "Excluded too large functions : %s\n"
-    (Vocab.string_of_list Vocab.id large_procs) ;
+    (Vocab.string_of_list Vocab.id large_procs);
   Inline.toinline :=
-    List.filter (fun fid -> not (List.mem fid to_exclude)) to_inline ;
-  Inline.doit f ;
+    List.filter (fun fid -> not (List.mem fid to_exclude)) to_inline;
+  Inline.doit f;
   not (!Inline.toinline = [])

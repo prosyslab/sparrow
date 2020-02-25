@@ -21,9 +21,9 @@ module type S = sig
   type loc
 
   val make :
-       ?skip_nodes:BasicDom.Node.t BatSet.t
-    -> Global.t * Access.t * PowLoc.t
-    -> DUGraph.t
+    ?skip_nodes:BasicDom.Node.t BatSet.t ->
+    Global.t * Access.t * PowLoc.t ->
+    DUGraph.t
 
   val to_json_intra : DUGraph.t -> Access.t -> Yojson.Safe.t
 
@@ -32,6 +32,6 @@ end
 
 module Make (DUGraph : Dug.S) :
   S
-  with type DUGraph.t = DUGraph.t
-   and type Access.t = DUGraph.Access.t
-   and type PowLoc.t = DUGraph.PowLoc.t
+    with type DUGraph.t = DUGraph.t
+     and type Access.t = DUGraph.Access.t
+     and type PowLoc.t = DUGraph.PowLoc.t

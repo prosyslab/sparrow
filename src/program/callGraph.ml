@@ -23,7 +23,7 @@ module G = struct
   let add_edge g s d =
     let old_pred = try PredHash.find pred_hash d with _ -> PowProc.empty in
     let new_pred = PowProc.add s old_pred in
-    PredHash.replace pred_hash d new_pred ;
+    PredHash.replace pred_hash d new_pred;
     add_edge g s d
 
   let fold_pred f g v a =
@@ -36,11 +36,13 @@ end
 module SCC = Graph.Components.Make (G)
 module Oper = Graph.Oper.I (G)
 
-type t = {graph: G.t; trans_calls: G.t}
+type t = { graph : G.t; trans_calls : G.t }
 
-let empty = {graph= G.create (); trans_calls= G.create ()}
+let empty = { graph = G.create (); trans_calls = G.create () }
 
-let add_edge src dst g = G.add_edge g.graph src dst ; g
+let add_edge src dst g =
+  G.add_edge g.graph src dst;
+  g
 
 let callees pid g = G.succ g.graph pid |> PowProc.of_list
 
@@ -48,7 +50,7 @@ let trans_callees pid g = G.succ g.trans_calls pid |> PowProc.of_list
 
 let compute_trans_calls callgraph =
   let trans_calls = Oper.transitive_closure callgraph.graph in
-  {callgraph with trans_calls}
+  { callgraph with trans_calls }
 
 let is_rec callgraph pid =
   try
@@ -69,13 +71,13 @@ let to_json g =
     `List
       (G.fold_edges
          (fun v1 v2 edges ->
-           `List [`String (Proc.to_string v1); `String (Proc.to_string v2)]
-           :: edges )
+           `List [ `String (Proc.to_string v1); `String (Proc.to_string v2) ]
+           :: edges)
          g.graph [])
   in
-  `Assoc [("nodes", nodes); ("edges", edges)]
+  `Assoc [ ("nodes", nodes); ("edges", edges) ]
 
 let remove_function pid callgraph =
-  G.remove_vertex callgraph.graph pid ;
-  G.remove_vertex callgraph.trans_calls pid ;
+  G.remove_vertex callgraph.graph pid;
+  G.remove_vertex callgraph.trans_calls pid;
   callgraph

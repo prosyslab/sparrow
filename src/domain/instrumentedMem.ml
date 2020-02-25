@@ -30,26 +30,26 @@ module Make (Mem : MapDom.CPO) = struct
 
   let init_access : unit -> unit =
    fun () ->
-    access_mode := true ;
-    access := Access.Info.empty ;
+    access_mode := true;
+    access := Access.Info.empty;
     ()
 
   let return_access : unit -> Access.info =
    fun () ->
-    access_mode := false ;
+    access_mode := false;
     !access
 
   let add k v m =
-    if !access_mode then access := Access.Info.add Access.Info.def k !access ;
+    if !access_mode then access := Access.Info.add Access.Info.def k !access;
     add k v m
 
   let weak_add k v m =
-    if !access_mode then access := Access.Info.add Access.Info.all k !access ;
+    if !access_mode then access := Access.Info.add Access.Info.all k !access;
     weak_add k v m
 
   let find : A.t -> t -> B.t =
    fun k m ->
     if !access_mode && not (eq m bot) then
-      access := Access.Info.add Access.Info.use k !access ;
+      access := Access.Info.add Access.Info.use k !access;
     find k m
 end

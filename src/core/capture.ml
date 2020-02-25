@@ -9,8 +9,8 @@ let json_to_assoc = function `Assoc a -> a | _ -> failwith "Invalid json"
 let rec create_dirs path =
   if Sys.file_exists path then ()
   else (
-    prerr_endline path ;
-    Filename.dirname path |> create_dirs ;
+    prerr_endline path;
+    Filename.dirname path |> create_dirs;
     FileManager.mkdir path )
 
 let preprocess_one_file cwd entry =
@@ -21,24 +21,22 @@ let preprocess_one_file cwd entry =
   let file = List.assoc "file" entry |> json_to_string in
   let outfile = Filename.concat outdir file in
   (* file may contain directories *)
-  Filename.dirname outfile |> create_dirs ;
+  Filename.dirname outfile |> create_dirs;
   let args =
     List.assoc "arguments" entry
     |> json_to_list
     |> List.fold_left
          (fun l arg ->
            match json_to_string arg with
-           | "-c" ->
-               l @ ["-E"]
+           | "-c" -> l @ [ "-E" ]
            | f when Filename.extension f = ".c" ->
-               l @ [file] (* replace with absolute path *)
+               l @ [ file ] (* replace with absolute path *)
            | f when Filename.extension f = ".o" ->
-               l @ [outfile ^ ".i"] (* replace with .i *)
-           | f ->
-               l @ [f])
+               l @ [ outfile ^ ".i" ] (* replace with .i *)
+           | f -> l @ [ f ])
          []
   in
-  Unix.chdir directory ;
+  Unix.chdir directory;
   let _ =
     Unix.create_process "cc" (args |> Array.of_list) Unix.stdin Unix.stdout
       Unix.stderr
@@ -53,7 +51,7 @@ let preprocess () =
        (fun () entry ->
          let entry = json_to_assoc entry in
          preprocess_one_file cwd entry)
-       () ;
+       ();
   Unix.chdir cwd
 
 let run_bear () =
@@ -63,12 +61,11 @@ let run_bear () =
       Unix.stderr
   in
   match Unix.wait () with
-  | _, Unix.WEXITED _ ->
-      ()
+  | _, Unix.WEXITED _ -> ()
   | _, _ ->
-      L.error "Invalid build command" ;
+      L.error "Invalid build command";
       exit 1
 
 let run () =
-  if not !Options.skip_build then run_bear () ;
+  if not !Options.skip_build then run_bear ();
   preprocess ()

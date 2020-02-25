@@ -8,22 +8,23 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
+
 (** Array domain *)
 module ArrInfo : sig
-  type t =
-    { offset: Itv.t
-    ; size: Itv.t
-    ; stride: Itv.t
-    ; null_pos: Itv.t
-    ; structure: StructBlk.PowStruct.t }
+  type t = {
+    offset : Itv.t;
+    size : Itv.t;
+    stride : Itv.t;
+    null_pos : Itv.t;
+    structure : StructBlk.PowStruct.t;
+  }
 
   val top : t
 
   val input : t
 end
 
-include
-  MapDom.LAT with type A.t = BasicDom.Allocsite.t and type B.t = ArrInfo.t
+include MapDom.LAT with type A.t = BasicDom.Allocsite.t and type B.t = ArrInfo.t
 
 val make : BasicDom.Allocsite.t -> Itv.t -> Itv.t -> Itv.t -> Itv.t -> t
 

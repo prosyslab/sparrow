@@ -27,11 +27,11 @@ module type S = sig
   module Access : Access.S with type Loc.t = Loc.t and type PowLoc.t = PowLoc.t
 
   val perform :
-       Global.t
-    -> Access.PowLoc.t
-    -> (BasicDom.Node.t -> Dom.t * Global.t -> Dom.t * Global.t)
-    -> Dom.t
-    -> Access.t
+    Global.t ->
+    Access.PowLoc.t ->
+    (BasicDom.Node.t -> Dom.t * Global.t -> Dom.t * Global.t) ->
+    Dom.t ->
+    Access.t
 end
 
 module Make (Sem : AccessSem.S) = struct
@@ -46,14 +46,14 @@ module Make (Sem : AccessSem.S) = struct
     let initial =
       list_fold
         (fun node ->
-          Access.add_node node (Sem.accessof ~locset global node f mem) )
+          Access.add_node node (Sem.accessof ~locset global node f mem))
         nodes Access.empty
     in
     let abslocs =
       Access.fold
         (fun _ access acc ->
           PowLoc.union_small_big (Access.Info.useof access) acc
-          |> PowLoc.union_small_big (Access.Info.defof access) )
+          |> PowLoc.union_small_big (Access.Info.defof access))
         initial PowLoc.empty
     in
     Access.add_total_abslocs abslocs initial
@@ -72,11 +72,11 @@ module Make (Sem : AccessSem.S) = struct
           Access.Info.empty
           |> PowProc.fold
                (fun callee ->
-                 Access.Info.union (Access.find_proc callee access) )
+                 Access.Info.union (Access.find_proc callee access))
                trans
           |> Access.Info.union (Access.find_proc pid access)
         in
-        Access.add_proc_reach pid info )
+        Access.add_proc_reach pid info)
       pids access
 
   let init_access_proc_reach_wo_local pids callgraph access =
@@ -87,9 +87,9 @@ module Make (Sem : AccessSem.S) = struct
         |> PowProc.fold
              (fun callee ->
                let local = Access.find_proc_local callee access in
-               Access.Info.filter_out local )
+               Access.Info.filter_out local)
              trans
-        |> Access.add_proc_reach_wo_local pid )
+        |> Access.add_proc_reach_wo_local pid)
       pids access
 
   let init_access_proc_local access =
@@ -126,8 +126,8 @@ module Make (Sem : AccessSem.S) = struct
         PowLoc.fold
           (fun loc access ->
             let old_nodes = Access.find_def_nodes loc access in
-            Access.add_def_nodes loc (PowNode.add node old_nodes) access )
-          (Access.Info.defof info) access )
+            Access.add_def_nodes loc (PowNode.add node old_nodes) access)
+          (Access.Info.defof info) access)
       access access
 
   let init_uses_of access =
@@ -136,8 +136,8 @@ module Make (Sem : AccessSem.S) = struct
         PowLoc.fold
           (fun loc access ->
             let old_nodes = Access.find_use_nodes loc access in
-            Access.add_use_nodes loc (PowNode.add node old_nodes) access )
-          (Access.Info.useof info) access )
+            Access.add_use_nodes loc (PowNode.add node old_nodes) access)
+          (Access.Info.useof info) access)
       access access
 
   let perform global locset sem mem =

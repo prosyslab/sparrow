@@ -44,8 +44,7 @@ val list_fold : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
 
 val list_fold2 : ('a -> 'b -> 'c -> 'c) -> 'a list -> 'b list -> 'c -> 'c
 
-val list_fold2_prefix :
-  ('a -> 'b -> 'c -> 'c) -> 'a list -> 'b list -> 'c -> 'c
+val list_fold2_prefix : ('a -> 'b -> 'c -> 'c) -> 'a list -> 'b list -> 'c -> 'c
 
 val list_rev : 'a list -> 'a list
 
@@ -58,30 +57,30 @@ val find_def : 'a -> ('a, 'b) BatMap.t -> 'b -> 'b
 val link_by_sep : string -> string -> string -> string
 
 val string_of_list :
-     ?first:string
-  -> ?last:string
-  -> ?sep:string
-  -> ('a -> string)
-  -> 'a list
-  -> string
+  ?first:string ->
+  ?last:string ->
+  ?sep:string ->
+  ('a -> string) ->
+  'a list ->
+  string
 
 val string_of_set :
-     ?first:string
-  -> ?last:string
-  -> ?sep:string
-  -> ('a -> string)
-  -> 'a BatSet.t
-  -> string
+  ?first:string ->
+  ?last:string ->
+  ?sep:string ->
+  ('a -> string) ->
+  'a BatSet.t ->
+  string
 
 val string_of_map :
-     ?first:string
-  -> ?last:string
-  -> ?sep:string
-  -> ?indent:string
-  -> ('a -> string)
-  -> ('b -> string)
-  -> ('a, 'b) BatMap.t
-  -> string
+  ?first:string ->
+  ?last:string ->
+  ?sep:string ->
+  ?indent:string ->
+  ('a -> string) ->
+  ('b -> string) ->
+  ('a, 'b) BatMap.t ->
+  string
 
 val i2s : int -> string
 

@@ -39,8 +39,7 @@ module Make (A : CPO) (B : CPO) = struct
 
   let bot = (A.bot, B.bot)
 
-  let to_string x =
-    "(" ^ A.to_string (fst x) ^ ", " ^ B.to_string (snd x) ^ ")"
+  let to_string x = "(" ^ A.to_string (fst x) ^ ", " ^ B.to_string (snd x) ^ ")"
 
   let pp fmt (a, b) = Format.fprintf fmt "(%a, %a)" A.pp a B.pp b
 end
@@ -79,11 +78,11 @@ module Make5 (A : CPO) (B : CPO) (C : CPO) (D : CPO) (E : CPO) = struct
     (A.widen a1 a2, B.widen b1 b2, C.widen c1 c2, D.widen d1 d2, E.widen e1 e2)
 
   let narrow (a1, b1, c1, d1, e1) (a2, b2, c2, d2, e2) =
-    ( A.narrow a1 a2
-    , B.narrow b1 b2
-    , C.narrow c1 c2
-    , D.narrow d1 d2
-    , E.narrow e1 e2 )
+    ( A.narrow a1 a2,
+      B.narrow b1 b2,
+      C.narrow c1 c2,
+      D.narrow d1 d2,
+      E.narrow e1 e2 )
 
   let bot = (A.bot, B.bot, C.bot, D.bot, E.bot)
 
@@ -101,6 +100,6 @@ module Make5 (A : CPO) (B : CPO) (C : CPO) (D : CPO) (E : CPO) = struct
     ^ ")"
 
   let pp fmt (a, b, c, d, e) =
-    Format.fprintf fmt "( %a, %a, %a, %a, %a )" A.pp a B.pp b C.pp c D.pp d
-      E.pp e
+    Format.fprintf fmt "( %a, %a, %a, %a, %a )" A.pp a B.pp b C.pp c D.pp d E.pp
+      e
 end

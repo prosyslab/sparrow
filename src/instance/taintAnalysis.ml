@@ -23,10 +23,10 @@ let marshal_in global =
 
 let marshal_out (global, dug, input, output) =
   let filename = Filename.basename global.file.fileName in
-  MarshalManager.output (filename ^ ".taint.global") global ;
-  MarshalManager.output (filename ^ ".taint.dug") dug ;
-  MarshalManager.output (filename ^ ".taint.input") input ;
-  MarshalManager.output (filename ^ ".taint.output") output ;
+  MarshalManager.output (filename ^ ".taint.global") global;
+  MarshalManager.output (filename ^ ".taint.dug") dug;
+  MarshalManager.output (filename ^ ".taint.input") input;
+  MarshalManager.output (filename ^ ".taint.output") output;
   (global, dug, input, output)
 
 let inspect_aexp node aexp itvmem mem queries =
@@ -50,14 +50,16 @@ let inspect_aexp node aexp itvmem mem queries =
             ^ Node.to_string src_node ^ " @ "
             ^ CilHelper.s_location src_loc
           in
-          { node
-          ; exp= aexp
-          ; loc
-          ; allocsite= None
-          ; status
-          ; desc
-          ; src= Some (src_node, src_loc) }
-          :: queries )
+          {
+            node;
+            exp = aexp;
+            loc;
+            allocsite = None;
+            status;
+            desc;
+            src = Some (src_node, src_loc);
+          }
+          :: queries)
         taint queries
   | Printf (_, e, loc) ->
       let pid = InterCfg.Node.get_pid node in
@@ -71,14 +73,16 @@ let inspect_aexp node aexp itvmem mem queries =
             "source = " ^ Node.to_string src_node ^ " @ "
             ^ CilHelper.s_location src_loc
           in
-          { node
-          ; exp= aexp
-          ; loc
-          ; allocsite= None
-          ; status= UnProven
-          ; desc
-          ; src= Some (src_node, src_loc) }
-          :: queries )
+          {
+            node;
+            exp = aexp;
+            loc;
+            allocsite = None;
+            status = UnProven;
+            desc;
+            src = Some (src_node, src_loc);
+          }
+          :: queries)
         taint queries
   | _ -> queries
 
@@ -87,7 +91,7 @@ let inspect_alarm global spec inputof =
   let total = List.length nodes in
   list_fold
     (fun node (qs, k) ->
-      prerr_progressbar ~itv:1000 k total ;
+      prerr_progressbar ~itv:1000 k total;
       let ptrmem = ItvDom.Table.find node spec.Spec.ptrinfo in
       let mem = Table.find node inputof in
       let cmd = InterCfg.cmdof global.icfg node in
@@ -96,10 +100,10 @@ let inspect_alarm global spec inputof =
         list_fold
           (fun aexp ->
             if ptrmem = ItvDom.Mem.bot then id (* dead code *)
-            else inspect_aexp node aexp ptrmem mem )
+            else inspect_aexp node aexp ptrmem mem)
           aexps qs
       in
-      (qs, k + 1) )
+      (qs, k + 1))
     nodes ([], 0)
   |> fst
 
@@ -110,16 +114,16 @@ let get_locset mem =
       |> PowLoc.union (ItvDom.Val.pow_loc_of_val v)
       |> BatSet.fold
            (fun a -> PowLoc.add (Loc.of_allocsite a))
-           (ItvDom.Val.allocsites_of_val v) )
+           (ItvDom.Val.allocsites_of_val v))
     mem PowLoc.empty
 
 let make_top_mem locset =
   PowLoc.fold (fun l mem -> Mem.add l TaintDom.Val.top mem) locset Mem.bot
 
 let print_datalog_fact spec global dug alarms =
-  RelSyntax.print analysis global.icfg ;
-  Provenance.print analysis global.relations ;
-  RelDUGraph.print analysis global dug alarms ;
+  RelSyntax.print analysis global.icfg;
+  Provenance.print analysis global.relations;
+  RelDUGraph.print analysis global dug alarms;
   RelDUGraph.print_alarm analysis alarms
 
 let ignore_function node =
@@ -136,28 +140,30 @@ let post_process spec itvdug (global, _, inputof, outputof) =
            match a.src with
            | Some (n, _) ->
                (not (ignore_function a.Report.node)) && not (ignore_function n)
-           | None -> not (ignore_function a.Report.node) )
+           | None -> not (ignore_function a.Report.node))
   in
   let report_file =
     open_out (FileManager.analysis_dir analysis ^ "/report.txt")
   in
   let fmt = F.formatter_of_out_channel report_file in
-  Report.print ~fmt:(Some fmt) global alarms ;
-  close_out report_file ;
+  Report.print ~fmt:(Some fmt) global alarms;
+  close_out report_file;
   if !Options.extract_datalog_fact_full then
-    print_datalog_fact spec global itvdug alarms ;
+    print_datalog_fact spec global itvdug alarms;
   (global, inputof, outputof, alarms)
 
 let do_analysis (global, itvdug, itvinputof) =
-  let global = {global with table= itvinputof} in
+  let global = { global with table = itvinputof } in
   let locset = get_locset global.mem in
   let spec =
-    { Spec.empty with
-      analysis
-    ; locset
-    ; locset_fs= locset
-    ; premem= make_top_mem locset
-    ; ptrinfo= itvinputof }
+    {
+      Spec.empty with
+      analysis;
+      locset;
+      locset_fs = locset;
+      premem = make_top_mem locset;
+      ptrinfo = itvinputof;
+    }
   in
   (* NOTE: fully flow-sensitive taint analysis *)
   let _ = Options.pfs := 100 in

@@ -85,17 +85,16 @@ module Loc : sig
   val typ : t -> Cil.typ option
 end
 
-module PowLoc :
-  sig
-    include PowDom.CPO
+module PowLoc : sig
+  include PowDom.CPO
 
-    val null : t
+  val null : t
 
-    val prune : Cil.binop -> t -> Cil.exp -> t
+  val prune : Cil.binop -> t -> Cil.exp -> t
 
-    val append_field : t -> Cil.fieldinfo -> t
-  end
-  with type t = PowDom.MakeCPO(Loc).t
-   and type elt = Loc.t
+  val append_field : t -> Cil.fieldinfo -> t
+end
+with type t = PowDom.MakeCPO(Loc).t
+ and type elt = Loc.t
 
 module Dump : MapDom.CPO with type A.t = Proc.t and type B.t = PowLoc.t

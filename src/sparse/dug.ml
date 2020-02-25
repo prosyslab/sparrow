@@ -99,12 +99,12 @@ module Make (Access : Access.S) = struct
   module G = struct
     module I = Graph.Imperative.Digraph.ConcreteBidirectional (BasicDom.Node)
 
-    type t = {graph: I.t; label: (node * node, locset) Hashtbl.t}
+    type t = { graph : I.t; label : (node * node, locset) Hashtbl.t }
 
     let create ~size () =
-      {graph= I.create ~size (); label= Hashtbl.create (2 * size)}
+      { graph = I.create ~size (); label = Hashtbl.create (2 * size) }
 
-    let copy g = {graph= I.copy g.graph; label= Hashtbl.copy g.label}
+    let copy g = { graph = I.copy g.graph; label = Hashtbl.copy g.label }
 
     let succ g n = I.succ g.graph n
 
@@ -130,7 +130,7 @@ module Make (Access : Access.S) = struct
       I.fold_edges
         (fun s d ->
           let locset = Hashtbl.find g.label (s, d) in
-          f s d locset )
+          f s d locset)
         g.graph a
 
     let iter_vertex f g = I.iter_vertex f g.graph
@@ -143,25 +143,27 @@ module Make (Access : Access.S) = struct
       I.iter_edges
         (fun s d ->
           let locset = Hashtbl.find g.label (s, d) in
-          f s d locset )
+          f s d locset)
         g.graph
 
     let fold_succ f g a = I.fold_succ f g.graph a
 
     let iter_succ f g = I.iter_succ f g.graph
 
-    let remove_vertex g n = I.remove_vertex g.graph n ; g
+    let remove_vertex g n =
+      I.remove_vertex g.graph n;
+      g
 
     let add_edge_e g (s, locs, d) =
-      Hashtbl.replace g.label (s, d) locs ;
-      I.add_edge g.graph s d ;
+      Hashtbl.replace g.label (s, d) locs;
+      I.add_edge g.graph s d;
       g
 
     let add_edge g s d = add_edge_e g (s, PowLoc.empty, d)
 
     let remove_edge g s d =
-      I.remove_edge g.graph s d ;
-      Hashtbl.remove g.label (s, d) ;
+      I.remove_edge g.graph s d;
+      Hashtbl.remove g.label (s, d);
       g
 
     let find_label g s d = Hashtbl.find g.label (s, d)
@@ -170,17 +172,17 @@ module Make (Access : Access.S) = struct
       try
         let old_label = find_label g s d in
         let new_label = f old_label in
-        Hashtbl.replace g.label (s, d) new_label ;
+        Hashtbl.replace g.label (s, d) new_label;
         g
       with _ -> add_edge_e g (s, def, d)
   end
 
-  type t = {graph: G.t; access: Access.t}
+  type t = { graph : G.t; access : Access.t }
 
   let create ?(size = 0) ?(access = Access.empty) () =
-    {graph= G.create ~size (); access}
+    { graph = G.create ~size (); access }
 
-  let copy dug = {graph= G.copy dug.graph; access= dug.access}
+  let copy dug = { graph = G.copy dug.graph; access = dug.access }
 
   let nodesof dug = G.fold_vertex BatSet.add dug.graph BatSet.empty
 
@@ -194,12 +196,12 @@ module Make (Access : Access.S) = struct
 
   let nb_edge dug = G.nb_edge dug.graph
 
-  let remove_node n dug = {dug with graph= G.remove_vertex dug.graph n}
+  let remove_node n dug = { dug with graph = G.remove_vertex dug.graph n }
 
-  let add_edge src dst dug = {dug with graph= G.add_edge dug.graph src dst}
+  let add_edge src dst dug = { dug with graph = G.add_edge dug.graph src dst }
 
   let remove_edge src dst dug =
-    try {dug with graph= G.remove_edge dug.graph src dst} with _ -> dug
+    try { dug with graph = G.remove_edge dug.graph src dst } with _ -> dug
 
   let get_abslocs src dst dug =
     try G.find_label dug.graph src dst with _ -> PowLoc.empty
@@ -208,18 +210,22 @@ module Make (Access : Access.S) = struct
 
   let mem_duset x duset = PowLoc.mem x duset
 
-  let add_edge_e dug e = {dug with graph= G.add_edge_e dug.graph e}
+  let add_edge_e dug e = { dug with graph = G.add_edge_e dug.graph e }
 
   let add_absloc src x dst dug =
-    { dug with
-      graph=
-        G.modify_edge_def (PowLoc.singleton x) dug.graph src dst (PowLoc.add x)
+    {
+      dug with
+      graph =
+        G.modify_edge_def (PowLoc.singleton x) dug.graph src dst (PowLoc.add x);
     }
 
   let add_abslocs src xs dst dug =
     if PowLoc.is_empty xs then dug
     else
-      {dug with graph= G.modify_edge_def xs dug.graph src dst (PowLoc.union xs)}
+      {
+        dug with
+        graph = G.modify_edge_def xs dug.graph src dst (PowLoc.union xs);
+      }
 
   let fold_node f g a = G.fold_vertex f g.graph a
 
@@ -261,7 +267,7 @@ module Make (Access : Access.S) = struct
           ^ BasicDom.Node.to_string dst
           ^ "\"" ^ "[label=\"{"
           ^ PowLoc.fold (fun addr s -> Loc.to_string addr ^ "," ^ s) addrset ""
-          ^ "}\"]" ^ ";\n" )
+          ^ "}\"]" ^ ";\n")
         dug ""
     ^ "}"
 
@@ -278,14 +284,16 @@ module Make (Access : Access.S) = struct
            (fun src dst edges ->
              let addrset = get_abslocs src dst g in
              `List
-               [ `String (BasicDom.Node.to_string src)
-               ; `String (BasicDom.Node.to_string dst)
-               ; `String
+               [
+                 `String (BasicDom.Node.to_string src);
+                 `String (BasicDom.Node.to_string dst);
+                 `String
                    (PowLoc.fold
                       (fun addr s -> Loc.to_string addr ^ "," ^ s)
-                      addrset "") ]
-             :: edges )
+                      addrset "");
+               ]
+             :: edges)
            g [])
     in
-    `Assoc [("nodes", nodes); ("edges", edges)]
+    `Assoc [ ("nodes", nodes); ("edges", edges) ]
 end

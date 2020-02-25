@@ -19,7 +19,7 @@ module AccessSem = struct
   include AccessSem.Make (ItvSem)
 
   let accessof_eval pid e mem =
-    Dom.init_access () ;
+    Dom.init_access ();
     let _ = ItvSem.eval pid e mem in
     Dom.return_access ()
 end
@@ -30,79 +30,82 @@ module Access = ItvSem.Dom.Access
 
 type loop = string
 
-type feature =
-  { (* syntactic features *)
-    (* Whether the loop condition contains nulls or not *)
-    null: bool
-  ; (* Whether the loop condition contains constants or not *)
-    constant: bool
-  ; (* Whether the loop condition contains array accesses or not *)
-    array_content: bool
-  ; (* Whether the loop condition contains && or not *)
-    conjunction: bool
-  ; (* Whether the loop condition contains an index for a single array in the loop *)
-    single_index: bool
-  ; (* Whether the loop condition contains an index for multiple arrays in the loop *)
-    multi_index: bool
-  ; (* Whether the loop condition contains an index for an array outside of the loop *)
-    out_index: bool
-  ; (* Whether an index is initialized before the loop e.g.) i = 0, p = arr, etc *)
-    init_index: bool
-  ; (* The normalized number of exits in the loop *)
-    exits: float
-  ; (* The normalized size of the loop (# nodes) *)
-    scc_size: float
-  ; (* The normalized number of distinct array accesses in the loop *)
-    diff_array_access: float
-  ; (* The normalized number of arithmetic increments in the loop *)
-    idx_pp: float
-  ; (* The normalized number of pointer increments in the loop *)
-    ptr_pp: float
-  ; (* semantic features *)
-    (* Whether the loop condition prunes the abstract state or not *)
-    prune_cond: bool
-  ; (* Whether the loop condition is determined by external inputs *)
-    extern: bool
-  ; (* Whether global variables are accessed in the loop condition *)
-    gvar: bool
-  ; (* Whether a variable has a finite interval value in the loop condition *)
-    finite_itv: bool
-  ; (* Whether a variable has a finite size of array in the loop condition *)
-    finite_arr: bool
-  ; (* Whether a variable has a finite string in the loop condition *)
-    cstring: bool
-  ; (* Whether a variable has an array of which the size is a left-closed interval *)
-    close_left_arr_size: bool
-  ; (* Whether a variable has an array of which the offset is a left-closed interval *)
-    close_left_arr_offset: bool
-  ; (* The (normalized) number of abstract locations accessed in the loop *)
-    points_to: float }
+type feature = {
+  (* syntactic features *)
+  (* Whether the loop condition contains nulls or not *)
+  null : bool;
+  (* Whether the loop condition contains constants or not *)
+  constant : bool;
+  (* Whether the loop condition contains array accesses or not *)
+  array_content : bool;
+  (* Whether the loop condition contains && or not *)
+  conjunction : bool;
+  (* Whether the loop condition contains an index for a single array in the loop *)
+  single_index : bool;
+  (* Whether the loop condition contains an index for multiple arrays in the loop *)
+  multi_index : bool;
+  (* Whether the loop condition contains an index for an array outside of the loop *)
+  out_index : bool;
+  (* Whether an index is initialized before the loop e.g.) i = 0, p = arr, etc *)
+  init_index : bool;
+  (* The normalized number of exits in the loop *)
+  exits : float;
+  (* The normalized size of the loop (# nodes) *)
+  scc_size : float;
+  (* The normalized number of distinct array accesses in the loop *)
+  diff_array_access : float;
+  (* The normalized number of arithmetic increments in the loop *)
+  idx_pp : float;
+  (* The normalized number of pointer increments in the loop *)
+  ptr_pp : float;
+  (* semantic features *)
+  (* Whether the loop condition prunes the abstract state or not *)
+  prune_cond : bool;
+  (* Whether the loop condition is determined by external inputs *)
+  extern : bool;
+  (* Whether global variables are accessed in the loop condition *)
+  gvar : bool;
+  (* Whether a variable has a finite interval value in the loop condition *)
+  finite_itv : bool;
+  (* Whether a variable has a finite size of array in the loop condition *)
+  finite_arr : bool;
+  (* Whether a variable has a finite string in the loop condition *)
+  cstring : bool;
+  (* Whether a variable has an array of which the size is a left-closed interval *)
+  close_left_arr_size : bool;
+  (* Whether a variable has an array of which the offset is a left-closed interval *)
+  close_left_arr_offset : bool;
+  (* The (normalized) number of abstract locations accessed in the loop *)
+  points_to : float;
+}
 
 type data = (loop, feature) BatMap.t
 
 let empty_feature =
-  { null= false
-  ; constant= false
-  ; array_content= false
-  ; conjunction= false
-  ; single_index= false
-  ; multi_index= false
-  ; out_index= false
-  ; init_index= false
-  ; exits= 0.0
-  ; scc_size= 0.0
-  ; diff_array_access= 0.0
-  ; idx_pp= 0.0
-  ; ptr_pp= 0.0
-  ; prune_cond= false
-  ; extern= false
-  ; gvar= false
-  ; finite_itv= false
-  ; finite_arr= false
-  ; close_left_arr_size= false
-  ; close_left_arr_offset= false
-  ; points_to= 0.0
-  ; cstring= false }
+  {
+    null = false;
+    constant = false;
+    array_content = false;
+    conjunction = false;
+    single_index = false;
+    multi_index = false;
+    out_index = false;
+    init_index = false;
+    exits = 0.0;
+    scc_size = 0.0;
+    diff_array_access = 0.0;
+    idx_pp = 0.0;
+    ptr_pp = 0.0;
+    prune_cond = false;
+    extern = false;
+    gvar = false;
+    finite_itv = false;
+    finite_arr = false;
+    close_left_arr_size = false;
+    close_left_arr_offset = false;
+    points_to = 0.0;
+    cstring = false;
+  }
 
 let string_of_feature f =
   "null : " ^ string_of_bool f.null ^ "\n" ^ "constant : "
@@ -155,28 +158,30 @@ let string_of_raw_feature f =
 let float_of_bool b = if b then 1.0 else 0.0
 
 let feature_vector_of f =
-  [ float_of_bool f.null
-  ; float_of_bool f.constant
-  ; float_of_bool f.array_content
-  ; float_of_bool f.conjunction
-  ; float_of_bool f.single_index
-  ; float_of_bool f.multi_index
-  ; float_of_bool f.out_index
-  ; float_of_bool f.init_index
-  ; f.exits
-  ; f.scc_size
-  ; f.diff_array_access
-  ; f.idx_pp
-  ; f.ptr_pp
-  ; float_of_bool f.prune_cond
-  ; float_of_bool f.extern
-  ; float_of_bool f.gvar
-  ; float_of_bool f.finite_itv
-  ; float_of_bool f.finite_arr
-  ; float_of_bool f.close_left_arr_size
-  ; float_of_bool f.close_left_arr_offset
-  ; f.points_to
-  ; float_of_bool f.cstring ]
+  [
+    float_of_bool f.null;
+    float_of_bool f.constant;
+    float_of_bool f.array_content;
+    float_of_bool f.conjunction;
+    float_of_bool f.single_index;
+    float_of_bool f.multi_index;
+    float_of_bool f.out_index;
+    float_of_bool f.init_index;
+    f.exits;
+    f.scc_size;
+    f.diff_array_access;
+    f.idx_pp;
+    f.ptr_pp;
+    float_of_bool f.prune_cond;
+    float_of_bool f.extern;
+    float_of_bool f.gvar;
+    float_of_bool f.finite_itv;
+    float_of_bool f.finite_arr;
+    float_of_bool f.close_left_arr_size;
+    float_of_bool f.close_left_arr_offset;
+    f.points_to;
+    float_of_bool f.cstring;
+  ]
 
 let string_of_trset trset =
   BatMap.foldi
@@ -193,23 +198,23 @@ let add_prune_cond global cond feat =
         let v2 = Mem.find k output in
         let itv1 = Val.itv_of_val v in
         let itv2 = Val.itv_of_val v2 in
-        Itv.le itv2 itv1 && not (Itv.eq itv1 itv2) )
+        Itv.le itv2 itv1 && not (Itv.eq itv1 itv2))
       global.mem
   in
-  if pruned then {feat with prune_cond= true} else feat
+  if pruned then { feat with prune_cond = true } else feat
 
 let add_extern global cond feat =
   let locset =
     AccessSem.accessof global cond sem_fun global.mem |> Access.Info.accessof
   in
   let locset = Val.pow_loc_of_val (Mem.lookup locset global.mem) in
-  if PowLoc.exists Loc.is_ext_allocsite locset then {feat with extern= true}
+  if PowLoc.exists Loc.is_ext_allocsite locset then { feat with extern = true }
   else feat
 
 let incptr_itself_by_one (lv, e) =
   match (lv, e) with
-  | ( (Var x, NoOffset)
-    , BinOp (PlusPI, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
+  | ( (Var x, NoOffset),
+      BinOp (PlusPI, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
     when x.vname = y.vname && Cil.i64_to_int i = 1 ->
       true
   | _ -> false
@@ -232,9 +237,9 @@ let add_cstring global cond_node cfg feat =
       let cmd2 = IntraCfg.find_cmd (List.hd pred2) cfg in
       let cmd3 = IntraCfg.find_cmd (List.hd pred3) cfg in
       match (cmd1, cmd2, cmd3) with
-      | ( IntraCfg.Cmd.Cset ((Var c, NoOffset), e1, _)
-        , IntraCfg.Cmd.Cset (lv2, e2, _)
-        , IntraCfg.Cmd.Cset (lv3, Lval lv4, _) )
+      | ( IntraCfg.Cmd.Cset ((Var c, NoOffset), e1, _),
+          IntraCfg.Cmd.Cset (lv2, e2, _),
+          IntraCfg.Cmd.Cset (lv3, Lval lv4, _) )
         when incptr_itself_by_one (lv2, e2) && lv2 = lv4 ->
           PowLoc.join locset (ItvSem.eval_lv pid lv2 global.mem)
       | _ -> locset
@@ -253,22 +258,24 @@ let add_cstring global cond_node cfg feat =
       let strlib =
         List.map
           (fun x -> "__extern__" ^ x)
-          [ "getenv"
-          ; "rindex"
-          ; "index"
-          ; "strdup"
-          ; "strrchr"
-          ; "strstr"
-          ; "basename"
-          ; "strtok"
-          ; "fgets"
-          ; "_IO_getc" ]
+          [
+            "getenv";
+            "rindex";
+            "index";
+            "strdup";
+            "strrchr";
+            "strstr";
+            "basename";
+            "strtok";
+            "fgets";
+            "_IO_getc";
+          ]
       in
       if
         BatSet.exists (fun x -> List.mem x strlib) locset
         || ((not (Itv.is_bot nullpos)) && Itv.is_finite nullpos)
-      then {feat with cstring= true}
-      else feat )
+      then { feat with cstring = true }
+      else feat)
     locset feat
 
 let add_gvar global cond feat =
@@ -281,7 +288,7 @@ let add_gvar global cond feat =
   if
     PowLoc.exists Loc.is_gvar locset
     || PowLoc.exists (fun x -> String.sub (Loc.to_string x) 0 3 = "_G_") locset
-  then {feat with gvar= true}
+  then { feat with gvar = true }
   else feat
 
 let get_cond_exp cond cfg =
@@ -305,7 +312,7 @@ let add_array_content global cond cfg feat =
     | Question (e, _, _, _) | CastE (_, e) -> exists_deref e
     | _ -> false
   in
-  if exists_deref cond then {feat with array_content= true} else feat
+  if exists_deref cond then { feat with array_content = true } else feat
 
 let add_null cond cfg feat =
   let rec null_condition = function
@@ -315,21 +322,21 @@ let add_null cond cfg feat =
         Cil.isZero e1 || Cil.isZero e2
     | _ -> false
   in
-  if null_condition (CilHelper.remove_cast cond) then {feat with null= true}
+  if null_condition (CilHelper.remove_cast cond) then { feat with null = true }
   else feat
 
 let add_constant cond cfg feat =
   let rec const_condition = function
     | UnOp (_, e, _) -> const_condition e
     | BinOp (bop, Lval _, (Const _ as c), _)
-     |BinOp (bop, (Const _ as c), Lval _, _)
+    | BinOp (bop, (Const _ as c), Lval _, _)
       when bop = Lt || bop = Gt || bop = Le || bop = Ge || bop = Eq || bop = Ne
       ->
         Cil.zero <> c
     | _ -> false
   in
   if const_condition (CilHelper.remove_cast cond) then
-    {feat with constant= true}
+    { feat with constant = true }
   else feat
 
 let add_conjunction cond_node cfg feat =
@@ -337,7 +344,7 @@ let add_conjunction cond_node cfg feat =
   if List.length pred = 1 then
     let pred = IntraCfg.pred (List.hd pred) cfg in
     match IntraCfg.find_cmd (List.hd pred) cfg with
-    | IntraCfg.Cmd.Cassume _ -> {feat with conjunction= true}
+    | IntraCfg.Cmd.Cassume _ -> { feat with conjunction = true }
     | _ -> feat
   else feat
 
@@ -353,8 +360,8 @@ let add_finite_itv global cond_node feat =
       let itv = Val.itv_of_val v in
       let ploc = PowLoc.remove Loc.null (Val.pow_loc_of_val v) in
       if Itv.is_finite itv && PowLoc.bot = ploc then
-        {feat with finite_itv= true}
-      else feat )
+        { feat with finite_itv = true }
+      else feat)
     access feat
 
 let add_close_left_arr_size_offset global cond_node cfg feat =
@@ -366,20 +373,20 @@ let add_close_left_arr_size_offset global cond_node cfg feat =
     (fun feat q ->
       match q with
       | AlarmExp.ArrayExp (arr, i, _)
-       |AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
+      | AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
           let v1 = Mem.lookup (ItvSem.eval_lv pid arr global.mem) global.mem in
           let size = ArrayBlk.sizeof (Val.array_of_val v1) in
           let offset = ArrayBlk.offsetof (Val.array_of_val v1) in
           let feat =
             if Itv.open_right size && Itv.close_left size then
-              {feat with close_left_arr_size= true}
-            else if Itv.is_finite size then {feat with finite_arr= true}
+              { feat with close_left_arr_size = true }
+            else if Itv.is_finite size then { feat with finite_arr = true }
             else feat
           in
           if Itv.open_right offset && Itv.close_left offset then
-            {feat with close_left_arr_offset= true}
+            { feat with close_left_arr_offset = true }
           else feat
-      | _ -> feat )
+      | _ -> feat)
     feat qs
 
 let add_points_to global conds feat =
@@ -387,14 +394,16 @@ let add_points_to global conds feat =
     List.fold_left
       (fun locset cond ->
         let access = AccessSem.accessof global cond sem_fun global.mem in
-        PowLoc.join (Access.Info.accessof access) locset )
+        PowLoc.join (Access.Info.accessof access) locset)
       PowLoc.bot conds
   in
-  {feat with points_to= float_of_int (PowLoc.cardinal locset)}
+  { feat with points_to = float_of_int (PowLoc.cardinal locset) }
 
-let add_exits conds feat = {feat with exits= float_of_int (List.length conds)}
+let add_exits conds feat =
+  { feat with exits = float_of_int (List.length conds) }
 
-let add_scc_size scc feat = {feat with scc_size= float_of_int (List.length scc)}
+let add_scc_size scc feat =
+  { feat with scc_size = float_of_int (List.length scc) }
 
 let add_index conds cfg scc feat =
   let rec collect_lv = function
@@ -413,14 +422,14 @@ let add_index conds cfg scc feat =
     List.fold_left
       (fun lvset node ->
         let cond_exp = CilHelper.remove_cast (get_cond_exp node cfg) in
-        BatSet.union lvset (collect_lv cond_exp) )
+        BatSet.union lvset (collect_lv cond_exp))
       BatSet.empty conds
   in
   let qs =
     List.fold_left
       (fun qs node ->
         let cmd = IntraCfg.find_cmd node cfg in
-        qs @ AlarmExp.collect Spec.Interval cmd )
+        qs @ AlarmExp.collect Spec.Interval cmd)
       [] scc
   in
   let map =
@@ -428,11 +437,11 @@ let add_index conds cfg scc feat =
       (fun map q ->
         match q with
         | AlarmExp.ArrayExp (arr, i, _)
-         |AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
+        | AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
             let s = try BatMap.find i map with _ -> BatSet.empty in
             let s = BatSet.add arr s in
             BatMap.add i s map
-        | _ -> map )
+        | _ -> map)
       BatMap.empty qs
   in
   if BatMap.is_empty map then feat
@@ -440,9 +449,9 @@ let add_index conds cfg scc feat =
     BatMap.for_all
       (fun i set -> BatSet.mem i lvset && BatSet.cardinal set = 1)
       map
-  then {feat with single_index= true}
+  then { feat with single_index = true }
   else if BatMap.for_all (fun i set -> BatSet.mem i lvset) map then
-    {feat with multi_index= true}
+    { feat with multi_index = true }
   else feat
 
 let add_out_index conds cfg scc feat =
@@ -450,7 +459,7 @@ let add_out_index conds cfg scc feat =
     List.fold_left
       (fun qs node ->
         let cmd = IntraCfg.find_cmd node cfg in
-        qs @ AlarmExp.collect Spec.Interval cmd )
+        qs @ AlarmExp.collect Spec.Interval cmd)
       [] scc
   in
   let idx_in_scc =
@@ -458,9 +467,9 @@ let add_out_index conds cfg scc feat =
       (fun set q ->
         match q with
         | AlarmExp.ArrayExp (arr, i, _)
-         |AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
+        | AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
             BatSet.add i set
-        | _ -> set )
+        | _ -> set)
       BatSet.empty qs
   in
   let idx_in_scc =
@@ -470,7 +479,7 @@ let add_out_index conds cfg scc feat =
         match cmd with
         | IntraCfg.Cmd.Cset (tmp, (Lval (Var _, NoOffset) as i), _) ->
             if BatSet.mem (Lval tmp) idx_in_scc then BatSet.add i set else set
-        | _ -> set )
+        | _ -> set)
       idx_in_scc scc
   in
   let exits =
@@ -478,7 +487,7 @@ let add_out_index conds cfg scc feat =
       (fun exits node ->
         let succ = IntraCfg.succ node cfg in
         let outs = List.filter (fun x -> not (List.mem x scc)) succ in
-        exits @ outs )
+        exits @ outs)
       [] scc
   in
   let exits_nexts =
@@ -488,7 +497,7 @@ let add_out_index conds cfg scc feat =
     List.fold_left
       (fun qs node ->
         let cmd = IntraCfg.find_cmd node cfg in
-        qs @ AlarmExp.collect Spec.Interval cmd )
+        qs @ AlarmExp.collect Spec.Interval cmd)
       [] exits_nexts
   in
   let idx_out_loop =
@@ -496,13 +505,13 @@ let add_out_index conds cfg scc feat =
       (fun set q ->
         match q with
         | AlarmExp.ArrayExp (arr, i, _)
-         |AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
+        | AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
             BatSet.add i set
-        | _ -> set )
+        | _ -> set)
       BatSet.empty qs
   in
   if not (BatSet.is_empty (BatSet.intersect idx_out_loop idx_in_scc)) then
-    {feat with out_index= true}
+    { feat with out_index = true }
   else feat
 
 let add_init global conds cfg scc feat =
@@ -512,7 +521,7 @@ let add_init global conds cfg scc feat =
       (fun entries node ->
         let preds = IntraCfg.pred node cfg in
         let ins = List.filter (fun x -> not (List.mem x scc)) preds in
-        entries @ ins )
+        entries @ ins)
       [] scc
   in
   let entry_prev =
@@ -525,18 +534,18 @@ let add_init global conds cfg scc feat =
     List.fold_left
       (fun qs node ->
         let cmd = IntraCfg.find_cmd node cfg in
-        qs @ AlarmExp.collect Spec.Interval cmd )
+        qs @ AlarmExp.collect Spec.Interval cmd)
       [] scc
   in
   let idx_in_scc =
     List.fold_left
       (fun set q ->
         match q with
-        | AlarmExp.ArrayExp (_, i, _)
-         |AlarmExp.DerefExp (BinOp (_, _, i, _), _) ->
+        | AlarmExp.ArrayExp (_, i, _) | AlarmExp.DerefExp (BinOp (_, _, i, _), _)
+          ->
             PowLoc.join set
               (Access.Info.useof (AccessSem.accessof_eval pid i global.mem))
-        | _ -> set )
+        | _ -> set)
       PowLoc.bot qs
   in
   let buf_in_scc =
@@ -548,10 +557,10 @@ let add_init global conds cfg scc feat =
               (Access.Info.useof
                  (AccessSem.accessof_eval pid (Lval arr) global.mem))
         | AlarmExp.DerefExp (BinOp (_, arr, _, _), _)
-         |AlarmExp.DerefExp (arr, _) ->
+        | AlarmExp.DerefExp (arr, _) ->
             PowLoc.join set
               (Access.Info.useof (AccessSem.accessof_eval pid arr global.mem))
-        | _ -> set )
+        | _ -> set)
       PowLoc.bot qs
   in
   let feat =
@@ -564,15 +573,15 @@ let add_init global conds cfg scc feat =
               PowLoc.remove Loc.null (ItvSem.eval_lv pid x global.mem)
             in
             if PowLoc.bot <> PowLoc.meet set idx_in_scc then
-              {feat with init_index= true}
+              { feat with init_index = true }
             else if PowLoc.bot <> PowLoc.meet set buf_in_scc then
-              {feat with init_index= true}
+              { feat with init_index = true }
             else feat
-        | _ -> feat )
+        | _ -> feat)
       feat entry_prev
   in
   if List.length entry_prev = 1 && IntraCfg.is_entry (List.hd entry_prev) then
-    {feat with init_index= true}
+    { feat with init_index = true }
   else feat
 
 let add_diff_array_access cfg scc feat =
@@ -580,7 +589,7 @@ let add_diff_array_access cfg scc feat =
     List.fold_left
       (fun qs node ->
         let cmd = IntraCfg.find_cmd node cfg in
-        qs @ AlarmExp.collect Spec.Interval cmd )
+        qs @ AlarmExp.collect Spec.Interval cmd)
       [] scc
   in
   let set =
@@ -588,17 +597,17 @@ let add_diff_array_access cfg scc feat =
       (fun set q ->
         match q with
         | AlarmExp.ArrayExp (arr, i, _)
-         |AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
+        | AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
             BatSet.add arr set
-        | _ -> set )
+        | _ -> set)
       BatSet.empty qs
   in
-  {feat with diff_array_access= float_of_int (BatSet.cardinal set)}
+  { feat with diff_array_access = float_of_int (BatSet.cardinal set) }
 
 let inc_itself_by_one (lv, e) =
   match (lv, e) with
-  | ( (Var x, NoOffset)
-    , BinOp (PlusA, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
+  | ( (Var x, NoOffset),
+      BinOp (PlusA, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
     when x.vname = y.vname && Cil.i64_to_int i = 1 ->
       true
   | _ -> false
@@ -611,10 +620,10 @@ let add_idx_pp cfg scc feat =
         match cmd with
         | IntraCfg.Cmd.Cset (lv, e, _) ->
             if inc_itself_by_one (lv, e) then BatSet.add lv set else set
-        | _ -> set )
+        | _ -> set)
       BatSet.empty scc
   in
-  {feat with idx_pp= float_of_int (BatSet.cardinal set)}
+  { feat with idx_pp = float_of_int (BatSet.cardinal set) }
 
 let add_ptr_pp cfg scc feat =
   let set =
@@ -624,10 +633,10 @@ let add_ptr_pp cfg scc feat =
         match cmd with
         | IntraCfg.Cmd.Cset (lv, e, _) ->
             if incptr_itself_by_one (lv, e) then BatSet.add lv set else set
-        | _ -> set )
+        | _ -> set)
       BatSet.empty scc
   in
-  {feat with ptr_pp= float_of_int (BatSet.cardinal set)}
+  { feat with ptr_pp = float_of_int (BatSet.cardinal set) }
 
 module G = Graph.Persistent.Digraph.ConcreteBidirectional (IntraCfg.Node)
 module Scc = Graph.Components.Make (G)
@@ -641,7 +650,7 @@ let rec get_nested_scc cfg scc_list =
             (fun src dst set ->
               if (not (List.mem src scc)) && List.mem dst scc then
                 BatSet.add dst set
-              else set )
+              else set)
             cfg BatSet.empty
         in
         let subgraph =
@@ -649,13 +658,15 @@ let rec get_nested_scc cfg scc_list =
             (fun g n ->
               let succ = IntraCfg.succ n cfg in
               let succ = List.filter (fun x -> List.mem x scc) succ in
-              List.fold_left (fun g s -> G.add_edge g n s) g succ )
+              List.fold_left (fun g s -> G.add_edge g n s) g succ)
             G.empty scc
         in
         let entry = BatSet.choose entries in
         let pred =
-          try G.pred subgraph entry with _ ->
-            prerr_endline "not found" ; exit 0
+          try G.pred subgraph entry
+          with _ ->
+            prerr_endline "not found";
+            exit 0
         in
         let subgraph =
           List.fold_left (fun g p -> G.remove_edge g p entry) subgraph pred
@@ -663,7 +674,7 @@ let rec get_nested_scc cfg scc_list =
         let sub_scc = Scc.scc_list subgraph in
         let sub_scc = get_nested_scc cfg sub_scc in
         scc_list @ sub_scc
-      else scc_list )
+      else scc_list)
     scc_list scc_list
 
 let extract global cfg loop_info trset =
@@ -678,7 +689,7 @@ let extract global cfg loop_info trset =
             (fun n ->
               let succ = IntraCfg.succ n cfg in
               List.length succ = 2
-              && List.exists (fun s -> not (List.mem s scc)) succ )
+              && List.exists (fun s -> not (List.mem s scc)) succ)
             scc
         in
         let loopid =
@@ -689,7 +700,7 @@ let extract global cfg loop_info trset =
           List.map
             (fun head ->
               InterCfg.Node.make (IntraCfg.get_pid cfg)
-                (List.hd (IntraCfg.succ head cfg)) )
+                (List.hd (IntraCfg.succ head cfg)))
             branches
         in
         let feature =
@@ -706,7 +717,7 @@ let extract global cfg loop_info trset =
               |> add_gvar global cond_node
               |> add_finite_itv global cond_node
               |> add_close_left_arr_size_offset global cond_node cfg
-              |> add_cstring global cond_node cfg )
+              |> add_cstring global cond_node cfg)
             empty_feature conds
           |> add_index conds cfg scc
           |> add_out_index conds cfg scc
@@ -715,7 +726,7 @@ let extract global cfg loop_info trset =
           |> add_diff_array_access cfg scc
           |> add_idx_pp cfg scc |> add_ptr_pp cfg scc
         in
-        BatMap.add loopid feature trset )
+        BatMap.add loopid feature trset)
     trset scc_list
 
 let rec generate_loop_info loopid stmts loop_info =
@@ -729,7 +740,7 @@ let rec generate_loop_info loopid stmts loop_info =
           |> generate_loop_info loopid fb.bstmts
       | Block blk -> generate_loop_info loopid blk.bstmts info
       | Switch (_, blk, _, _) -> generate_loop_info loopid blk.bstmts info
-      | _ -> BatMap.add stmt.sid (CilHelper.s_location loopid) info )
+      | _ -> BatMap.add stmt.sid (CilHelper.s_location loopid) info)
     loop_info stmts
 
 let normalize trset =
@@ -749,7 +760,7 @@ let normalize trset =
   let max_diff_array_access =
     BatMap.fold
       (fun v max ->
-        if v.diff_array_access > max then v.diff_array_access else max )
+        if v.diff_array_access > max then v.diff_array_access else max)
       trset 0.0
   in
   let max_idx_pp =
@@ -759,15 +770,16 @@ let normalize trset =
   in
   BatMap.map
     (fun feat ->
-      { feat with
-        exits= feat.exits /. max_exit
-      ; scc_size= feat.scc_size /. max_scc
-      ; points_to= feat.points_to /. max_points_to
-      ; diff_array_access=
+      {
+        feat with
+        exits = feat.exits /. max_exit;
+        scc_size = feat.scc_size /. max_scc;
+        points_to = feat.points_to /. max_points_to;
+        diff_array_access =
           ( if feat.diff_array_access = 0.0 then 0.0
-          else feat.diff_array_access /. max_diff_array_access )
-      ; idx_pp= (if feat.idx_pp = 0.0 then 0.0 else feat.idx_pp /. max_idx_pp)
-      } )
+          else feat.diff_array_access /. max_diff_array_access );
+        idx_pp = (if feat.idx_pp = 0.0 then 0.0 else feat.idx_pp /. max_idx_pp);
+      })
     trset
 
 let extract_feature global =
@@ -776,21 +788,21 @@ let extract_feature global =
       (fun trset glob ->
         match glob with
         | Cil.GFun (fd, _) -> (
-          try
-            let loop_info =
-              generate_loop_info Cil.locUnknown fd.sbody.bstmts BatMap.empty
-            in
-            let cfg = InterCfg.cfgof global.icfg fd.svar.vname in
-            extract global cfg loop_info trset
-          with _ -> trset )
-        | _ -> trset )
+            try
+              let loop_info =
+                generate_loop_info Cil.locUnknown fd.sbody.bstmts BatMap.empty
+              in
+              let cfg = InterCfg.cfgof global.icfg fd.svar.vname in
+              extract global cfg loop_info trset
+            with _ -> trset )
+        | _ -> trset)
       BatMap.empty
   in
   if !Options.debug then (
-    prerr_endline "== features for loop ==" ;
+    prerr_endline "== features for loop ==";
     BatMap.iter
       (fun k v -> prerr_endline (k ^ "\n" ^ string_of_feature v))
-      trset ) ;
+      trset );
   normalize trset
 
 class loopRemoveVisitor (loops : string BatSet.t) =
@@ -818,23 +830,24 @@ let get_harmless_loops global =
     let classifier =
       Lymp.Pyref
         (Lymp.get_ref py_module "load"
-           [Lymp.Pystr (sparrow_data_path ^ "/harmless_loop_clf")])
+           [ Lymp.Pystr (sparrow_data_path ^ "/harmless_loop_clf") ])
     in
     let set =
       BatMap.foldi
         (fun l fvec loops ->
           let vec = feature_vector_of fvec in
           let vec = Lymp.Pylist (List.map (fun x -> Lymp.Pyfloat x) vec) in
-          let b = Lymp.get_bool py_module "is_harmless" [classifier; vec] in
-          if b then BatSet.add l loops else loops )
+          let b = Lymp.get_bool py_module "is_harmless" [ classifier; vec ] in
+          if b then BatSet.add l loops else loops)
         data BatSet.empty
     in
-    Lymp.close py ; set
+    Lymp.close py;
+    set
 
 let transform global =
   let target_loops =
     BatSet.union (get_harmless_loops global) !Options.unsound_loop
   in
   let vis = new loopRemoveVisitor target_loops in
-  ignore (Cil.visitCilFile vis global.file) ;
+  ignore (Cil.visitCilFile vis global.file);
   not (BatSet.is_empty target_loops)

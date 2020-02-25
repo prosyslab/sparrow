@@ -50,31 +50,26 @@ let rec set mode global ptrmem pid lv_set e mem =
   if try Cil.isIntegralType (Cil.typeOf e) with _ -> false then
     match e |> CilHelper.remove_cast |> CilHelper.remove_coeff with
     | Const _ ->
-        lv_set
-        |> (fun x ->
-             if can_strong_update_octloc mode global lv_set then
-               PowOctLoc.fold AbsOct.set_const x o
-             else PowOctLoc.fold AbsOct.weak_set_const x o )
+        ( lv_set |> fun x ->
+          if can_strong_update_octloc mode global lv_set then
+            PowOctLoc.fold AbsOct.set_const x o
+          else PowOctLoc.fold AbsOct.weak_set_const x o )
         |> fun o -> update mode global pid o mem
     | Lval lval ->
-        ItvSem.eval_lv pid lval ptrmem
-        |> PowOctLoc.of_locs
-        |> (fun rv_set ->
-             if
-               can_strong_update_octloc mode global lv_set
-               && can_strong_update_octloc mode global rv_set
-             then PowOctLoc.fold2 AbsOct.set_variable lv_set rv_set o
-             else PowOctLoc.fold2 AbsOct.weak_set_variable lv_set rv_set o )
+        ( ItvSem.eval_lv pid lval ptrmem |> PowOctLoc.of_locs |> fun rv_set ->
+          if
+            can_strong_update_octloc mode global lv_set
+            && can_strong_update_octloc mode global rv_set
+          then PowOctLoc.fold2 AbsOct.set_variable lv_set rv_set o
+          else PowOctLoc.fold2 AbsOct.weak_set_variable lv_set rv_set o )
         |> fun o -> update mode global pid o mem
     (* x = y + c *)
     | BinOp (bop, Lval lval, Const (CInt64 (i, _, _)), _)
-     |BinOp (bop, Const (CInt64 (i, _, _)), Lval lval, _)
+    | BinOp (bop, Const (CInt64 (i, _, _)), Lval lval, _)
     (* heuristic: forget the relationship only if x = x + 1 *)
       when (bop = PlusA && Cil.i64_to_int i = 1)
            || (bop = MinusA && Cil.i64_to_int i = -1) ->
-        ItvSem.eval_lv pid lval ptrmem
-        |> PowOctLoc.of_locs
-        |> fun rv_set ->
+        ItvSem.eval_lv pid lval ptrmem |> PowOctLoc.of_locs |> fun rv_set ->
         if PowOctLoc.meet lv_set rv_set |> PowOctLoc.is_empty then
           set mode global ptrmem pid lv_set (Lval lval) mem
         else forget mode global pid lv_set mem
@@ -86,9 +81,8 @@ let rec set mode global ptrmem pid lv_set e mem =
 
 and forget mode global pid lv_set mem =
   let o = lookup mem in
-  lv_set
-  |> (fun l -> PowOctLoc.fold AbsOct.forget l o)
-  |> fun o -> update mode global pid o mem
+  (lv_set |> fun l -> PowOctLoc.fold AbsOct.forget l o) |> fun o ->
+  update mode global pid o mem
 
 let alloc mode global ptrmem pid lv_set ptrs e mem =
   set mode global ptrmem pid ptrs e mem
@@ -102,20 +96,20 @@ let rec prune mode global ptrmem pid exp mem =
   | None -> mem
   | Some (Cil.BinOp (bop, Cil.Lval x, Cil.Lval y, _))
     when bop = Lt || bop = Le || bop = Eq ->
-      (x, y)
+      ( (x, y)
       |> BatTuple.Tuple2.mapn (fun lv -> ItvSem.eval_lv pid lv ptrmem)
       |> BatTuple.Tuple2.mapn PowOctLoc.of_locs
-      |> (fun (lv_set, rv_set) ->
-           if
-             can_strong_update_octloc mode global lv_set
-             && can_strong_update_octloc mode global rv_set
-           then PowOctLoc.fold2 AbsOct.assume lv_set rv_set o
-           else PowOctLoc.fold2 AbsOct.weak_assume lv_set rv_set o )
+      |> fun (lv_set, rv_set) ->
+        if
+          can_strong_update_octloc mode global lv_set
+          && can_strong_update_octloc mode global rv_set
+        then PowOctLoc.fold2 AbsOct.assume lv_set rv_set o
+        else PowOctLoc.fold2 AbsOct.weak_assume lv_set rv_set o )
       |> fun o -> update mode global pid o mem
   | Some
       (Cil.BinOp
         (bop, Cil.Lval x, Cil.BinOp (bop2, Cil.Lval y, Cil.Const _, _), t))
-   |Some
+  | Some
       (Cil.BinOp
         (bop, Cil.Lval x, Cil.BinOp (bop2, Cil.Const _, Cil.Lval y, _), t))
     when (bop = Lt || bop = Le || bop = Eq) && (bop2 = PlusA || bop2 = MinusA)
@@ -156,8 +150,7 @@ let model_input mode pid lvo ptrmem (mem, global) =
   match lvo with
   | Some lv ->
       let size =
-        Allocsite.allocsite_of_ext None
-        |> OctLoc.of_size |> PowOctLoc.singleton
+        Allocsite.allocsite_of_ext None |> OctLoc.of_size |> PowOctLoc.singleton
       in
       forget mode global pid size mem
   | _ -> mem
@@ -228,38 +221,38 @@ let model_strlen mode pid lvo exps ptrmem (mem, global) =
       update mode global pid o mem
   | _ -> mem
 
-let handle_undefined_functions mode node pid (lvo, f, exps) ptrmem
-    (mem, global) loc =
+let handle_undefined_functions mode node pid (lvo, f, exps) ptrmem (mem, global)
+    loc =
   match f.vname with
   | "sparrow_print" ->
-      sparrow_print pid exps mem loc ;
+      sparrow_print pid exps mem loc;
       mem
   | "sparrow_arg" -> sparrow_arg mode pid exps ptrmem (mem, global)
   | "strlen" -> model_strlen mode pid lvo exps ptrmem (mem, global)
   | "getenv" -> model_input mode pid lvo ptrmem (mem, global)
   | "strdup" -> model_strdup mode pid node lvo exps ptrmem (mem, global)
-  | "realloc" ->
-      model_realloc mode global node pid lvo exps ptrmem (mem, global)
+  | "realloc" -> model_realloc mode global node pid lvo exps ptrmem (mem, global)
   | "calloc" -> model_calloc mode global node pid lvo exps ptrmem (mem, global)
   | _ -> (
-    match lvo with
-    | None -> mem
-    | Some lv -> (
-      match Cil.unrollTypeDeep (Cil.typeOfLval lv) with
-      | Cil.TInt (_, _) | Cil.TFloat (_, _) ->
-          let lv = ItvSem.eval_lv pid lv ptrmem in
-          let oct_lv = PowOctLoc.of_locs lv in
-          forget mode global pid oct_lv mem
-      | _ ->
-          let size =
-            Allocsite.allocsite_of_ext (Some f.vname)
-            |> OctLoc.of_size |> PowOctLoc.singleton
-          in
-          let loc =
-            Allocsite.allocsite_of_ext (Some f.vname)
-            |> Loc.of_allocsite |> OctLoc.of_loc |> PowOctLoc.singleton
-          in
-          mem |> forget mode global pid size |> forget mode global pid loc ) )
+      match lvo with
+      | None -> mem
+      | Some lv -> (
+          match Cil.unrollTypeDeep (Cil.typeOfLval lv) with
+          | Cil.TInt (_, _) | Cil.TFloat (_, _) ->
+              let lv = ItvSem.eval_lv pid lv ptrmem in
+              let oct_lv = PowOctLoc.of_locs lv in
+              forget mode global pid oct_lv mem
+          | _ ->
+              let size =
+                Allocsite.allocsite_of_ext (Some f.vname)
+                |> OctLoc.of_size |> PowOctLoc.singleton
+              in
+              let loc =
+                Allocsite.allocsite_of_ext (Some f.vname)
+                |> Loc.of_allocsite |> OctLoc.of_loc |> PowOctLoc.singleton
+              in
+              mem |> forget mode global pid size |> forget mode global pid loc )
+      )
 
 let binding mode global ptrmem pid paramset args mem =
   let rec adjust params args new_params new_args =
@@ -274,8 +267,8 @@ let binding mode global ptrmem pid paramset args mem =
       List.fold_left2
         (fun mem param arg ->
           let param = PowLoc.singleton param |> PowOctLoc.of_locs in
-          set mode global ptrmem pid param arg mem )
-        mem params args )
+          set mode global ptrmem pid param arg mem)
+        mem params args)
     paramset mem
 
 let rec run_cmd mode node cmd ptrmem (mem, global) =

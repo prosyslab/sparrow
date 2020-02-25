@@ -20,16 +20,16 @@ module L = Logging
 let onestep_transfer nodes (mem, global) =
   list_fold
     (fun node (mem, global) ->
-      ItvSem.run AbsSem.Weak ItvSem.Spec.empty node (mem, global) )
+      ItvSem.run AbsSem.Weak ItvSem.Spec.empty node (mem, global))
     nodes (mem, global)
 
 let rec fixpt nodes k (mem, global) =
-  my_prerr_string ("\riteration : " ^ string_of_int k) ;
-  flush stderr ;
+  my_prerr_string ("\riteration : " ^ string_of_int k);
+  flush stderr;
   let mem', global' = onestep_transfer nodes (mem, global) in
   let mem' = Mem.widen mem mem' in
   if Mem.le mem' mem && Dump.le global'.dump global.dump then (
-    L.info ~level:1 "#iteration : %d\n" k ;
+    L.info ~level:1 "#iteration : %d\n" k;
     (mem', global') )
   else fixpt nodes (k + 1) (mem', global')
 
@@ -48,10 +48,10 @@ let draw_call_edges nodes mem global =
         if InterCfg.is_callnode node icfg then
           let callees = callees_of icfg node mem in
           PowProc.fold (InterCfg.add_call_edge node) callees icfg
-        else icfg )
+        else icfg)
       global.icfg nodes
   in
-  {global with icfg}
+  { global with icfg }
 
 let draw_callgraph nodes mem global =
   let callgraph =
@@ -60,16 +60,16 @@ let draw_callgraph nodes mem global =
         let callees = callees_of global.icfg node mem in
         PowProc.fold
           (fun callee callgraph ->
-            CallGraph.add_edge (InterCfg.Node.get_pid node) callee callgraph )
-          callees callgraph )
+            CallGraph.add_edge (InterCfg.Node.get_pid node) callee callgraph)
+          callees callgraph)
       global.callgraph nodes
     |> CallGraph.compute_trans_calls
   in
-  {global with callgraph}
+  { global with callgraph }
 
 let perform global =
   let nodes = InterCfg.nodesof global.icfg in
   let mem, global = fixpt nodes 1 (Mem.bot, global) in
-  L.info ~level:1 "mem size : %d\n\n" (Mem.cardinal mem) ;
-  {global with mem} |> draw_call_edges nodes mem |> draw_callgraph nodes mem
+  L.info ~level:1 "mem size : %d\n\n" (Mem.cardinal mem);
+  { global with mem } |> draw_call_edges nodes mem |> draw_callgraph nodes mem
   |> Global.remove_unreachable_functions

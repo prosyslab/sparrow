@@ -1,7 +1,7 @@
 open Cil
 open Vocab
 
-let allocs = ["malloc"; "calloc"; "realloc"]
+let allocs = [ "malloc"; "calloc"; "realloc" ]
 
 (* Get the pointer for the allocated block *)
 let rec ptr_of_exp op exp =
@@ -9,8 +9,7 @@ let rec ptr_of_exp op exp =
   | (BinOp (op0, CastE (_, e1), e2, t) | BinOp (op0, e1, CastE (_, e2), t))
     when op = op0 ->
       ptr_of_exp op (BinOp (op0, e1, e2, t))
-  | BinOp (op0, Lval (Var v, NoOffset), zero, t) when op = op0 && isZero zero
-    ->
+  | BinOp (op0, Lval (Var v, NoOffset), zero, t) when op = op0 && isZero zero ->
       Some v.vname
   | Lval (Var v, NoOffset) when op = Ne -> Some v.vname
   | UnOp (LNot, Lval (Var v, NoOffset), _) when op = Eq -> Some v.vname
@@ -24,14 +23,15 @@ let is_alloc_ptr_instr instr p =
 
 let rec is_alloc_ptr stmt p =
   match stmt.preds with
-  | [pred] -> (
-    match pred.skind with
-    | Instr [Set ((Var v, NoOffset), Lval (Var tmp, NoOffset), _)]
-     |Instr [Set ((Var v, NoOffset), CastE (_, Lval (Var tmp, NoOffset)), _)]
-      when p = v.vname ->
-        is_alloc_ptr pred tmp.vname
-    | Instr instr -> is_alloc_ptr_instr instr p
-    | _ -> false )
+  | [ pred ] -> (
+      match pred.skind with
+      | Instr [ Set ((Var v, NoOffset), Lval (Var tmp, NoOffset), _) ]
+      | Instr
+          [ Set ((Var v, NoOffset), CastE (_, Lval (Var tmp, NoOffset)), _) ]
+        when p = v.vname ->
+          is_alloc_ptr pred tmp.vname
+      | Instr instr -> is_alloc_ptr_instr instr p
+      | _ -> false )
   | _ -> false
 
 let check_null op stmt exp =
@@ -63,11 +63,11 @@ let rec split_dead stmts dead =
 let rec split stmts (live, dead) =
   match stmts with
   | h :: t -> (
-    match h.skind with
-    | Return (_, loc) ->
-        let dead', live' = split_dead t [] in
-        (List.rev (h :: live) @ live', dead')
-    | _ -> split t (h :: live, dead) )
+      match h.skind with
+      | Return (_, loc) ->
+          let dead', live' = split_dead t [] in
+          (List.rev (h :: live) @ live', dead')
+      | _ -> split t (h :: live, dead) )
   | _ -> (List.rev live, dead)
 
 (* Remove statements after returns. For example,
@@ -83,12 +83,12 @@ class returnVisitor () =
       let live, dead = split b.bstmts ([], []) in
       match dead with
       | [] -> DoChildren
-      | _ :: _ -> ChangeDoChildrenPost ({b with bstmts= live}, id)
+      | _ :: _ -> ChangeDoChildrenPost ({ b with bstmts = live }, id)
   end
 
 let transform file =
   let vis = new allocVisitor () in
-  ignore (Cil.visitCilFile vis file) ;
+  ignore (Cil.visitCilFile vis file);
   let vis = new returnVisitor () in
-  ignore (Cil.visitCilFile vis file) ;
+  ignore (Cil.visitCilFile vis file);
   Frontend.makeCFGinfo file

@@ -227,7 +227,7 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
         (fun orig_v ->
           if B.le v orig_v then orig_v
           else if B.le orig_v v then v
-          else B.join orig_v v )
+          else B.join orig_v v)
         x
 
   let widen_add : A.t -> B.t -> t -> t =
@@ -328,9 +328,9 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
   let pp fmt m =
     let rec pp_map fmt = function
       | [] -> ()
-      | [(k, v)] -> Format.fprintf fmt "@[<h>%a -> %a@]" A.pp k B.pp v
+      | [ (k, v) ] -> Format.fprintf fmt "@[<h>%a -> %a@]" A.pp k B.pp v
       | (k, v) :: t ->
-          Format.fprintf fmt "@[<h>%a -> %a@\n@]" A.pp k B.pp v ;
+          Format.fprintf fmt "@[<h>%a -> %a@\n@]" A.pp k B.pp v;
           pp_map fmt t
     in
     if is_empty m then Format.fprintf fmt "bot"
@@ -376,9 +376,7 @@ module MakeLAT (A : AbsDom.SET) (B : AbsDom.CPO) = struct
     | Top -> raise (Failure "Error: filter")
 
   let join x y =
-    match (x, y) with
-    | V x, V y -> V (MapCPO.join x y)
-    | _, Top | Top, _ -> top
+    match (x, y) with V x, V y -> V (MapCPO.join x y) | _, Top | Top, _ -> top
 
   let meet x y =
     match (x, y) with

@@ -53,19 +53,20 @@ module NodeSet = BatSet.Make (Node)
 
 type node = Node.t
 
-type t =
-  { cfgs: (pid, IntraCfg.t) BatMap.t
-  ; globals: Cil.global list
-  ; call_edges: (Node.t, ProcSet.t) BatMap.t }
+type t = {
+  cfgs : (pid, IntraCfg.t) BatMap.t;
+  globals : Cil.global list;
+  call_edges : (Node.t, ProcSet.t) BatMap.t;
+}
 
-let dummy = {cfgs= BatMap.empty; globals= []; call_edges= BatMap.empty}
+let dummy = { cfgs = BatMap.empty; globals = []; call_edges = BatMap.empty }
 
 let add_call_edge call_node pid g =
   let callees =
     (try BatMap.find call_node g.call_edges with _ -> ProcSet.empty)
     |> ProcSet.add pid
   in
-  {g with call_edges= BatMap.add call_node callees g.call_edges}
+  { g with call_edges = BatMap.add call_node callees g.call_edges }
 
 let get_callees call_node g =
   try BatMap.find call_node g.call_edges with _ -> ProcSet.empty
@@ -91,31 +92,39 @@ let gen_cfgs file =
          match g with
          | Cil.GFun (f, loc) when not (ignore_file regexps loc) ->
              BatMap.add f.svar.vname (IntraCfg.init f loc) m
-         | _ -> m )
+         | _ -> m)
        file.Cil.globals BatMap.empty)
 
 let compute_dom_and_scc icfg =
-  { icfg with
-    cfgs=
+  {
+    icfg with
+    cfgs =
       BatMap.map
         (fun cfg -> IntraCfg.compute_scc (IntraCfg.compute_dom cfg))
-        icfg.cfgs }
+        icfg.cfgs;
+  }
 
 let remove_function pid icfg =
   let is_not_pid_node node _ = Node.get_pid node <> pid in
-  { icfg with
-    cfgs= BatMap.remove pid icfg.cfgs
-  ; call_edges= BatMap.filter is_not_pid_node icfg.call_edges }
+  {
+    icfg with
+    cfgs = BatMap.remove pid icfg.cfgs;
+    call_edges = BatMap.filter is_not_pid_node icfg.call_edges;
+  }
 
 let cfgof g pid =
-  try BatMap.find pid g.cfgs with Not_found ->
-    prerr_endline ("InterCfg.cfgof " ^ pid) ;
+  try BatMap.find pid g.cfgs
+  with Not_found ->
+    prerr_endline ("InterCfg.cfgof " ^ pid);
     raise Not_found
 
 let cmdof g (pid, node) = IntraCfg.find_cmd node (cfgof g pid)
 
 let add_cmd g (pid, node) cmd =
-  {g with cfgs= BatMap.add pid (IntraCfg.add_cmd node cmd (cfgof g pid)) g.cfgs}
+  {
+    g with
+    cfgs = BatMap.add pid (IntraCfg.add_cmd node cmd (cfgof g pid)) g.cfgs;
+  }
 
 let nodes_of_pid g pid =
   List.map (Node.make pid) (IntraCfg.nodesof (cfgof g pid))
@@ -124,13 +133,12 @@ let fold_cfgs f g a = BatMap.foldi f g.cfgs a
 
 let iter f g = BatMap.iter f g.cfgs
 
-let map_cfgs f g = {g with cfgs= BatMap.map f g.cfgs}
+let map_cfgs f g = { g with cfgs = BatMap.map f g.cfgs }
 
 let nodesof g =
   BatMap.foldi
     (fun pid cfg ->
-      List.append (List.map (fun n -> Node.make pid n) (IntraCfg.nodesof cfg))
-      )
+      List.append (List.map (fun n -> Node.make pid n) (IntraCfg.nodesof cfg)))
     g.cfgs []
 
 let pidsof g = BatMap.foldi (fun pid _ acc -> pid :: acc) g.cfgs []
@@ -175,7 +183,7 @@ let unreachable_node g =
 let remove_node (pid, intra_node) g =
   let intra_cfg = cfgof g pid in
   let intra_cfg = IntraCfg.remove_node intra_node intra_cfg in
-  {g with cfgs= BatMap.add pid intra_cfg g.cfgs}
+  { g with cfgs = BatMap.add pid intra_cfg g.cfgs }
 
 let print chan g =
   BatMap.iter (fun pid cfg -> IntraCfg.print_dot chan cfg) g.cfgs
@@ -207,8 +215,8 @@ let to_json_simple g =
             | `List l1, `List l2 -> `List (l1 @ l2)
             | _ -> failwith "Invalid format"
           in
-          `Assoc [("nodes", nodes); ("edges", edges)]
-      | _, _ -> failwith "Invalid format" )
+          `Assoc [ ("nodes", nodes); ("edges", edges) ]
+      | _, _ -> failwith "Invalid format")
     g.cfgs (`Assoc [])
 
 let print_json chan g = Yojson.Safe.pretty_to_channel chan (to_json g)
@@ -223,13 +231,13 @@ let print_json chan g = Yojson.Safe.pretty_to_channel chan (to_json g)
 let collect_strs icfg =
   list_fold
     (fun n ->
-      match cmdof icfg n with Csalloc (_, s, _) -> BatSet.add s | _ -> id )
+      match cmdof icfg n with Csalloc (_, s, _) -> BatSet.add s | _ -> id)
     (nodesof icfg) BatSet.empty
 
 let str_count = ref 0
 
 let get_cstr_name () =
-  str_count := !str_count + 1 ;
+  str_count := !str_count + 1;
   "_zoo_cstr_" ^ i2s !str_count
 
 let build_strmap strs =
@@ -237,7 +245,7 @@ let build_strmap strs =
     (fun str map ->
       let name = get_cstr_name () in
       let lv = (Var (Cil.makeGlobalVar name Cil.charPtrType), NoOffset) in
-      BatMap.add str lv map )
+      BatMap.add str lv map)
     strs BatMap.empty
 
 let replace_salloc icfg strmap =
@@ -249,10 +257,10 @@ let replace_salloc icfg strmap =
           let rhs = Lval (BatMap.find str strmap) in
           let cmd = Cset (lhs, rhs, location) in
           add_cmd g n cmd
-      | _ -> g )
+      | _ -> g)
     nodes icfg
 
-let dummy_location = {line= 0; file= ""; byte= 0}
+let dummy_location = { line = 0; file = ""; byte = 0 }
 
 let insert_salloc icfg strmap =
   let _G_ = cfgof icfg global_proc in
@@ -263,10 +271,10 @@ let insert_salloc icfg strmap =
         let _ = assert (List.length (IntraCfg.succ entry g) = 1) in
         let next = List.nth (IntraCfg.succ entry g) 0 in
         let cmd = Csalloc (lhs, str, dummy_location) in
-        IntraCfg.add_new_node entry cmd next g )
+        IntraCfg.add_new_node entry cmd next g)
       strmap _G_
   in
-  {icfg with cfgs= BatMap.add global_proc _G_with_sallocs icfg.cfgs}
+  { icfg with cfgs = BatMap.add global_proc _G_with_sallocs icfg.cfgs }
 
 let opt_salloc icfg =
   let strs = collect_strs icfg in
@@ -280,6 +288,10 @@ let optimize_il icfg = icfg |> map_cfgs IntraCfg.optimize
 (*  |> opt_salloc*)
 
 let init file =
-  {cfgs= gen_cfgs file; globals= file.Cil.globals; call_edges= BatMap.empty}
+  {
+    cfgs = gen_cfgs file;
+    globals = file.Cil.globals;
+    call_edges = BatMap.empty;
+  }
   |> opt !Options.optil optimize_il
   |> compute_dom_and_scc

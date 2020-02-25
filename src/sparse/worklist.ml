@@ -43,9 +43,13 @@ module NGraph = struct
   include G
   include Graph.Components.Make (G)
 
-  let add_edge g s d = add_edge g s d ; g
+  let add_edge g s d =
+    add_edge g s d;
+    g
 
-  let remove_edge g s d = remove_edge g s d ; g
+  let remove_edge g s d =
+    remove_edge g s d;
+    g
 
   let empty size = create ~size ()
 end
@@ -54,23 +58,29 @@ module Make (DUGraph : Dug.S) = struct
   module DUGraph = DUGraph
 
   module Workorder = struct
-    type t =
-      { order: (DUGraph.node, int * bool) BatMap.t
-      ; headorder: (DUGraph.node, int) BatMap.t
-      ; loopheads: DUGraph.node BatSet.t }
+    type t = {
+      order : (DUGraph.node, int * bool) BatMap.t;
+      headorder : (DUGraph.node, int) BatMap.t;
+      loopheads : DUGraph.node BatSet.t;
+    }
 
     let empty =
-      {order= BatMap.empty; headorder= BatMap.empty; loopheads= BatSet.empty}
+      {
+        order = BatMap.empty;
+        headorder = BatMap.empty;
+        loopheads = BatSet.empty;
+      }
 
     let make g =
       let i = ref 0 in
       let new_i () =
         let v = !i in
-        i := !i + 1 ;
+        i := !i + 1;
         v
       in
       let create n i2n n2i =
-        try (BatMap.find n n2i, i2n, n2i) with Not_found ->
+        try (BatMap.find n n2i, i2n, n2i)
+        with Not_found ->
           let i = new_i () in
           (i, BatMap.add i n i2n, BatMap.add n i n2i)
       in
@@ -89,7 +99,7 @@ module Make (DUGraph : Dug.S) = struct
       let add_back_edge e newg =
         NGraph.fold_succ
           (fun s newg ->
-            if Hashtbl.mem scc s then NGraph.add_edge newg e s else newg )
+            if Hashtbl.mem scc s then NGraph.add_edge newg e s else newg)
           ng e newg
       in
       Hashtbl.fold
@@ -114,7 +124,7 @@ module Make (DUGraph : Dug.S) = struct
               | Some (_, old_score) when new_score > old_score ->
                   Some (dst, new_score)
               | _ -> score
-            else score )
+            else score)
           ng None
       in
       match score with Some (n, _) -> n | None -> assert false
@@ -131,13 +141,13 @@ module Make (DUGraph : Dug.S) = struct
           if size > 1 then (
             let headorder = order + (3 * size) in
             let scc_hash = Hashtbl.create size in
-            List.iter (fun x -> Hashtbl.add scc_hash x x) scc ;
-            Profiler.start_event "Worklist.projection" ;
+            List.iter (fun x -> Hashtbl.add scc_hash x x) scc;
+            Profiler.start_event "Worklist.projection";
             let ng' = projection scc_hash ng in
-            Profiler.finish_event "Worklist.projection" ;
-            Profiler.start_event "Worklist.loophead_of" ;
+            Profiler.finish_event "Worklist.projection";
+            Profiler.start_event "Worklist.loophead_of";
             let lh = try loophead_of scc_hash ng with _ -> List.hd scc in
-            Profiler.finish_event "Worklist.loophead_of" ;
+            Profiler.finish_event "Worklist.loophead_of";
             let lhs, ho = (BatSet.add lh lhs, BatMap.add lh headorder ho) in
             let wo, lhs, ho, _ =
               get_order1 t ng (wo, lhs, ho) (headorder + 1)
@@ -157,14 +167,14 @@ module Make (DUGraph : Dug.S) = struct
           if List.length scc > 1 then (
             let headorder = order + size in
             let scc_hash = Hashtbl.create size in
-            List.iter (fun x -> Hashtbl.add scc_hash x x) scc ;
-            Profiler.start_event "Worklist.loophead_of" ;
+            List.iter (fun x -> Hashtbl.add scc_hash x x) scc;
+            Profiler.start_event "Worklist.loophead_of";
             let lh = loophead_of scc_hash ng in
-            Profiler.finish_event "Worklist.loophead_of" ;
+            Profiler.finish_event "Worklist.loophead_of";
             let lhs, ho = (BatSet.add lh lhs, BatMap.add lh headorder ho) in
-            Profiler.start_event "Worklist.projection" ;
+            Profiler.start_event "Worklist.projection";
             let ng' = projection scc_hash ng in
-            Profiler.finish_event "Worklist.projection" ;
+            Profiler.finish_event "Worklist.projection";
             let ng' = cut_backedges ng' lh in
             let sccs' =
               List.rev (NGraph.scc_list ng') |> List.map (fun scc -> (scc, ng'))
@@ -180,11 +190,11 @@ module Make (DUGraph : Dug.S) = struct
     let perform g =
       let ng, i2n = make g in
       let sccs = List.rev (NGraph.scc_list ng) in
-      Profiler.start_event "Worklist.get_order" ;
+      Profiler.start_event "Worklist.get_order";
       let wo, lhs, ho, _ =
         get_order1 sccs ng (BatMap.empty, BatSet.empty, BatMap.empty) 0
       in
-      Profiler.finish_event "Worklist.get_order" ;
+      Profiler.finish_event "Worklist.get_order";
       let add_rec_node src dst nodes =
         if NGraph.Node.compare src dst = 0 then BatSet.add src nodes else nodes
       in
@@ -198,12 +208,12 @@ module Make (DUGraph : Dug.S) = struct
         BatSet.fold add_1 s BatSet.empty
       in
       let trans_k k = BatMap.find k i2n in
-      Profiler.start_event "Worklist.trans" ;
+      Profiler.start_event "Worklist.trans";
       let wo = trans_map trans_k (fun k v -> (v, BatSet.mem k lhs)) wo in
       let lhs = trans_set (fun v -> BatMap.find v i2n) lhs in
       let ho = trans_map trans_k (fun _ v -> v) ho in
-      Profiler.finish_event "Worklist.trans" ;
-      {order= wo; headorder= ho; loopheads= lhs}
+      Profiler.finish_event "Worklist.trans";
+      { order = wo; headorder = ho; loopheads = lhs }
   end
 
   module Ord = struct
@@ -222,7 +232,7 @@ module Make (DUGraph : Dug.S) = struct
 
   module S = BatSet.Make (Ord)
 
-  type t = {set: S.t; order: Workorder.t}
+  type t = { set : S.t; order : Workorder.t }
 
   let compare_order succ idx order =
     try
@@ -233,9 +243,9 @@ module Make (DUGraph : Dug.S) = struct
 
   let queue is_inneredge n wl =
     (* change order if,
-     - the n node has a loophead order, and
-     - an inneredge to the n node is updated
-  *)
+       - the n node has a loophead order, and
+       - an inneredge to the n node is updated
+    *)
     let rec change_order n o is_inneredge =
       let is_loophead = snd o in
       if is_inneredge && is_loophead then
@@ -245,7 +255,7 @@ module Make (DUGraph : Dug.S) = struct
     in
     let o = BatMap.find n wl.order.Workorder.order in
     let new_o = change_order n o is_inneredge in
-    {wl with set= S.add (new_o, n) wl.set}
+    { wl with set = S.add (new_o, n) wl.set }
 
   let push idx succ ws =
     let bInnerLoop = compare_order succ idx ws.order in
@@ -255,17 +265,17 @@ module Make (DUGraph : Dug.S) = struct
     BatSet.fold
       (fun succ works ->
         let bInnerLoop = compare_order succ idx works.order in
-        queue bInnerLoop succ works )
+        queue bInnerLoop succ works)
       succs ws
 
-  let init dug = {set= S.empty; order= Workorder.perform dug}
+  let init dug = { set = S.empty; order = Workorder.perform dug }
 
   let is_loopheader idx ws = Workorder.is_loopheader idx ws.order
 
   let pick ws =
     try
       let ((_, n) as e), set = S.pop_min ws.set in
-      let ws = {ws with set} in
+      let ws = { ws with set } in
       Some (n, ws)
     with Not_found -> None
 end

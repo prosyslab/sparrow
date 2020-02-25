@@ -17,16 +17,16 @@ module type S = sig
 
   module Spec :
     Spec.S
-    with type Dom.t = Dom.t
-     and type Dom.A.t = Dom.A.t
-     and type Dom.PowA.t = Dom.PowA.t
+      with type Dom.t = Dom.t
+       and type Dom.A.t = Dom.A.t
+       and type Dom.PowA.t = Dom.PowA.t
 
   val run :
-       update_mode
-    -> Spec.t
-    -> BasicDom.Node.t
-    -> Dom.t * Global.t
-    -> Dom.t * Global.t
+    update_mode ->
+    Spec.t ->
+    BasicDom.Node.t ->
+    Dom.t * Global.t ->
+    Dom.t * Global.t
 
   val initial : Dom.PowA.t -> Dom.t
 end

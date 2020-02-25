@@ -43,28 +43,28 @@ let inspect_overflow v1 v2 itv1 itv2 =
 
 let eval_bop b v1 v2 itv1 itv2 =
   match b with
-  | Cil.PlusA | Cil.MinusA | Cil.Mult | Cil.PlusPI | Cil.IndexPI
-   |Cil.MinusPI | Cil.MinusPP | Cil.Div | Cil.Shiftlt | Cil.Shiftrt | Cil.Mod
-   |Cil.BAnd | Cil.BXor | Cil.BOr ->
+  | Cil.PlusA | Cil.MinusA | Cil.Mult | Cil.PlusPI | Cil.IndexPI | Cil.MinusPI
+  | Cil.MinusPP | Cil.Div | Cil.Shiftlt | Cil.Shiftrt | Cil.Mod | Cil.BAnd
+  | Cil.BXor | Cil.BOr ->
       (* overflow may happen *)
       let user_input = UserInput.join v1.Val.user_input v2.Val.user_input in
       let int_overflow = inspect_overflow v1 v2 itv1 itv2 in
-      {Val.int_overflow; user_input}
+      { Val.int_overflow; user_input }
   | Cil.Lt | Cil.Gt | Cil.Le | Cil.Ge | Cil.Eq | Cil.Ne | Cil.LAnd | Cil.LOr ->
       Val.bot
 
 let rec eval pid e itvmem mem =
   match e with
-  | Cil.Const _ | Cil.SizeOf _ | Cil.SizeOfE _ | Cil.SizeOfStr _
-   |Cil.AlignOf _ | Cil.AlignOfE _
-   |Cil.UnOp (_, _, _)
-   |Cil.AddrOf _ | Cil.AddrOfLabel _ | Cil.StartOf _ ->
+  | Cil.Const _ | Cil.SizeOf _ | Cil.SizeOfE _ | Cil.SizeOfStr _ | Cil.AlignOf _
+  | Cil.AlignOfE _
+  | Cil.UnOp (_, _, _)
+  | Cil.AddrOf _ | Cil.AddrOfLabel _ | Cil.StartOf _ ->
       Val.bot
   | Cil.Lval l -> lookup (ItvSem.eval_lv pid l itvmem) mem
   | Cil.BinOp (b, e1, e2, _) ->
       let itv1, itv2 =
-        ( ItvSem.eval pid e1 itvmem |> ItvDom.Val.itv_of_val
-        , ItvSem.eval pid e2 itvmem |> ItvDom.Val.itv_of_val )
+        ( ItvSem.eval pid e1 itvmem |> ItvDom.Val.itv_of_val,
+          ItvSem.eval pid e2 itvmem |> ItvDom.Val.itv_of_val )
       in
       eval_bop b (eval pid e1 itvmem mem) (eval pid e2 itvmem mem) itv1 itv2
   | Cil.Question (_, e2, e3, _) ->
@@ -125,7 +125,7 @@ let eval_src src_typ pid itvmem mem arg_e =
 let rec collect_src_vals arg_exps arg_typs pid itvmem mem =
   match (arg_exps, arg_typs) with
   | [], _ | _, [] -> []
-  | _, [Src (Variable, src_typ)] ->
+  | _, [ Src (Variable, src_typ) ] ->
       List.map (eval_src src_typ pid itvmem mem) arg_exps
   | _, Src (Variable, src_typ) :: _ ->
       failwith "itvSem.ml : API encoding error (Varg not at the last position)"
@@ -138,7 +138,7 @@ let rec collect_src_vals arg_exps arg_typs pid itvmem mem =
 let rec collect_dst_vals arg_exps arg_typs pid itvmem mem =
   match (arg_exps, arg_typs) with
   | [], _ | _, [] -> []
-  | _, [Dst (Variable, _)] ->
+  | _, [ Dst (Variable, _) ] ->
       List.map (fun e -> eval pid e itvmem mem) arg_exps
   | _, Dst (Variable, _) :: _ ->
       failwith "itvSem.ml : API encoding error (Varg not at the last position)"
@@ -151,7 +151,7 @@ let rec collect_dst_vals arg_exps arg_typs pid itvmem mem =
 let rec collect_buf_vals arg_exps arg_typs pid itvmem mem =
   match (arg_exps, arg_typs) with
   | [], _ | _, [] -> []
-  | _, [Buf (Variable, _)] ->
+  | _, [ Buf (Variable, _) ] ->
       List.map (fun e -> eval pid e itvmem mem) arg_exps
   | _, Buf (Variable, _) :: _ ->
       failwith "itvSem.ml : API encoding error (Varg not at the last position)"
@@ -192,7 +192,7 @@ let rec process_args mode node arg_exps arg_typs src_vals loc itvmem
   let pid = Node.get_pid node in
   match (arg_exps, arg_typs) with
   | [], _ | _, [] -> mem
-  | _, [Dst (Variable, alloc)] ->
+  | _, [ Dst (Variable, alloc) ] ->
       let _ = assert (va_src_flag || List.length src_vals > 0) in
       List.fold_left
         (process_dst mode node pid src_vals global alloc itvmem)
@@ -206,7 +206,7 @@ let rec process_args mode node arg_exps arg_typs src_vals loc itvmem
       in
       process_args mode node arg_exps_left arg_typs_left src_vals loc itvmem
         (mem, global)
-  | _, [Buf (Variable, _)] ->
+  | _, [ Buf (Variable, _) ] ->
       List.fold_left (process_buf mode node global loc itvmem) mem arg_exps
   | _, Buf (Variable, _) :: _ ->
       failwith "API encoding error (Varg not at the last position)"
@@ -215,8 +215,8 @@ let rec process_args mode node arg_exps arg_typs src_vals loc itvmem
       process_args mode node arg_exps_left arg_typs_left src_vals loc itvmem
         (mem, global)
   | _ :: arg_exps_left, Src _ :: arg_typs_left
-   |_ :: arg_exps_left, Size :: arg_typs_left
-   |_ :: arg_exps_left, Skip :: arg_typs_left ->
+  | _ :: arg_exps_left, Size :: arg_typs_left
+  | _ :: arg_exps_left, Skip :: arg_typs_left ->
       process_args mode node arg_exps_left arg_typs_left src_vals loc itvmem
         (mem, global)
   | _, _ -> mem
@@ -283,9 +283,7 @@ let handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc =
   match lvo with
   | Some lv ->
       let va_src_flag =
-        List.exists
-          (function Src (Variable, _) -> true | _ -> false)
-          arg_typs
+        List.exists (function Src (Variable, _) -> true | _ -> false) arg_typs
       in
       let mem, ret_v =
         produce_ret mode node ret_typ va_src_flag src_vals dst_vals buf_vals
@@ -298,48 +296,46 @@ let is_printf0 fname = fname = "printf"
 
 let is_printf1 fname =
   List.mem fname
-    [ "fprintf"
-    ; "sprintf"
-    ; "vfprintf"
-    ; "vsprintf"
-    ; "vasprintf"
-    ; "__asprintf"
-    ; "asprintf"
-    ; "vdprintf"
-    ; "dprintf"
-    ; "easprintf"
-    ; "evasprintf" ]
+    [
+      "fprintf";
+      "sprintf";
+      "vfprintf";
+      "vsprintf";
+      "vasprintf";
+      "__asprintf";
+      "asprintf";
+      "vdprintf";
+      "dprintf";
+      "easprintf";
+      "evasprintf";
+    ]
 
-let is_printf2 fname = List.mem fname ["snprintf"; "vsnprintf"]
+let is_printf2 fname = List.mem fname [ "snprintf"; "vsnprintf" ]
 
 let is_printf fname = is_printf0 fname || is_printf1 fname || is_printf2 fname
 
 let dummy_read_printf fname pid exps itvmem mem =
-  let typ =
-    if is_printf0 fname then 0 else if is_printf1 fname then 1 else 2
-  in
-  let locs =
-    ItvDom.Val.all_locs (ItvSem.eval pid (List.nth exps typ) itvmem)
-  in
+  let typ = if is_printf0 fname then 0 else if is_printf1 fname then 1 else 2 in
+  let locs = ItvDom.Val.all_locs (ItvSem.eval pid (List.nth exps typ) itvmem) in
   (* for inspection *)
   let _ = lookup locs mem in
   ()
 
-let handle_undefined_functions mode node (lvo, f, exps) itvmem (mem, global)
-    loc =
+let handle_undefined_functions mode node (lvo, f, exps) itvmem (mem, global) loc
+    =
   let pid = Node.get_pid node in
   match f.vname with
   | "sparrow_arg" -> sparrow_arg mode node exps loc itvmem (mem, global)
   (*   | "sparrow_opt" -> sparrow_opt mode node exps loc itvmem (mem,global) *)
   | "sparrow_print" ->
-      sparrow_print pid exps itvmem mem loc ;
+      sparrow_print pid exps itvmem mem loc;
       mem
   | fname when ApiSem.ApiMap.mem fname ApiSem.api_map ->
-      if is_printf fname then dummy_read_printf fname pid exps itvmem mem ;
+      if is_printf fname then dummy_read_printf fname pid exps itvmem mem;
       let api_type = ApiSem.ApiMap.find fname ApiSem.api_map in
       handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc
   | fname when is_printf fname ->
-      if is_printf fname then dummy_read_printf fname pid exps itvmem mem ;
+      if is_printf fname then dummy_read_printf fname pid exps itvmem mem;
       mem
   | _ -> mem
 
@@ -402,14 +398,12 @@ let run_cmd mode node cmd itvmem (mem, global) =
       let callnode = InterCfg.callof node global.icfg in
       match InterCfg.cmdof global.icfg callnode with
       | IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
-          let callees =
-            ItvDom.Val.pow_proc_of_val (ItvSem.eval pid f itvmem)
-          in
+          let callees = ItvDom.Val.pow_proc_of_val (ItvSem.eval pid f itvmem) in
           let retvar_set =
             PowProc.fold
               (fun f ->
                 let ret = Loc.return_var f (Cil.typeOfLval lv) in
-                PowLoc.add ret )
+                PowLoc.add ret)
               callees PowLoc.empty
           in
           update Weak global

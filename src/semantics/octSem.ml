@@ -31,12 +31,12 @@ module ItvAccessSem = AccessSem.Make (ItvSem)
 let can_strong_update mode global oct_list =
   match (mode, oct_list) with
   | Weak, _ -> false
-  | Strong, [(octlv, pack, oct)] -> (
-    match octlv with
-    | OctLoc.Loc lv ->
-        Loc.is_gvar lv
-        || (Loc.is_lvar lv && not (Global.is_rec (Loc.get_proc lv) global))
-    | _ -> true )
+  | Strong, [ (octlv, pack, oct) ] -> (
+      match octlv with
+      | OctLoc.Loc lv ->
+          Loc.is_gvar lv
+          || (Loc.is_lvar lv && not (Global.is_rec (Loc.get_proc lv) global))
+      | _ -> true )
   | _ -> false
 
 let lookup pack mem = Mem.find pack mem
@@ -44,9 +44,7 @@ let lookup pack mem = Mem.find pack mem
 let update mode global oct_list mem =
   if oct_list = [] then mem
   else if can_strong_update mode global oct_list then
-    List.fold_left
-      (fun mem (_, pack, oct) -> Mem.add pack oct mem)
-      mem oct_list
+    List.fold_left (fun mem (_, pack, oct) -> Mem.add pack oct mem) mem oct_list
   else
     List.fold_left
       (fun mem (_, pack, oct) -> Mem.weak_add pack oct mem)
@@ -89,25 +87,26 @@ let lval_to_texpr pid packconf pack lv premem mem =
         Texpr1.Cst
           (Coeff.Interval (Octagon.itv_of_var x rv_oct |> itv_to_interval))
         :: el
-      else el )
+      else el)
     lvset []
 
 (* XXX : Cil.bitsSizeOf often fails: just return top for the moment
  * Adhoc solution: To avoid this failure, translate original C sources
  * into "CIL" (using -il option) and analyze the CIL program. *)
 let sizeof_to_texpr typ =
-  try Texpr1.Cst (Coeff.s_of_int (Cil.bitsSizeOf typ / 8)) with _ ->
-    prerr_endline ("warn: Cil.bitsSizeOf (" ^ CilHelper.s_type typ ^ ")") ;
+  try Texpr1.Cst (Coeff.s_of_int (Cil.bitsSizeOf typ / 8))
+  with _ ->
+    prerr_endline ("warn: Cil.bitsSizeOf (" ^ CilHelper.s_type typ ^ ")");
     Texpr1.Cst (Coeff.Interval Interval.top)
 
 let rec exp_to_texpr pid packconf pack e ptrmem mem =
   match e with
-  | Cil.Const c -> [const_to_texpr c]
+  | Cil.Const c -> [ const_to_texpr c ]
   | Cil.Lval l -> lval_to_texpr pid packconf pack l ptrmem mem
-  | Cil.SizeOf t -> [sizeof_to_texpr t]
-  | Cil.SizeOfE e -> [sizeof_to_texpr (Cil.typeOf e)]
-  | Cil.SizeOfStr s -> [Texpr1.Cst (Coeff.s_of_int (String.length s + 1))]
-  | Cil.AlignOfE _ -> [Texpr1.Cst (Coeff.Interval Interval.top)]
+  | Cil.SizeOf t -> [ sizeof_to_texpr t ]
+  | Cil.SizeOfE e -> [ sizeof_to_texpr (Cil.typeOf e) ]
+  | Cil.SizeOfStr s -> [ Texpr1.Cst (Coeff.s_of_int (String.length s + 1)) ]
+  | Cil.AlignOfE _ -> [ Texpr1.Cst (Coeff.Interval Interval.top) ]
   | Cil.CastE (_, e) -> exp_to_texpr pid packconf pack e ptrmem mem
   | Cil.UnOp (uop, e, _) -> uop_to_texpr pid packconf pack uop e ptrmem mem
   | Cil.BinOp (bop, e1, e2, _) ->
@@ -137,8 +136,8 @@ and binop_to_texpr pid packconf pack bop e1 e2 ptrmem mem =
               :: l
           | Cil.BAnd | Cil.BXor | Cil.BOr | Cil.Shiftlt | Cil.Shiftrt ->
               Texpr1.Cst (Coeff.Interval Interval.top) :: l
-          | _ -> l )
-        l e2_list )
+          | _ -> l)
+        l e2_list)
     [] e1_list
 
 and bop_to_texpr = function
@@ -153,34 +152,34 @@ let normalize bop lv texpr =
   match bop with
   | Cil.Lt ->
       ( Texpr1.Binop
-          ( Texpr1.Sub
-          , Texpr1.Binop
-              (Texpr1.Sub, texpr, Texpr1.Var lv, Texpr1.Int, Texpr1.Near)
-          , Texpr1.Cst (Coeff.s_of_int 1)
-          , Texpr1.Int
-          , Texpr1.Near )
-      , Tcons1.SUPEQ )
+          ( Texpr1.Sub,
+            Texpr1.Binop
+              (Texpr1.Sub, texpr, Texpr1.Var lv, Texpr1.Int, Texpr1.Near),
+            Texpr1.Cst (Coeff.s_of_int 1),
+            Texpr1.Int,
+            Texpr1.Near ),
+        Tcons1.SUPEQ )
   | Cil.Le ->
-      ( Texpr1.Binop (Texpr1.Sub, texpr, Texpr1.Var lv, Texpr1.Int, Texpr1.Near)
-      , Tcons1.SUPEQ )
+      ( Texpr1.Binop (Texpr1.Sub, texpr, Texpr1.Var lv, Texpr1.Int, Texpr1.Near),
+        Tcons1.SUPEQ )
   | Cil.Gt ->
       ( Texpr1.Binop
-          ( Texpr1.Sub
-          , Texpr1.Binop
-              (Texpr1.Sub, Texpr1.Var lv, texpr, Texpr1.Int, Texpr1.Near)
-          , Texpr1.Cst (Coeff.s_of_int 1)
-          , Texpr1.Int
-          , Texpr1.Near )
-      , Tcons1.SUPEQ )
+          ( Texpr1.Sub,
+            Texpr1.Binop
+              (Texpr1.Sub, Texpr1.Var lv, texpr, Texpr1.Int, Texpr1.Near),
+            Texpr1.Cst (Coeff.s_of_int 1),
+            Texpr1.Int,
+            Texpr1.Near ),
+        Tcons1.SUPEQ )
   | Cil.Ge ->
-      ( Texpr1.Binop (Texpr1.Sub, Texpr1.Var lv, texpr, Texpr1.Int, Texpr1.Near)
-      , Tcons1.SUPEQ )
+      ( Texpr1.Binop (Texpr1.Sub, Texpr1.Var lv, texpr, Texpr1.Int, Texpr1.Near),
+        Tcons1.SUPEQ )
   | Cil.Eq ->
-      ( Texpr1.Binop (Texpr1.Sub, Texpr1.Var lv, texpr, Texpr1.Int, Texpr1.Near)
-      , Tcons1.EQ )
+      ( Texpr1.Binop (Texpr1.Sub, Texpr1.Var lv, texpr, Texpr1.Int, Texpr1.Near),
+        Tcons1.EQ )
   | Cil.Ne ->
-      ( Texpr1.Binop (Texpr1.Sub, Texpr1.Var lv, texpr, Texpr1.Int, Texpr1.Near)
-      , Tcons1.DISEQ )
+      ( Texpr1.Binop (Texpr1.Sub, Texpr1.Var lv, texpr, Texpr1.Int, Texpr1.Near),
+        Tcons1.DISEQ )
   | _ -> raise (Failure "normalize")
 
 let cond_to_texpr pid packconf pack lv bop e ptrmem mem =
@@ -201,9 +200,9 @@ let strlen_texpr_set pid packconf pack exp ptrmem mem =
       (fun x ->
         let rv_pack = PackConf.get_pack packconf x in
         let rv_oct = lookup rv_pack mem in
-        not (Octagon.is_bot rv_oct) )
+        not (Octagon.is_bot rv_oct))
       set
-  then [nat_texpr]
+  then [ nat_texpr ]
   else []
 
 let strlen_texpr_prune pid packconf pack lv exp ptrmem mem =
@@ -217,7 +216,7 @@ let strlen_texpr_prune pid packconf pack lv exp ptrmem mem =
       let rv_oct = lookup rv_pack mem in
       if Pack.mem x pack && not (Octagon.is_bot rv_oct) then
         octloc_to_texpr x :: el
-      else el )
+      else el)
     set []
   |> List.map (normalize Cil.Lt lv)
 
@@ -234,7 +233,7 @@ let set mode global ptrmem packconf pid lv_set e mem =
         let texpr_list = exp_to_texpr pid packconf pack simple_e ptrmem mem in
         List.fold_left
           (fun l texpr -> (lv, pack, Octagon.set lv texpr old_oct) :: l)
-          l texpr_list )
+          l texpr_list)
       lv_set []
     |> fun l -> update mode global l mem
   else mem
@@ -245,7 +244,7 @@ let forget mode global packconf pid lv_set mem =
       let pack = PackConf.get_pack packconf lv in
       let old_oct = lookup pack mem in
       let new_oct = Octagon.forget lv old_oct in
-      (lv, pack, new_oct) :: l )
+      (lv, pack, new_oct) :: l)
     lv_set []
   |> fun l -> update mode global l mem
 
@@ -259,8 +258,7 @@ let rec prune mode global ptrmem packconf pid exp mem =
   with
   | None -> mem
   | Some (Cil.BinOp (bop, Cil.Lval lval, e, _))
-    when bop = Lt || bop = Gt || bop = Le || bop = Ge || bop = Eq || bop = Ne
-    ->
+    when bop = Lt || bop = Gt || bop = Le || bop = Ge || bop = Eq || bop = Ne ->
       let lv_set = ItvSem.eval_lv pid lval ptrmem |> PowOctLoc.of_locs in
       PowOctLoc.fold
         (fun lv l ->
@@ -271,8 +269,8 @@ let rec prune mode global ptrmem packconf pid exp mem =
           in
           List.fold_left
             (fun l (texpr, typ) ->
-              (lv, pack, Octagon.prune lv texpr typ old_oct) :: l )
-            l texpr_list )
+              (lv, pack, Octagon.prune lv texpr typ old_oct) :: l)
+            l texpr_list)
         lv_set []
       |> fun l -> update mode global l mem
   | Some (Cil.UnOp (LNot, Lval x, t)) ->
@@ -295,7 +293,7 @@ let sparrow_print ptrmem packconf pid exps mem loc =
              let oct = lookup pack mem in
              prerr_endline
                ( "sparrow_print (" ^ CilHelper.s_location loc ^ ") : "
-               ^ Octagon.to_string oct ) )
+               ^ Octagon.to_string oct ))
   | _ -> ()
 
 let model_strlen mode packconf node pid lvo exps ptrmem (mem, global) =
@@ -312,7 +310,7 @@ let model_strlen mode packconf node pid lvo exps ptrmem (mem, global) =
             in
             List.fold_left
               (fun l texpr -> (lv, pack, Octagon.set lv texpr old_oct) :: l)
-              l texpr_list )
+              l texpr_list)
           lv_set []
         |> fun l -> update mode global l mem
       in
@@ -326,8 +324,8 @@ let model_strlen mode packconf node pid lvo exps ptrmem (mem, global) =
             in
             List.fold_left
               (fun l (texpr, typ) ->
-                (lv, pack, Octagon.prune lv texpr typ old_oct) :: l )
-              l texpr_list )
+                (lv, pack, Octagon.prune lv texpr typ old_oct) :: l)
+              l texpr_list)
           lv_set []
       in
       update mode global l mem
@@ -388,7 +386,7 @@ let strdup_texpr pid packconf pack exp ptrmem mem =
       if Pack.mem x pack && not (Octagon.is_bot rv_oct) then
         octloc_to_texpr x :: l
       else if not (Octagon.is_bot rv_oct) then nat_texpr :: l
-      else l )
+      else l)
     set []
 
 let model_strdup mode packconf node pid lvo exps ptrmem (mem, global) =
@@ -408,8 +406,7 @@ let model_input mode packconf pid lvo ptrmem (mem, global) =
   match lvo with
   | Some lv ->
       let size =
-        Allocsite.allocsite_of_ext None
-        |> OctLoc.of_size |> PowOctLoc.singleton
+        Allocsite.allocsite_of_ext None |> OctLoc.of_size |> PowOctLoc.singleton
       in
       forget mode global packconf pid size mem
   | _ -> mem
@@ -439,18 +436,15 @@ let handle_undefined_functions mode packconf node pid (lvo, f, exps) ptrmem
     (mem, global) loc =
   match f.vname with
   | "sparrow_print" ->
-      sparrow_print ptrmem packconf pid exps mem loc ;
+      sparrow_print ptrmem packconf pid exps mem loc;
       mem
   | "sparrow_arg" -> sparrow_arg mode packconf pid exps ptrmem (mem, global)
-  | "strlen" ->
-      model_strlen mode packconf node pid lvo exps ptrmem (mem, global)
+  | "strlen" -> model_strlen mode packconf node pid lvo exps ptrmem (mem, global)
   | "realloc" ->
       model_realloc mode packconf node pid lvo exps ptrmem (mem, global)
-  | "calloc" ->
-      model_calloc mode packconf node pid lvo exps ptrmem (mem, global)
+  | "calloc" -> model_calloc mode packconf node pid lvo exps ptrmem (mem, global)
   | "getenv" -> model_input mode packconf pid lvo ptrmem (mem, global)
-  | "strdup" ->
-      model_strdup mode packconf node pid lvo exps ptrmem (mem, global)
+  | "strdup" -> model_strdup mode packconf node pid lvo exps ptrmem (mem, global)
   | _ -> model_unknown mode packconf node pid lvo f exps ptrmem (mem, global)
 
 let binding mode global ptrmem packconf pid paramset args mem =
@@ -466,8 +460,8 @@ let binding mode global ptrmem packconf pid paramset args mem =
       List.fold_left2
         (fun mem param arg ->
           let param = PowLoc.singleton param |> PowOctLoc.of_locs in
-          set mode global ptrmem packconf pid param arg mem )
-        mem params args )
+          set mode global ptrmem packconf pid param arg mem)
+        mem params args)
     paramset mem
 
 let rec run_cmd mode packconf node cmd ptrmem (mem, global) =
@@ -535,11 +529,11 @@ let rec run_cmd mode packconf node cmd ptrmem (mem, global) =
 
 let run mode spec node (mem, global) =
   if !Options.oct_debug then (
-    prerr_endline "CMD" ;
-    prerr_endline (Node.to_string node) ;
-    prerr_endline (IntraCfg.Cmd.to_string (InterCfg.cmdof global.icfg node)) ;
-    prerr_endline "== input ==" ;
-    prerr_endline (Mem.to_string mem) ) ;
+    prerr_endline "CMD";
+    prerr_endline (Node.to_string node);
+    prerr_endline (IntraCfg.Cmd.to_string (InterCfg.cmdof global.icfg node));
+    prerr_endline "== input ==";
+    prerr_endline (Mem.to_string mem) );
   let ptrmem = ItvDom.Table.find node spec.Spec.ptrinfo in
   let mem =
     run_cmd mode spec.Spec.locset node
@@ -547,8 +541,8 @@ let run mode spec node (mem, global) =
       ptrmem (mem, global)
   in
   if !Options.oct_debug then (
-    prerr_endline "== output ==" ;
-    prerr_endline (Mem.to_string mem) ) ;
+    prerr_endline "== output ==";
+    prerr_endline (Mem.to_string mem) );
   (mem, global)
 
 let accessof ?(locset = PackConf.empty) global node f mem =
@@ -560,8 +554,8 @@ let accessof ?(locset = PackConf.empty) global node f mem =
     |> tuple
     |> Tuple2.map ItvSem.Dom.Access.Info.useof ItvSem.Dom.Access.Info.defof
   in
-  Dom.init_access () ;
-  ignore (f node (mem, global)) ;
+  Dom.init_access ();
+  ignore (f node (mem, global));
   Dom.return_access ()
   (* access information for complex expressions are computed using interval access information *)
   |> PowLoc.fold
@@ -573,7 +567,7 @@ let accessof ?(locset = PackConf.empty) global node f mem =
              access
              |> Access.Info.add Access.Info.use loc_pack
              |> Access.Info.add Access.Info.use size_pack
-         | _ -> access |> Access.Info.add Access.Info.use loc_pack )
+         | _ -> access |> Access.Info.add Access.Info.use loc_pack)
        itv_use
   |> PowLoc.fold
        (fun l access ->
@@ -584,7 +578,7 @@ let accessof ?(locset = PackConf.empty) global node f mem =
              access
              |> Access.Info.add Access.Info.all loc_pack
              |> Access.Info.add Access.Info.all size_pack
-         | _ -> access |> Access.Info.add Access.Info.all loc_pack )
+         | _ -> access |> Access.Info.add Access.Info.all loc_pack)
        itv_def
 
 let initial locset = Mem.top locset
@@ -597,8 +591,8 @@ let check_bo pid packconf a offset idx ptrmem mem =
   let pack = PackConf.get_pack packconf size in
   let oct = Mem.find pack mem in
   if !Options.oct_debug then (
-    prerr_endline (Pack.to_string pack) ;
-    prerr_endline (Octagon.to_string oct) ) ;
+    prerr_endline (Pack.to_string pack);
+    prerr_endline (Octagon.to_string oct) );
   exp_to_texpr pid packconf pack idx ptrmem mem
   |> List.fold_left
        (fun diff idx ->
@@ -606,6 +600,6 @@ let check_bo pid packconf a offset idx ptrmem mem =
          let diff_texpr =
            Texpr1.Binop (Texpr1.Sub, size_texpr, idx, Texpr1.Int, Texpr1.Near)
          in
-         Itv.join diff (Octagon.itv_of_expr diff_texpr oct) )
+         Itv.join diff (Octagon.itv_of_expr diff_texpr oct))
        Itv.bot
   |> fun d -> Itv.minus d offset

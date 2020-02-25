@@ -8,6 +8,7 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
+
 (** Intra-procedural CFG *)
 module Node : sig
   include AbsDom.HASHABLE_SET
@@ -57,8 +58,8 @@ module Cmd : sig
   val to_string : t -> string
 end
 
-(** Abstract type of intra-procedural CFG *)
 type t
+(** Abstract type of intra-procedural CFG *)
 
 and node = Node.t
 

@@ -26,8 +26,7 @@ let transform global =
   if (not !Options.il) && (loop_transformed || inlined) then
     (* NOTE: CFG must be re-computed after transformation *)
     Frontend.makeCFGinfo global.file
-    |> StepManager.stepf true "Translation to graphs (after inline)"
-         Global.init
+    |> StepManager.stepf true "Translation to graphs (after inline)" Global.init
     |> StepManager.stepf true "Pre-analysis (after inline)" PreAnalysis.perform
   else (* nothing changed *)
     global
@@ -38,7 +37,7 @@ let marshal_in file =
 
 let marshal_out file global =
   let filename = Filename.basename file.Cil.fileName in
-  MarshalManager.output (filename ^ ".global") global ;
+  MarshalManager.output (filename ^ ".global") global;
   global
 
 let init_analysis file =
@@ -53,12 +52,12 @@ let init_analysis file =
 let print_pgm_info global =
   let pids = InterCfg.pidsof global.icfg in
   let nodes = InterCfg.nodesof global.icfg in
-  L.info "#Procs : %d\n" (List.length pids) ;
-  L.info "#Nodes : %d\n" (List.length nodes) ;
+  L.info "#Procs : %d\n" (List.length pids);
+  L.info "#Nodes : %d\n" (List.length nodes);
   let oc = open_out (!Options.outdir ^ "/node.json") in
   let json = InterCfg.to_json_simple global.icfg in
-  Yojson.Safe.pretty_to_channel oc json ;
-  close_out oc ;
+  Yojson.Safe.pretty_to_channel oc json;
+  close_out oc;
   global
 
 let print_il file =
@@ -66,20 +65,22 @@ let print_il file =
     Cil.dumpFile !Cil.printerForMaincil stdout "" (transform_simple file)
   else
     let global = init_analysis file in
-    Cil.dumpFile !Cil.printerForMaincil stdout "" global.file ) ;
+    Cil.dumpFile !Cil.printerForMaincil stdout "" global.file );
   exit 0
 
 let print_cfg global =
   `Assoc
-    [ ("callgraph", CallGraph.to_json global.callgraph)
-    ; ("cfgs", InterCfg.to_json global.icfg) ]
-  |> Yojson.Safe.pretty_to_channel stdout ;
+    [
+      ("callgraph", CallGraph.to_json global.callgraph);
+      ("cfgs", InterCfg.to_json global.icfg);
+    ]
+  |> Yojson.Safe.pretty_to_channel stdout;
   exit 0
 
 let finalize t0 =
-  L.info ~level:1 "Finished properly.\n" ;
-  Profiler.report stdout ;
-  L.info ~level:1 "%f\n" (Sys.time () -. t0) ;
+  L.info ~level:1 "Finished properly.\n";
+  Profiler.report stdout;
+  L.info ~level:1 "%f\n" (Sys.time () -. t0);
   L.finalize ()
 
 let octagon_analysis (global, _, itvinputof, _, _) =
@@ -102,31 +103,31 @@ let extract_feature global =
   else global
 
 let initialize () =
-  Printexc.record_backtrace true ;
+  Printexc.record_backtrace true;
   (* process arguments *)
   let usageMsg = "Usage: sparrow [options] source-files" in
-  Arg.parse_dynamic Options.options Frontend.parse_arg usageMsg ;
-  FileManager.mk_outdir () ;
-  L.init (if !Options.debug then L.DEBUG else L.INFO) ;
-  L.info "%s\n" (String.concat " " !Frontend.files) ;
-  Profiler.start_logger () ;
+  Arg.parse_dynamic Options.options Frontend.parse_arg usageMsg;
+  FileManager.mk_outdir ();
+  L.init (if !Options.debug then L.DEBUG else L.INFO);
+  L.info "%s\n" (String.concat " " !Frontend.files);
+  Profiler.start_logger ();
   Cil.initCIL ()
 
 let main () =
   let t0 = Sys.time () in
-  initialize () ;
+  initialize ();
   match !Options.task with
-  | Options.Capture ->
-      Capture.run ()
+  | Options.Capture -> Capture.run ()
   | _ ->
-      StepManager.stepf true "Front-end" Frontend.parse ()
+      ( StepManager.stepf true "Front-end" Frontend.parse ()
       |> Frontend.makeCFGinfo |> opt !Options.il print_il |> init_analysis
       |> print_pgm_info |> opt !Options.cfg print_cfg |> extract_feature
       |> StepManager.stepf true "Itv Sparse Analysis" ItvAnalysis.do_analysis
       |> case
-           [(!Options.oct, octagon_analysis); (!Options.taint, taint_analysis)]
-           (fun (global, _, _, _, alarm) -> (global, alarm))
-      |> (fun (global, alarm) -> Report.print global alarm)
+           [
+             (!Options.oct, octagon_analysis); (!Options.taint, taint_analysis);
+           ] (fun (global, _, _, _, alarm) -> (global, alarm))
+      |> fun (global, alarm) -> Report.print global alarm )
       |> fun () -> finalize t0
 
 let _ = main ()

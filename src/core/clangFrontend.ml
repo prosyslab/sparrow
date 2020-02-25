@@ -13,24 +13,24 @@ module EnvData = struct
     | EnvLabel of string
 
   let to_string = function
-    | EnvVar vi ->
-        vi.vname
-    | EnvEnum e ->
-        CilHelper.s_exp e
-    | EnvTyp t ->
-        CilHelper.s_type t
-    | EnvLabel l ->
-        l
+    | EnvVar vi -> vi.vname
+    | EnvEnum e -> CilHelper.s_exp e
+    | EnvTyp t -> CilHelper.s_type t
+    | EnvLabel l -> l
 end
 
 module Env = struct
-  type t = {var: (string, EnvData.t) H.t; typ: (string, Cil.typ) H.t}
+  type t = { var : (string, EnvData.t) H.t; typ : (string, Cil.typ) H.t }
 
-  let create () = {var= H.create 64; typ= H.create 64}
+  let create () = { var = H.create 64; typ = H.create 64 }
 
-  let add_var name vi env = H.add env.var name vi ; env
+  let add_var name vi env =
+    H.add env.var name vi;
+    env
 
-  let add_typ name typ env = H.add env.typ name typ ; env
+  let add_typ name typ env =
+    H.add env.typ name typ;
+    env
 
   let mem_var name env = H.mem env.var name
 
@@ -46,7 +46,7 @@ module Scope = struct
 
   let empty = []
 
-  let initial = [Env.create ()]
+  let initial = [ Env.create () ]
 
   let enter scope = Env.create () :: scope
 
@@ -54,29 +54,23 @@ module Scope = struct
 
   let add name varinfo = function
     | h :: t as l ->
-        ignore (Env.add_var name varinfo h) ;
+        ignore (Env.add_var name varinfo h);
         l
-    | [] ->
-        failwith "empty scope"
+    | [] -> failwith "empty scope"
 
   let add_type name typ = function
     | h :: t as l ->
-        ignore (Env.add_typ name typ h) ;
+        ignore (Env.add_typ name typ h);
         l
-    | [] ->
-        failwith "empty scope"
+    | [] -> failwith "empty scope"
 
   let rec mem_var name = function
-    | h :: t ->
-        if Env.mem_var name h then true else mem_var name t
-    | [] ->
-        false
+    | h :: t -> if Env.mem_var name h then true else mem_var name t
+    | [] -> false
 
   let rec mem_typ name = function
-    | h :: t ->
-        if Env.mem_typ name h then true else mem_typ name t
-    | [] ->
-        false
+    | h :: t -> if Env.mem_typ name h then true else mem_typ name t
+    | [] -> false
 
   let rec find ?(allow_undef = false) ?(compinfo = None) name = function
     | h :: t ->
@@ -87,8 +81,7 @@ module Scope = struct
         EnvData.EnvVar (Cil.makeGlobalVar name ftype)
     | [] when compinfo <> None ->
         EnvData.EnvTyp (Cil.TComp (Option.get compinfo, []))
-    | [] ->
-        failwith (name ^ " not found")
+    | [] -> failwith (name ^ " not found")
 
   let rec find_var_enum ?(allow_undef = false) name = function
     | h :: t ->
@@ -97,8 +90,7 @@ module Scope = struct
     | [] when allow_undef ->
         let ftype = Cil.TFun (Cil.intType, None, false, []) in
         EnvData.EnvVar (Cil.makeGlobalVar name ftype)
-    | _ ->
-        failwith ("variable " ^ name ^ " not found")
+    | _ -> failwith ("variable " ^ name ^ " not found")
 
   let rec find_type ?(compinfo = None) name = function
     | h :: t ->
@@ -110,29 +102,28 @@ module Scope = struct
         let compinfo = Option.get compinfo in
         if compinfo.Cil.cname = name then Cil.TComp (compinfo, [])
         else failwith ("type of " ^ name ^ " not found")
-    | _ ->
-        failwith ("type of " ^ name ^ " not found")
+    | _ -> failwith ("type of " ^ name ^ " not found")
 
   let pp fmt scope =
     let fmt = F.std_formatter in
     List.iter
       (fun env ->
-        F.fprintf fmt "=====\n" ;
+        F.fprintf fmt "=====\n";
         H.iter
           (fun name v -> F.fprintf fmt "%s -> %s\n" name (EnvData.to_string v))
-          env ;
+          env;
         F.fprintf fmt "=====\n")
       scope
 end
 
-let empty_block = {Cil.battrs= []; bstmts= []}
+let empty_block = { Cil.battrs = []; bstmts = [] }
 
 let struct_id_count = ref 0
 
 let new_record_id is_struct =
   let kind = if is_struct then "struct" else "union" in
   let new_id = "__anon" ^ kind ^ "_" ^ string_of_int !struct_id_count in
-  struct_id_count := !struct_id_count + 1 ;
+  struct_id_count := !struct_id_count + 1;
   new_id
 
 type exp_action = ADrop | AExp
@@ -143,7 +134,7 @@ let create_new_global_variable scope name typ =
   let new_name =
     if Scope.mem_var name scope then (
       let new_name = name ^ "___" ^ string_of_int !alpha_count in
-      alpha_count := !alpha_count + 1 ;
+      alpha_count := !alpha_count + 1;
       new_name )
     else name
   in
@@ -155,17 +146,15 @@ let find_global_variable scope name typ =
   if Scope.mem_var name scope then
     let envdata = Scope.find_var_enum name scope in
     match envdata with
-    | EnvData.EnvVar vi ->
-        (vi, scope)
-    | _ ->
-        create_new_global_variable scope name typ
+    | EnvData.EnvVar vi -> (vi, scope)
+    | _ -> create_new_global_variable scope name typ
   else create_new_global_variable scope name typ
 
 let create_local_variable scope fundec name typ =
   let new_name =
     if Scope.mem_var name scope then (
       let new_name = name ^ "___" ^ string_of_int !alpha_count in
-      alpha_count := !alpha_count + 1 ;
+      alpha_count := !alpha_count + 1;
       new_name )
     else name
   in
@@ -177,149 +166,87 @@ let trans_location node =
   let location =
     C.Ast.location_of_node node |> C.Ast.concrete_of_source_location C.Presumed
   in
-  { Cil.file= location.C.Ast.filename
-  ; line= location.C.Ast.line
-  ; byte= location.C.Ast.column }
+  {
+    Cil.file = location.C.Ast.filename;
+    line = location.C.Ast.line;
+    byte = location.C.Ast.column;
+  }
 
 let trans_int_kind : C.Ast.builtin_type -> Cil.ikind = function
-  | C.Int | C.Bool ->
-      Cil.IInt
-  | C.Char_U | C.UChar ->
-      Cil.IUChar
-  | C.UShort ->
-      Cil.IUShort
-  | C.UInt ->
-      Cil.IUInt
-  | C.ULong ->
-      Cil.IULong
-  | C.ULongLong ->
-      Cil.IULongLong
-  | C.Char_S | C.SChar ->
-      Cil.ISChar
-  | C.Short ->
-      Cil.IShort
-  | C.Long ->
-      Cil.ILong
-  | C.LongLong ->
-      Cil.ILongLong
-  | _ ->
-      invalid_arg "int kind"
+  | C.Int | C.Bool -> Cil.IInt
+  | C.Char_U | C.UChar -> Cil.IUChar
+  | C.UShort -> Cil.IUShort
+  | C.UInt -> Cil.IUInt
+  | C.ULong -> Cil.IULong
+  | C.ULongLong -> Cil.IULongLong
+  | C.Char_S | C.SChar -> Cil.ISChar
+  | C.Short -> Cil.IShort
+  | C.Long -> Cil.ILong
+  | C.LongLong -> Cil.ILongLong
+  | _ -> invalid_arg "int kind"
 
 let trans_float_kind : C.Ast.builtin_type -> Cil.fkind = function
-  | C.Float ->
-      Cil.FFloat
-  | C.Double ->
-      Cil.FDouble
-  | C.LongDouble ->
-      Cil.FLongDouble
-  | _ ->
-      invalid_arg "float kind"
+  | C.Float -> Cil.FFloat
+  | C.Double -> Cil.FDouble
+  | C.LongDouble -> Cil.FLongDouble
+  | _ -> invalid_arg "float kind"
 
 let trans_binop = function
-  | C.Mul ->
-      Cil.Mult
-  | C.Div ->
-      Cil.Div
-  | C.Rem ->
-      Cil.Mod
-  | C.Add ->
-      Cil.PlusA
-  | C.Sub ->
-      Cil.MinusA
-  | C.Shl ->
-      Cil.Shiftlt
-  | C.Shr ->
-      Cil.Shiftrt
-  | C.LT ->
-      Cil.Lt
-  | C.GT ->
-      Cil.Gt
-  | C.LE ->
-      Cil.Le
-  | C.GE ->
-      Cil.Ge
-  | C.EQ ->
-      Cil.Eq
-  | C.NE ->
-      Cil.Ne
-  | C.And ->
-      Cil.BAnd
-  | C.Xor ->
-      Cil.BXor
-  | C.Or ->
-      Cil.BOr
-  | C.LAnd ->
-      Cil.LAnd
-  | C.LOr ->
-      Cil.LOr
-  | _ ->
-      failwith "invalid binop"
+  | C.Mul -> Cil.Mult
+  | C.Div -> Cil.Div
+  | C.Rem -> Cil.Mod
+  | C.Add -> Cil.PlusA
+  | C.Sub -> Cil.MinusA
+  | C.Shl -> Cil.Shiftlt
+  | C.Shr -> Cil.Shiftrt
+  | C.LT -> Cil.Lt
+  | C.GT -> Cil.Gt
+  | C.LE -> Cil.Le
+  | C.GE -> Cil.Ge
+  | C.EQ -> Cil.Eq
+  | C.NE -> Cil.Ne
+  | C.And -> Cil.BAnd
+  | C.Xor -> Cil.BXor
+  | C.Or -> Cil.BOr
+  | C.LAnd -> Cil.LAnd
+  | C.LOr -> Cil.LOr
+  | _ -> failwith "invalid binop"
 
 let string_of_declaration_name name =
   match name with
-  | C.Ast.IdentifierName s ->
-      s
-  | _ ->
-      failwith "name_of_ident_ref"
+  | C.Ast.IdentifierName s -> s
+  | _ -> failwith "name_of_ident_ref"
 
 let name_of_ident_ref idref = string_of_declaration_name idref.C.Ast.name
 
 let rec trans_type ?(compinfo = None) scope typ =
   match typ.C.Ast.desc with
-  | C.Ast.Pointer pt ->
-      Cil.TPtr (trans_type ~compinfo scope pt, [])
-  | C.Ast.FunctionType ft ->
-      trans_function_type scope ft
-  | C.Ast.Typedef td ->
-      Scope.find_type ~compinfo (name_of_ident_ref td) scope
-  | C.Ast.Elaborated et ->
-      trans_type ~compinfo scope et.named_type
-  | C.Ast.Record rt ->
-      Scope.find_type ~compinfo (name_of_ident_ref rt) scope
-  | C.Ast.Enum et ->
-      Scope.find_type ~compinfo (name_of_ident_ref et) scope
-  | C.Ast.InvalidType ->
-      failwith "invalid type"
-  | C.Ast.Vector _ ->
-      failwith "vector"
-  | C.Ast.BuiltinType _ ->
-      trans_builtin_type scope typ.C.Ast.cxtype
-  | x ->
-      trans_builtin_type scope typ.C.Ast.cxtype
+  | C.Ast.Pointer pt -> Cil.TPtr (trans_type ~compinfo scope pt, [])
+  | C.Ast.FunctionType ft -> trans_function_type scope ft
+  | C.Ast.Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
+  | C.Ast.Elaborated et -> trans_type ~compinfo scope et.named_type
+  | C.Ast.Record rt -> Scope.find_type ~compinfo (name_of_ident_ref rt) scope
+  | C.Ast.Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
+  | C.Ast.InvalidType -> failwith "invalid type"
+  | C.Ast.Vector _ -> failwith "vector"
+  | C.Ast.BuiltinType _ -> trans_builtin_type scope typ.C.Ast.cxtype
+  | x -> trans_builtin_type scope typ.C.Ast.cxtype
 
 and trans_builtin_type scope t =
   let k = C.get_type_kind t in
   match k with
-  | C.Void ->
-      Cil.TVoid []
+  | C.Void -> Cil.TVoid []
   (* integer types *)
-  | C.Int
-  | C.Bool
-  | C.Char_U
-  | C.UChar
-  | C.UShort
-  | C.UInt
-  | C.ULong
-  | C.ULongLong
-  | C.Char_S
-  | C.SChar
-  | C.Short
-  | C.Long
-  | C.LongLong ->
+  | C.Int | C.Bool | C.Char_U | C.UChar | C.UShort | C.UInt | C.ULong
+  | C.ULongLong | C.Char_S | C.SChar | C.Short | C.Long | C.LongLong ->
       Cil.TInt (trans_int_kind (k : C.Ast.builtin_type), [])
-  | C.Float | C.Double | C.LongDouble ->
-      Cil.TFloat (trans_float_kind k, [])
-  | C.Pointer ->
-      failwith "pointer"
+  | C.Float | C.Double | C.LongDouble -> Cil.TFloat (trans_float_kind k, [])
+  | C.Pointer -> failwith "pointer"
   (*       Cil.TPtr (C.get_pointee_type t |> trans_builtin_type, [])  *)
-  | C.Enum ->
-      failwith "enum"
-  | C.Typedef ->
-      failwith "typedef"
-  | C.FunctionNoProto ->
-      failwith "typedef"
-  | C.FunctionProto ->
-      failwith "typedef"
+  | C.Enum -> failwith "enum"
+  | C.Typedef -> failwith "typedef"
+  | C.FunctionNoProto -> failwith "typedef"
+  | C.FunctionProto -> failwith "typedef"
   | C.ConstantArray ->
       let size = C.get_array_size t |> Cil.integer in
       let elem_type =
@@ -331,35 +258,23 @@ and trans_builtin_type scope t =
         C.get_array_element_type t |> C.Type.of_cxtype |> trans_type scope
       in
       Cil.TArray (elem_type, None, [])
-  | Invalid | Unexposed | Char16 | Char32 ->
-      failwith "type 1"
+  | Invalid | Unexposed | Char16 | Char32 -> failwith "type 1"
   | UInt128 | WChar | Int128 | NullPtr | Overload | Dependent | ObjCId ->
       failwith "9"
   | ObjCClass | ObjCSel | Float128 | Half | Float16 | ShortAccum | Accum ->
       failwith "8"
-  | LongAccum
-  | UShortAccum
-  | UAccum
-  | ULongAccum
-  | Complex
-  | BlockPointer
-  | LValueReference
-  | RValueReference
-  | Record ->
+  | LongAccum | UShortAccum | UAccum | ULongAccum | Complex | BlockPointer
+  | LValueReference | RValueReference | Record ->
       failwith "7"
-  | ObjCInterface | ObjCObjectPointer | Vector ->
-      failwith ""
-  | DependentSizedArray ->
-      failwith "dependent"
-  | MemberPointer ->
-      failwith "6"
-  | Auto | Elaborated | Pipe ->
-      failwith "5"
+  | ObjCInterface | ObjCObjectPointer | Vector -> failwith ""
+  | DependentSizedArray -> failwith "dependent"
+  | MemberPointer -> failwith "6"
+  | Auto | Elaborated | Pipe -> failwith "5"
   | x ->
-      F.fprintf F.err_formatter "%s" (C.get_type_spelling t) ;
+      F.fprintf F.err_formatter "%s" (C.get_type_spelling t);
       (*       C.pp_cxtypekind F.err_formatter x ; *)
-      F.fprintf F.err_formatter "\n" ;
-      F.pp_print_flush F.err_formatter () ;
+      F.fprintf F.err_formatter "\n";
+      F.pp_print_flush F.err_formatter ();
       failwith "zxcv"
 
 and trans_function_type scope typ =
@@ -376,8 +291,7 @@ and trans_parameter_types scope = function
           params.C.Ast.non_variadic
       in
       (Some formals, params.C.Ast.variadic)
-  | None ->
-      (None, false)
+  | None -> (None, false)
 
 let trans_params scope args fundec =
   match args with
@@ -390,45 +304,35 @@ let trans_params scope args fundec =
           in
           Scope.add param.desc.name (EnvData.EnvVar vi) scope)
         scope l.C.Ast.non_variadic
-  | None ->
-      scope
+  | None -> scope
 
 let trans_integer_literal decoration il =
   let ikind =
     match decoration with
-    | C.Ast.Cursor c ->
-        C.get_cursor_type c |> C.get_type_kind |> trans_int_kind
-    | _ ->
-        failwith "qqq"
+    | C.Ast.Cursor c -> C.get_cursor_type c |> C.get_type_kind |> trans_int_kind
+    | _ -> failwith "qqq"
   in
   match il with
-  | C.Ast.Int i ->
-      Cil.kinteger ikind i
-  | _ ->
-      failwith "unknown integer literal"
+  | C.Ast.Int i -> Cil.kinteger ikind i
+  | _ -> failwith "unknown integer literal"
 
 let trans_floating_literal decoration il =
   let fkind =
     match decoration with
     | C.Ast.Cursor c ->
         C.get_cursor_type c |> C.get_type_kind |> trans_float_kind
-    | _ ->
-        failwith "qqq"
+    | _ -> failwith "qqq"
   in
   match il with
-  | C.Ast.Float f ->
-      Cil.Const (Cil.CReal (f, fkind, None))
-  | _ ->
-      failwith "no"
+  | C.Ast.Float f -> Cil.Const (Cil.CReal (f, fkind, None))
+  | _ -> failwith "no"
 
 let trans_string_literal sl = Cil.Const (Cil.CStr sl.C.Ast.bytes)
 
 let type_of_decoration decoration =
   match decoration with
-  | C.Ast.Cursor c ->
-      C.get_cursor_type c
-  | _ ->
-      failwith "qqq"
+  | C.Ast.Cursor c -> C.get_cursor_type c
+  | _ -> failwith "qqq"
 
 let type_of_expr expr = C.Type.of_node expr
 
@@ -438,10 +342,8 @@ let trans_decl_ref scope allow_undef idref =
   | EnvVar varinfo ->
       let exp = Cil.Lval (Cil.Var varinfo, NoOffset) in
       ([], Some exp)
-  | EnvEnum enum ->
-      ([], Some enum)
-  | _ ->
-      failwith "no found"
+  | EnvEnum enum -> ([], Some enum)
+  | _ -> failwith "no found"
 
 let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
     (expr : C.Ast.expr) =
@@ -451,8 +353,7 @@ let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
         ([], Some (trans_integer_literal expr.decoration il))
     | C.Ast.FloatingLiteral fl ->
         ([], Some (trans_floating_literal expr.decoration fl))
-    | C.Ast.StringLiteral sl ->
-        ([], Some (trans_string_literal sl))
+    | C.Ast.StringLiteral sl -> ([], Some (trans_string_literal sl))
     | C.Ast.CharacterLiteral cl ->
         ([], Some (Cil.Const (Cil.CChr (char_of_int cl.value))))
     | C.Ast.UnaryOperator uo ->
@@ -469,8 +370,7 @@ let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
             bo.rhs
         in
         (il, Some exp)
-    | C.Ast.DeclRef idref ->
-        trans_decl_ref scope allow_undef idref
+    | C.Ast.DeclRef idref -> trans_decl_ref scope allow_undef idref
     | C.Ast.Call call ->
         trans_call scope fundec_opt loc action call.callee call.args
     | C.Ast.Cast cast ->
@@ -481,45 +381,38 @@ let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
         let expr = Option.get expr_opt in
         (sl, Some (Cil.CastE (typ, expr)))
     | C.Ast.Member mem ->
-        ( []
-        , Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field)
+        ( [],
+          Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field)
         )
     | C.Ast.ArraySubscript arr ->
         let sl1, base = trans_expr scope fundec_opt loc action arr.base in
         let sl2, idx = trans_expr scope fundec_opt loc action arr.index in
         let base =
           match Option.get base |> CilHelper.remove_cast with
-          | Cil.Lval lv ->
-              lv
-          | e ->
-              failwith (CilHelper.s_exp e)
+          | Cil.Lval lv -> lv
+          | e -> failwith (CilHelper.s_exp e)
         in
         let new_lval =
           match idx with
-          | Some x ->
-              Cil.addOffsetLval (Cil.Index (x, Cil.NoOffset)) base
-          | _ ->
-              failwith "lval"
+          | Some x -> Cil.addOffsetLval (Cil.Index (x, Cil.NoOffset)) base
+          | _ -> failwith "lval"
         in
         (sl1 @ sl2, Some (Cil.Lval new_lval))
     | C.Ast.ConditionalOperator co ->
         trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
     | C.Ast.UnaryExpr ue ->
         trans_unary_expr scope fundec_opt loc ue.kind ue.argument
-    | C.Ast.InitList el ->
-        failwith "init list"
+    | C.Ast.InitList el -> failwith "init list"
     | C.Ast.ImaginaryLiteral _ ->
         failwith "Unsupported syntax (ImaginaryLiteral)"
-    | C.Ast.BoolLiteral _ ->
-        failwith "Unsupported syntax (BoolLiteral)"
-    | C.Ast.NullPtrLiteral ->
-        failwith "Unsupported syntax (NullPtrLiteral)"
+    | C.Ast.BoolLiteral _ -> failwith "Unsupported syntax (BoolLiteral)"
+    | C.Ast.NullPtrLiteral -> failwith "Unsupported syntax (NullPtrLiteral)"
     | C.Ast.UnknownExpr (_, _) ->
-        prerr_endline ("warning unknown expr " ^ CilHelper.s_location loc) ;
-        Clangml_show.pp_expr F.err_formatter expr ;
+        prerr_endline ("warning unknown expr " ^ CilHelper.s_location loc);
+        Clangml_show.pp_expr F.err_formatter expr;
         raise UnknownSyntax
     | _ ->
-        Clangml_show.pp_expr F.err_formatter expr ;
+        Clangml_show.pp_expr F.err_formatter expr;
         failwith "unknown trans_expr"
   with UnknownSyntax -> ([], Some Cil.zero)
 
@@ -527,11 +420,10 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
   let sl, var_opt = trans_expr scope fundec_opt loc action expr in
   let var =
     match var_opt with
-    | Some x ->
-        x
+    | Some x -> x
     | None ->
-        prerr_endline (CilHelper.s_location loc) ;
-        Clangml_show.pp_expr F.err_formatter expr ;
+        prerr_endline (CilHelper.s_location loc);
+        Clangml_show.pp_expr F.err_formatter expr;
         failwith "var_opt"
   in
   let lval_of_expr var =
@@ -544,41 +436,34 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       let temp = (Cil.Var (Cil.makeTempVar fundec typ), Cil.NoOffset) in
       let exp = Cil.BinOp (Cil.PlusA, var, Cil.one, Cil.intType) in
       let instr2 = Cil.Set (lval_of_expr var, exp, loc) in
-      if action = ADrop then (sl @ [Cil.mkStmt (Cil.Instr [instr2])], var)
+      if action = ADrop then (sl @ [ Cil.mkStmt (Cil.Instr [ instr2 ]) ], var)
       else
         let instr1 = Cil.Set (temp, var, loc) in
-        (sl @ [Cil.mkStmt (Cil.Instr [instr1; instr2])], Cil.Lval temp)
+        (sl @ [ Cil.mkStmt (Cil.Instr [ instr1; instr2 ]) ], Cil.Lval temp)
   | C.PostDec ->
       let fundec = Option.get fundec_opt in
       let temp = (Cil.Var (Cil.makeTempVar fundec typ), Cil.NoOffset) in
       let instr1 = Cil.Set (temp, var, loc) in
       let exp = Cil.BinOp (Cil.MinusA, var, Cil.one, Cil.intType) in
       let instr2 = Cil.Set (lval_of_expr var, exp, loc) in
-      (sl @ [Cil.mkStmt (Cil.Instr [instr1; instr2])], Cil.Lval temp)
+      (sl @ [ Cil.mkStmt (Cil.Instr [ instr1; instr2 ]) ], Cil.Lval temp)
   | C.PreInc ->
       let exp = Cil.BinOp (Cil.PlusA, var, Cil.one, Cil.intType) in
       let instr = Cil.Set (lval_of_expr var, exp, loc) in
-      (sl @ [Cil.mkStmt (Cil.Instr [instr])], var)
+      (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], var)
   | C.PreDec ->
       let exp = Cil.BinOp (Cil.MinusA, var, Cil.one, Cil.intType) in
       let instr = Cil.Set (lval_of_expr var, exp, loc) in
-      (sl @ [Cil.mkStmt (Cil.Instr [instr])], var)
-  | C.AddrOf ->
-      (sl, Cil.AddrOf (lval_of_expr var))
-  | C.Deref ->
-      (sl, Cil.Lval (Cil.Mem var, Cil.NoOffset))
-  | C.Plus ->
-      (sl, Cil.Lval (lval_of_expr var))
-  | C.Minus ->
-      (sl, Cil.UnOp (Cil.Neg, var, typ))
-  | C.Not ->
-      (sl, Cil.UnOp (Cil.BNot, var, typ))
-  | C.LNot ->
-      (sl, Cil.UnOp (Cil.LNot, var, typ))
-  | C.Extension ->
-      (sl, var)
+      (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], var)
+  | C.AddrOf -> (sl, Cil.AddrOf (lval_of_expr var))
+  | C.Deref -> (sl, Cil.Lval (Cil.Mem var, Cil.NoOffset))
+  | C.Plus -> (sl, Cil.Lval (lval_of_expr var))
+  | C.Minus -> (sl, Cil.UnOp (Cil.Neg, var, typ))
+  | C.Not -> (sl, Cil.UnOp (Cil.BNot, var, typ))
+  | C.LNot -> (sl, Cil.UnOp (Cil.LNot, var, typ))
+  | C.Extension -> (sl, var)
   | _ ->
-      Clangml_show.pp_expr F.err_formatter expr ;
+      Clangml_show.pp_expr F.err_formatter expr;
       failwith ("unary_operator at " ^ CilHelper.s_location loc)
 
 and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
@@ -590,79 +475,43 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
   (* | C.PtrMemD
      | C.PtrMemI
   *)
-  | C.Mul
-  | C.Div
-  | C.Rem
-  | C.Add
-  | C.Sub
-  | C.Shl
-  | C.Shr
+  | C.Mul | C.Div | C.Rem | C.Add | C.Sub | C.Shl | C.Shr
   (*  | C.Cmp
 *)
-  | C.LT
-  | C.GT
-  | C.LE
-  | C.GE
-  | C.EQ
-  | C.NE
-  | C.And
-  | C.Xor
-  | C.Or
-  | C.LAnd
+  | C.LT | C.GT | C.LE | C.GE | C.EQ | C.NE | C.And | C.Xor | C.Or | C.LAnd
   | C.LOr ->
-      ( rhs_sl @ lhs_sl
-      , Cil.constFoldBinOp false (trans_binop kind) lhs_expr rhs_expr typ )
+      ( rhs_sl @ lhs_sl,
+        Cil.constFoldBinOp false (trans_binop kind) lhs_expr rhs_expr typ )
   | C.Assign ->
       let lval =
         match lhs_expr with Cil.Lval l -> l | _ -> failwith "invalid lhs"
       in
-      let stmt = Cil.mkStmt (Cil.Instr [Cil.Set (lval, rhs_expr, loc)]) in
-      (rhs_sl @ lhs_sl @ [stmt], lhs_expr)
-  | C.MulAssign
-  | C.DivAssign
-  | C.RemAssign
-  | C.AddAssign
-  | C.SubAssign
-  | C.ShlAssign
-  | C.ShrAssign
-  | C.AndAssign
-  | C.XorAssign
-  | C.OrAssign ->
+      let stmt = Cil.mkStmt (Cil.Instr [ Cil.Set (lval, rhs_expr, loc) ]) in
+      (rhs_sl @ lhs_sl @ [ stmt ], lhs_expr)
+  | C.MulAssign | C.DivAssign | C.RemAssign | C.AddAssign | C.SubAssign
+  | C.ShlAssign | C.ShrAssign | C.AndAssign | C.XorAssign | C.OrAssign ->
       let drop_assign = function
-        | C.MulAssign ->
-            C.Mul
-        | C.DivAssign ->
-            C.Mul
-        | C.RemAssign ->
-            C.Mul
-        | C.AddAssign ->
-            C.Mul
-        | C.SubAssign ->
-            C.Mul
-        | C.ShlAssign ->
-            C.Mul
-        | C.ShrAssign ->
-            C.Mul
-        | C.AndAssign ->
-            C.Mul
-        | C.XorAssign ->
-            C.Mul
-        | C.OrAssign ->
-            C.Or
-        | _ ->
-            failwith "Invalid syntaxk"
+        | C.MulAssign -> C.Mul
+        | C.DivAssign -> C.Mul
+        | C.RemAssign -> C.Mul
+        | C.AddAssign -> C.Mul
+        | C.SubAssign -> C.Mul
+        | C.ShlAssign -> C.Mul
+        | C.ShrAssign -> C.Mul
+        | C.AndAssign -> C.Mul
+        | C.XorAssign -> C.Mul
+        | C.OrAssign -> C.Or
+        | _ -> failwith "Invalid syntaxk"
       in
       let lval =
         match lhs_expr with Cil.Lval l -> l | _ -> failwith "invalid lhs"
       in
       let bop = drop_assign kind in
       let rhs = Cil.BinOp (trans_binop bop, lhs_expr, rhs_expr, typ) in
-      let stmt = Cil.mkStmt (Cil.Instr [Cil.Set (lval, rhs, loc)]) in
-      (rhs_sl @ lhs_sl @ [stmt], lhs_expr)
-  | C.Comma ->
-      failwith "Unsupported syntax (MulAssign)"
-  | C.InvalidBinaryOperator | _ ->
-      failwith "unsupported expr"
+      let stmt = Cil.mkStmt (Cil.Instr [ Cil.Set (lval, rhs, loc) ]) in
+      (rhs_sl @ lhs_sl @ [ stmt ], lhs_expr)
+  | C.Comma -> failwith "Unsupported syntax (MulAssign)"
+  | C.InvalidBinaryOperator | _ -> failwith "unsupported expr"
 
 and trans_call scope fundec_opt loc action callee args =
   let fundec = Option.get fundec_opt in
@@ -675,7 +524,7 @@ and trans_call scope fundec_opt loc action callee args =
       (fun (args_insts, args_exprs) arg ->
         let insts, expr_opt = trans_expr scope fundec_opt loc AExp arg in
         let expr = match expr_opt with Some x -> x | None -> failwith "arg" in
-        (args_insts @ insts, args_exprs @ [expr]))
+        (args_insts @ insts, args_exprs @ [ expr ]))
       ([], []) args
   in
   let retvar =
@@ -683,16 +532,15 @@ and trans_call scope fundec_opt loc action callee args =
     | Cil.TFun (rt, _, _, _) | TPtr (TFun (rt, _, _, _), _) ->
         let temp = (Cil.Var (Cil.makeTempVar fundec rt), Cil.NoOffset) in
         Some temp
-    | _ ->
-        None
+    | _ -> None
   in
   let retvar_exp =
     match retvar with Some x -> Some (Cil.Lval x) | _ -> None
   in
   let stmt =
-    Cil.mkStmt (Cil.Instr [Cil.Call (retvar, callee, args_exprs, loc)])
+    Cil.mkStmt (Cil.Instr [ Cil.Call (retvar, callee, args_exprs, loc) ])
   in
-  (callee_insts @ args_insts @ [stmt], retvar_exp)
+  (callee_insts @ args_insts @ [ stmt ], retvar_exp)
 
 and trans_member scope fundec_opt loc base arrow field =
   match base with
@@ -706,14 +554,11 @@ and trans_member scope fundec_opt loc base arrow field =
             | Cil.TPtr (TComp (comp, _), _) ->
                 let name =
                   match field with
-                  | C.Ast.FieldName f ->
-                      name_of_ident_ref f.desc
-                  | _ ->
-                      "unknown"
+                  | C.Ast.FieldName f -> name_of_ident_ref f.desc
+                  | _ -> "unknown"
                 in
                 List.find (fun f -> f.Cil.fname = name) comp.Cil.cfields
-            | _ ->
-                failwith "fail"
+            | _ -> failwith "fail"
           in
           Cil.Lval
             (Cil.mkMem ~addr:e ~off:(Cil.Field (fieldinfo, Cil.NoOffset)))
@@ -724,35 +569,30 @@ and trans_member scope fundec_opt loc base arrow field =
             | Cil.TComp (comp, _) ->
                 let name =
                   match field with
-                  | C.Ast.FieldName f ->
-                      name_of_ident_ref f.desc
-                  | _ ->
-                      "unknown"
+                  | C.Ast.FieldName f -> name_of_ident_ref f.desc
+                  | _ -> "unknown"
                 in
                 List.find (fun f -> f.Cil.fname = name) comp.Cil.cfields
-            | _ ->
-                failwith "fail"
+            | _ -> failwith "fail"
           in
           Cil.Lval (Cil.addOffsetLval (Cil.Field (fieldinfo, Cil.NoOffset)) lv)
       | Some e ->
-          CilHelper.s_location loc |> prerr_endline ;
-          CilHelper.s_exp e |> prerr_endline ;
+          CilHelper.s_location loc |> prerr_endline;
+          CilHelper.s_exp e |> prerr_endline;
           failwith "error bexp = some e"
       | None ->
-          CilHelper.s_location loc |> prerr_endline ;
+          CilHelper.s_location loc |> prerr_endline;
           failwith "error bexp = none" )
   | None ->
-      CilHelper.s_location loc |> prerr_endline ;
+      CilHelper.s_location loc |> prerr_endline;
       failwith "error base = none"
 
 and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
   let cond_sl, cond_expr = trans_expr scope fundec_opt loc AExp cond in
   let then_sl, then_expr =
     match then_branch with
-    | Some tb ->
-        trans_expr scope fundec_opt loc ADrop tb
-    | None ->
-        ([], None)
+    | Some tb -> trans_expr scope fundec_opt loc ADrop tb
+    | None -> ([], None)
   in
   let else_sl, else_expr = trans_expr scope fundec_opt loc ADrop else_branch in
   let cond_expr = Option.get cond_expr in
@@ -768,16 +608,16 @@ and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
       let var = (Cil.Var vi, Cil.NoOffset) in
       let bstmts =
         match then_expr with
-        | Some e ->
-            [Cil.mkStmt (Cil.Instr [Cil.Set (var, e, loc)])]
-        | None ->
-            []
+        | Some e -> [ Cil.mkStmt (Cil.Instr [ Cil.Set (var, e, loc) ]) ]
+        | None -> []
       in
-      let tb = {Cil.battrs= []; bstmts= then_sl @ bstmts} in
-      let bstmts = [Cil.mkStmt (Cil.Instr [Cil.Set (var, else_expr, loc)])] in
-      let fb = {Cil.battrs= []; bstmts= else_sl @ bstmts} in
-      ( cond_sl @ [Cil.mkStmt (Cil.If (cond_expr, tb, fb, loc))]
-      , Some (Cil.Lval var) )
+      let tb = { Cil.battrs = []; bstmts = then_sl @ bstmts } in
+      let bstmts =
+        [ Cil.mkStmt (Cil.Instr [ Cil.Set (var, else_expr, loc) ]) ]
+      in
+      let fb = { Cil.battrs = []; bstmts = else_sl @ bstmts } in
+      ( cond_sl @ [ Cil.mkStmt (Cil.If (cond_expr, tb, fb, loc)) ],
+        Some (Cil.Lval var) )
 
 and trans_unary_expr scope fundec_opt loc kind argument =
   match (kind, argument) with
@@ -794,68 +634,67 @@ and trans_unary_expr scope fundec_opt loc kind argument =
   | C.AlignOf, C.Ast.ArgumentType t ->
       let typ = trans_type scope t in
       ([], Some (Cil.AlignOf typ))
-  | _, _ ->
-      ([], None)
+  | _, _ -> ([], None)
 
 let get_opt msg = function Some x -> x | None -> failwith msg
 
 module Chunk = struct
-  type t = {stmts: Cil.stmt list; cases: Cil.stmt list}
+  type t = { stmts : Cil.stmt list; cases : Cil.stmt list }
 
-  let empty = {stmts= []; cases= []}
+  let empty = { stmts = []; cases = [] }
 
-  let append x y = {stmts= x.stmts @ y.stmts; cases= x.cases @ y.cases}
+  let append x y = { stmts = x.stmts @ y.stmts; cases = x.cases @ y.cases }
 end
 
 let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   let loc = trans_location stmt in
-  if !Options.debug then prerr_endline (CilHelper.s_location loc) ;
+  if !Options.debug then prerr_endline (CilHelper.s_location loc);
   match stmt.C.Ast.desc with
-  | C.Ast.Null ->
-      ({stmts= []; cases= []}, scope)
+  | C.Ast.Null -> ({ stmts = []; cases = [] }, scope)
   | C.Ast.Compound sl ->
       let chunk = trans_compound scope fundec sl in
       let stmts =
-        [Cil.mkStmt (Cil.Block {Cil.battrs= []; bstmts= chunk.Chunk.stmts})]
+        [
+          Cil.mkStmt (Cil.Block { Cil.battrs = []; bstmts = chunk.Chunk.stmts });
+        ]
       in
-      ({Chunk.stmts; cases= chunk.cases}, scope)
+      ({ Chunk.stmts; cases = chunk.cases }, scope)
   | C.Ast.For fdesc ->
       ( trans_for scope fundec loc fdesc.init fdesc.condition_variable
-          fdesc.cond fdesc.inc fdesc.body
-      , scope )
+          fdesc.cond fdesc.inc fdesc.body,
+        scope )
   | C.Ast.If desc ->
       ( trans_if scope fundec loc desc.init desc.condition_variable desc.cond
-          desc.then_branch desc.else_branch
-      , scope )
+          desc.then_branch desc.else_branch,
+        scope )
   | C.Ast.Decl dl ->
       let stmts, scope = trans_var_decl_list scope fundec loc AExp dl in
-      ({Chunk.empty with stmts}, scope)
+      ({ Chunk.empty with stmts }, scope)
   | C.Ast.Return None ->
-      let stmts = [Cil.mkStmt (Cil.Return (None, loc))] in
-      ({Chunk.empty with stmts}, scope)
+      let stmts = [ Cil.mkStmt (Cil.Return (None, loc)) ] in
+      ({ Chunk.empty with stmts }, scope)
   | C.Ast.Return (Some e) ->
       let sl, expr_opt = trans_expr scope (Some fundec) loc AExp e in
       let expr = get_opt "return" expr_opt in
       let stmts =
-        if List.length sl = 0 then [Cil.mkStmt (Cil.Return (Some expr, loc))]
-        else sl @ [Cil.mkStmt (Cil.Return (Some expr, loc))]
+        if List.length sl = 0 then [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
+        else sl @ [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
       in
-      ({Chunk.empty with stmts}, scope)
+      ({ Chunk.empty with stmts }, scope)
   | C.Ast.Expr e ->
       let stmts, _ = trans_expr scope (Some fundec) loc ADrop e in
-      ({Chunk.empty with stmts}, scope)
+      ({ Chunk.empty with stmts }, scope)
   | C.Ast.Switch desc ->
       ( trans_switch scope fundec loc desc.init desc.condition_variable
-          desc.cond desc.body
-      , scope )
+          desc.cond desc.body,
+        scope )
   | C.Ast.Case desc ->
       (trans_case scope fundec loc desc.lhs desc.rhs desc.body, scope)
-  | C.Ast.Default stmt ->
-      (trans_default scope fundec loc stmt, scope)
+  | C.Ast.Default stmt -> (trans_default scope fundec loc stmt, scope)
   | _ ->
       (*       C.Ast.pp_stmt F.err_formatter stmt ; *)
-      let stmts = [Cil.dummyStmt] in
-      ({Chunk.empty with stmts}, scope)
+      let stmts = [ Cil.dummyStmt ] in
+      ({ Chunk.empty with stmts }, scope)
 
 and trans_compound scope fundec sl =
   let scope = Scope.enter scope in
@@ -873,8 +712,7 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
       | C.Ast.Var desc ->
           let decl_stmts, scope = trans_var_decl scope fundec loc action desc in
           (sl @ decl_stmts, scope)
-      | _ ->
-          (sl, scope))
+      | _ -> (sl, scope))
     ([], scope) dl
 
 and trans_var_decl (scope : Scope.t) fundec loc action
@@ -883,37 +721,37 @@ and trans_var_decl (scope : Scope.t) fundec loc action
   let varinfo, scope = create_local_variable scope fundec desc.var_name typ in
   match desc.var_init with
   | Some e -> (
-    match e.C.Ast.desc with
-    | C.Ast.InitList el ->
-        let sl, _ =
-          List.fold_left
-            (fun (sl, o) i ->
-              let _, expr_opt = trans_expr scope (Some fundec) loc action i in
-              let expr = get_opt "var_decl" expr_opt in
-              let var =
-                (Cil.Var varinfo, Cil.Index (Cil.integer o, Cil.NoOffset))
-              in
-              let stmt = Cil.mkStmt (Cil.Instr [Cil.Set (var, expr, loc)]) in
-              (sl @ [stmt], o + 1))
-            ([], 0) el
-        in
-        (sl, scope)
-    | _ ->
-        let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
-        let expr = get_opt "var_decl" expr_opt in
-        let var = (Cil.Var varinfo, Cil.NoOffset) in
-        let stmt = Cil.mkStmt (Cil.Instr [Cil.Set (var, expr, loc)]) in
-        (sl_expr @ [stmt], scope) )
-  | _ ->
-      ([], scope)
+      match e.C.Ast.desc with
+      | C.Ast.InitList el ->
+          let sl, _ =
+            List.fold_left
+              (fun (sl, o) i ->
+                let _, expr_opt = trans_expr scope (Some fundec) loc action i in
+                let expr = get_opt "var_decl" expr_opt in
+                let var =
+                  (Cil.Var varinfo, Cil.Index (Cil.integer o, Cil.NoOffset))
+                in
+                let stmt =
+                  Cil.mkStmt (Cil.Instr [ Cil.Set (var, expr, loc) ])
+                in
+                (sl @ [ stmt ], o + 1))
+              ([], 0) el
+          in
+          (sl, scope)
+      | _ ->
+          let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
+          let expr = get_opt "var_decl" expr_opt in
+          let var = (Cil.Var varinfo, Cil.NoOffset) in
+          let stmt = Cil.mkStmt (Cil.Instr [ Cil.Set (var, expr, loc) ]) in
+          (sl_expr @ [ stmt ], scope) )
+  | _ -> ([], scope)
 
 and trans_var_decl_opt scope fundec loc action (vdecl : C.Ast.var_decl option) =
   match vdecl with
   | Some v ->
       let sl, scope = trans_var_decl scope fundec loc AExp v.C.Ast.desc in
       (sl, scope)
-  | None ->
-      ([], scope)
+  | None -> ([], scope)
 
 and trans_for scope fundec loc init cond_var cond inc body =
   let scope = Scope.enter scope in
@@ -923,24 +761,23 @@ and trans_for scope fundec loc init cond_var cond inc body =
     match cond with
     | Some e ->
         trans_expr scope (Some fundec) loc AExp e |> snd |> get_opt "for_cond"
-    | None ->
-        Cil.one
+    | None -> Cil.one
   in
-  let break_stmt = Cil.mkBlock [Cil.mkStmt (Cil.Break loc)] in
+  let break_stmt = Cil.mkBlock [ Cil.mkStmt (Cil.Break loc) ] in
   let body_stmt = trans_block scope fundec body in
   let bstmts =
     Cil.mkStmt (Cil.If (cond_expr, empty_block, break_stmt, loc))
     :: body_stmt.Chunk.stmts
   in
-  let block = {Cil.battrs= []; bstmts} in
+  let block = { Cil.battrs = []; bstmts } in
   let inc_stmt = trans_stmt_opt scope fundec inc |> fst in
   let stmts =
     decl_stmt @ init_stmt.Chunk.stmts
-    @ [Cil.mkStmt (Cil.Loop (block, loc, None, None))]
+    @ [ Cil.mkStmt (Cil.Loop (block, loc, None, None)) ]
     @ inc_stmt.Chunk.stmts
   in
   let cases = init_stmt.cases @ body_stmt.cases @ inc_stmt.cases in
-  {Chunk.stmts; cases}
+  { Chunk.stmts; cases }
 
 and trans_if scope fundec loc init cond_var cond then_branch else_branch =
   let init_stmt = trans_stmt_opt scope fundec init |> fst in
@@ -949,26 +786,24 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
   let then_stmt = trans_block scope fundec then_branch in
   let else_stmt =
     match else_branch with
-    | Some s ->
-        trans_block scope fundec s
-    | None ->
-        Chunk.empty
+    | Some s -> trans_block scope fundec s
+    | None -> Chunk.empty
   in
-  let then_block = {Cil.battrs= []; bstmts= then_stmt.stmts} in
-  let else_block = {Cil.battrs= []; bstmts= else_stmt.stmts} in
+  let then_block = { Cil.battrs = []; bstmts = then_stmt.stmts } in
+  let else_block = { Cil.battrs = []; bstmts = else_stmt.stmts } in
   let stmts =
     decl_stmt @ init_stmt.stmts @ cond_sl
-    @ [Cil.mkStmt (Cil.If (Option.get cond_expr, then_block, else_block, loc))]
+    @ [
+        Cil.mkStmt (Cil.If (Option.get cond_expr, then_block, else_block, loc));
+      ]
   in
   let cases = init_stmt.cases @ then_stmt.cases @ else_stmt.cases in
-  {Chunk.stmts; cases}
+  { Chunk.stmts; cases }
 
 and trans_block scope fundec body =
   match body.C.Ast.desc with
-  | C.Ast.Compound l ->
-      trans_compound scope fundec l
-  | _ ->
-      trans_stmt scope fundec body |> fst
+  | C.Ast.Compound l -> trans_compound scope fundec l
+  | _ -> trans_stmt scope fundec body |> fst
 
 and trans_switch scope fundec loc init cond_var cond body =
   let init, cope = trans_stmt_opt scope fundec init in
@@ -976,7 +811,7 @@ and trans_switch scope fundec loc init cond_var cond body =
   let cond_sl, cond_expr_opt = trans_expr scope (Some fundec) loc AExp cond in
   let cond_expr = Option.get cond_expr_opt in
   let body_stmt = trans_stmt scope fundec body |> fst in
-  let body = {Cil.battrs= []; bstmts= body_stmt.Chunk.stmts} in
+  let body = { Cil.battrs = []; bstmts = body_stmt.Chunk.stmts } in
   let cases =
     List.fold_left
       (fun acc s -> if List.memq s acc then acc else s :: acc)
@@ -986,9 +821,9 @@ and trans_switch scope fundec loc init cond_var cond body =
   in
   let stmts =
     init.Chunk.stmts @ decl_sl @ cond_sl
-    @ [Cil.mkStmt (Cil.Switch (cond_expr, body, cases, loc))]
+    @ [ Cil.mkStmt (Cil.Switch (cond_expr, body, cases, loc)) ]
   in
-  {Chunk.empty with stmts}
+  { Chunk.empty with stmts }
 
 and trans_case scope fundec loc lhs rhs body =
   let lhs_expr = trans_expr scope (Some fundec) loc ADrop lhs |> snd in
@@ -996,26 +831,22 @@ and trans_case scope fundec loc lhs rhs body =
   let label = Cil.Case (Option.get lhs_expr, loc) in
   match chunk.Chunk.stmts with
   | h :: t ->
-      h.labels <- h.labels @ [label] ;
-      {chunk with cases= h :: chunk.cases}
-  | [] ->
-      chunk
+      h.labels <- h.labels @ [ label ];
+      { chunk with cases = h :: chunk.cases }
+  | [] -> chunk
 
 and trans_default scope fundec loc stmt =
   let chunk = trans_stmt scope fundec stmt |> fst in
   let label = Cil.Default loc in
   match chunk.Chunk.stmts with
   | h :: t ->
-      h.labels <- label :: h.labels ;
-      {chunk with cases= chunk.cases @ [h]}
-  | [] ->
-      chunk
+      h.labels <- label :: h.labels;
+      { chunk with cases = chunk.cases @ [ h ] }
+  | [] -> chunk
 
 and trans_stmt_opt scope fundec = function
-  | Some s ->
-      trans_stmt scope fundec s
-  | None ->
-      (Chunk.empty, scope)
+  | Some s -> trans_stmt scope fundec s
+  | None -> (Chunk.empty, scope)
 
 let rec trans_global_init scope loc (e : C.Ast.expr) =
   let typ = type_of_expr e |> trans_type scope in
@@ -1026,7 +857,7 @@ let rec trans_global_init scope loc (e : C.Ast.expr) =
         List.fold_left
           (fun (r, o) i ->
             let init = trans_global_init scope loc i in
-            (r @ [(Cil.Index (Cil.integer o, Cil.NoOffset), init)], o + 1))
+            (r @ [ (Cil.Index (Cil.integer o, Cil.NoOffset), init) ], o + 1))
           ([], 0) el
       in
       Cil.CompoundInit (typ, init_list)
@@ -1037,25 +868,19 @@ let rec trans_global_init scope loc (e : C.Ast.expr) =
 
 let failwith_decl (decl : C.Ast.decl) =
   match decl.C.Ast.desc with
-  | C.Ast.RecordDecl _ ->
-      failwith "record decl"
-  | _ ->
-      failwith "unknown decl"
+  | C.Ast.RecordDecl _ -> failwith "record decl"
+  | _ -> failwith "unknown decl"
 
 let trans_storage decl =
   match C.Ast.cursor_of_node decl |> C.cursor_get_storage_class with
-  | C.Extern ->
-      Cil.Extern
-  | C.Register ->
-      Cil.Register
-  | C.Static ->
-      Cil.Static
-  | _ ->
-      Cil.NoStorage
+  | C.Extern -> Cil.Extern
+  | C.Register -> Cil.Register
+  | C.Static -> Cil.Static
+  | _ -> Cil.NoStorage
 
 let trans_function_body scope fundec body =
   let chunk = trans_block scope fundec body in
-  {Cil.battrs= []; bstmts= chunk.Chunk.stmts}
+  { Cil.battrs = []; bstmts = chunk.Chunk.stmts }
 
 let rec trans_global_decl scope (decl : C.Ast.decl) =
   let loc = trans_location decl in
@@ -1065,31 +890,31 @@ let rec trans_global_decl scope (decl : C.Ast.decl) =
       let name = string_of_declaration_name fdecl.name in
       let typ = trans_function_type scope fdecl.function_type in
       let svar, scope = find_global_variable scope name typ in
-      svar.vstorage <- storage ;
-      ([Cil.GVarDecl (svar, loc)], scope)
+      svar.vstorage <- storage;
+      ([ Cil.GVarDecl (svar, loc) ], scope)
   | C.Ast.Function fdecl ->
       let name = string_of_declaration_name fdecl.name in
       let typ = trans_function_type scope fdecl.function_type in
       let svar, scope = find_global_variable scope name typ in
-      let fundec = {Cil.dummyFunDec with svar} in
+      let fundec = { Cil.dummyFunDec with svar } in
       let scope = Scope.enter scope in
       let scope = trans_params scope fdecl.function_type.parameters fundec in
-      fundec.svar.vstorage <- storage ;
-      fundec.sbody <- trans_function_body scope fundec (Option.get fdecl.body) ;
+      fundec.svar.vstorage <- storage;
+      fundec.sbody <- trans_function_body scope fundec (Option.get fdecl.body);
       let scope = Scope.exit scope in
-      ([Cil.GFun (fundec, loc)], scope)
+      ([ Cil.GFun (fundec, loc) ], scope)
   | C.Ast.Var vdecl when vdecl.var_init = None ->
       let typ = trans_type scope vdecl.var_type in
       let vi, scope = find_global_variable scope vdecl.var_name typ in
-      vi.vstorage <- storage ;
-      ([Cil.GVarDecl (vi, loc)], scope)
+      vi.vstorage <- storage;
+      ([ Cil.GVarDecl (vi, loc) ], scope)
   | C.Ast.Var vdecl ->
       let typ = trans_type scope vdecl.var_type in
       let vi, scope = find_global_variable scope vdecl.var_name typ in
-      vi.vstorage <- storage ;
+      vi.vstorage <- storage;
       let e = Option.get vdecl.var_init in
-      let init = {Cil.init= Some (trans_global_init scope loc e)} in
-      ([Cil.GVar (vi, init, loc)], scope)
+      let init = { Cil.init = Some (trans_global_init scope loc e) } in
+      ([ Cil.GVar (vi, init, loc) ], scope)
   | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
       let is_struct = rdecl.keyword = C.Struct in
       let globals, scope =
@@ -1103,32 +928,28 @@ let rec trans_global_decl scope (decl : C.Ast.decl) =
         List.fold_left
           (fun fl (decl : C.Ast.decl) ->
             match decl.C.Ast.desc with
-            | C.Ast.Field _ ->
-                fl @ [trans_field_decl scope compinfo decl]
-            | _ ->
-                fl)
+            | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+            | _ -> fl)
           [] rdecl.fields
       in
       let name =
         if rdecl.name = "" then new_record_id is_struct else rdecl.name
       in
       let compinfo = Cil.mkCompInfo is_struct name callback [] in
-      compinfo.cdefined <- true ;
+      compinfo.cdefined <- true;
       if Scope.mem_typ name scope then (
         let typ = Scope.find_type name scope in
         let prev_ci =
           match typ with
-          | Cil.TComp (ci, _) ->
-              ci
-          | _ ->
-              failwith "invalid type"
+          | Cil.TComp (ci, _) -> ci
+          | _ -> failwith "invalid type"
         in
-        prev_ci.cfields <- compinfo.cfields ;
-        (globals @ [Cil.GCompTag (prev_ci, loc)], scope) )
+        prev_ci.cfields <- compinfo.cfields;
+        (globals @ [ Cil.GCompTag (prev_ci, loc) ], scope) )
       else
         let typ = Cil.TComp (compinfo, []) in
         let scope = Scope.add_type rdecl.name typ scope in
-        (globals @ [Cil.GCompTag (compinfo, loc)], scope)
+        (globals @ [ Cil.GCompTag (compinfo, loc) ], scope)
   | C.Ast.RecordDecl rdecl ->
       let is_struct = rdecl.keyword = C.Struct in
       let name =
@@ -1138,23 +959,21 @@ let rec trans_global_decl scope (decl : C.Ast.decl) =
         let typ = Scope.find_type name scope in
         let prev_ci =
           match typ with
-          | Cil.TComp (ci, _) ->
-              ci
-          | _ ->
-              failwith "invalid type"
+          | Cil.TComp (ci, _) -> ci
+          | _ -> failwith "invalid type"
         in
-        ([Cil.GCompTagDecl (prev_ci, loc)], scope)
+        ([ Cil.GCompTagDecl (prev_ci, loc) ], scope)
       else
         let callback compinfo = [] in
         let compinfo = Cil.mkCompInfo is_struct name callback [] in
         let typ = Cil.TComp (compinfo, []) in
         let scope = Scope.add_type rdecl.name typ scope in
-        ([Cil.GCompTagDecl (compinfo, loc)], scope)
+        ([ Cil.GCompTagDecl (compinfo, loc) ], scope)
   | TypedefDecl tdecl ->
       let ttype = trans_type scope tdecl.underlying_type in
-      let tinfo = {Cil.tname= tdecl.name; ttype; treferenced= false} in
+      let tinfo = { Cil.tname = tdecl.name; ttype; treferenced = false } in
       let scope = Scope.add_type tdecl.name (Cil.TNamed (tinfo, [])) scope in
-      ([Cil.GType (tinfo, loc)], scope)
+      ([ Cil.GType (tinfo, loc) ], scope)
   | EnumDecl edecl ->
       let eitems, scope, _ =
         List.fold_left
@@ -1163,34 +982,24 @@ let rec trans_global_decl scope (decl : C.Ast.decl) =
             let scope =
               Scope.add c.desc.constant_name (EnvData.EnvEnum value) scope
             in
-            (eitems @ [(c.desc.constant_name, value, loc)], scope, next))
+            (eitems @ [ (c.desc.constant_name, value, loc) ], scope, next))
           ([], scope, Cil.zero) edecl.constants
       in
       let einfo =
-        { Cil.ename= edecl.name
-        ; eitems
-        ; eattr= []
-        ; ereferenced= false
-        ; ekind= Cil.IInt }
+        {
+          Cil.ename = edecl.name;
+          eitems;
+          eattr = [];
+          ereferenced = false;
+          ekind = Cil.IInt;
+        }
       in
       let scope = Scope.add_type edecl.name (Cil.TEnum (einfo, [])) scope in
-      ([Cil.GEnumTag (einfo, loc)], scope)
-  | Field _
-  | EmptyDecl
-  | AccessSpecifier _
-  | Namespace _
-  | UsingDirective _
-  | UsingDeclaration _
-  | Constructor _
-  | Destructor _
-  | LinkageSpec _
-  | TemplateTemplateParameter _
-  | Friend _
-  | NamespaceAlias _
-  | Directive _
-  | StaticAssert _
-  | TypeAlias _
-  | Decomposition _
+      ([ Cil.GEnumTag (einfo, loc) ], scope)
+  | Field _ | EmptyDecl | AccessSpecifier _ | Namespace _ | UsingDirective _
+  | UsingDeclaration _ | Constructor _ | Destructor _ | LinkageSpec _
+  | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
+  | StaticAssert _ | TypeAlias _ | Decomposition _
   | UnknownDecl (_, _) ->
       ([], scope)
   | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
@@ -1202,8 +1011,7 @@ and trans_field_decl scope compinfo (field : C.Ast.decl) =
   | C.Ast.Field fdecl ->
       let typ = trans_type ~compinfo:(Some compinfo) scope fdecl.qual_type in
       (fdecl.name, typ, None, [], floc)
-  | _ ->
-      failwith_decl field
+  | _ -> failwith_decl field
 
 let initialize_builtins scope =
   H.fold
@@ -1214,7 +1022,7 @@ let initialize_builtins scope =
     Cil.builtinFunctions scope
 
 let parse fname =
-  let options = {C.Ast.Options.default with ignore_implicit_cast= false} in
+  let options = { C.Ast.Options.default with ignore_implicit_cast = false } in
   let tu = C.Ast.parse_file ~options fname in
   let scope = initialize_builtins Scope.initial in
   let globals =
@@ -1225,8 +1033,10 @@ let parse fname =
       ([], scope) tu.desc.items
     |> fst
   in
-  prerr_endline (string_of_int (List.length globals)) ;
-  { Cil.fileName= fname
-  ; Cil.globals
-  ; Cil.globinit= None
-  ; Cil.globinitcalled= false }
+  prerr_endline (string_of_int (List.length globals));
+  {
+    Cil.fileName = fname;
+    Cil.globals;
+    Cil.globinit = None;
+    Cil.globinitcalled = false;
+  }

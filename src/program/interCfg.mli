@@ -26,8 +26,8 @@ end
 
 module NodeSet : BatSet.S with type elt = Node.t
 
-(** Abstract type of inter-procedural CFG *)
 type t
+(** Abstract type of inter-procedural CFG *)
 
 and pid = Proc.t
 

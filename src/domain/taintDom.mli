@@ -29,7 +29,7 @@ module UserInput : sig
 end
 
 module Val : sig
-  type t = {int_overflow: IntOverflow.t; user_input: UserInput.t}
+  type t = { int_overflow : IntOverflow.t; user_input : UserInput.t }
 
   include AbsDom.LAT with type t := t
 
@@ -40,16 +40,15 @@ module Val : sig
   val input_value : BasicDom.Node.t -> Cil.location -> t
 end
 
-module Mem :
-  sig
-    include InstrumentedMem.S
+module Mem : sig
+  include InstrumentedMem.S
 
-    val lookup : BasicDom.PowLoc.t -> t -> Val.t
+  val lookup : BasicDom.PowLoc.t -> t -> Val.t
 
-    val strong_update : BasicDom.PowLoc.t -> Val.t -> t -> t
+  val strong_update : BasicDom.PowLoc.t -> Val.t -> t -> t
 
-    val weak_update : BasicDom.PowLoc.t -> Val.t -> t -> t
-  end
-  with type A.t = BasicDom.Loc.t
-   and type B.t = Val.t
-   and type PowA.t = BasicDom.PowLoc.t
+  val weak_update : BasicDom.PowLoc.t -> Val.t -> t -> t
+end
+with type A.t = BasicDom.Loc.t
+ and type B.t = Val.t
+ and type PowA.t = BasicDom.PowLoc.t

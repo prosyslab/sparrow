@@ -33,7 +33,7 @@ let append_field s f =
     (fun loc info ->
       if PowStruct.mem f.Cil.fcomp.Cil.cname info then
         PowLoc.add (Loc.append_field loc f.Cil.fname f.Cil.ftype)
-      else id )
+      else id)
     s PowLoc.bot
 
 let pow_loc_of_struct str = foldi (fun k _ -> PowLoc.add k) str PowLoc.bot
@@ -46,5 +46,5 @@ let to_string x =
     foldi
       (fun a b s ->
         let str = A.to_string a ^ " -> " ^ B.to_string b in
-        link_by_sep "\n\t" str s )
+        link_by_sep "\n\t" str s)
       x ""

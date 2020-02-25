@@ -59,14 +59,15 @@ module PackConf = struct
   let loc2pack : (OctLoc.t, Pack.t) Hashtbl.t = Hashtbl.create 1000
 
   let get_pack packconf lv =
-    try Hashtbl.find loc2pack lv with Not_found -> (
+    try Hashtbl.find loc2pack lv
+    with Not_found -> (
       try
         let pack = choose (filter (Pack.mem lv) packconf) in
-        Hashtbl.add loc2pack lv pack ;
+        Hashtbl.add loc2pack lv pack;
         pack
       with _ ->
         if !Options.debug then
-          prerr_endline ("get_pack.Not_found : " ^ OctLoc.to_string lv) ;
+          prerr_endline ("get_pack.Not_found : " ^ OctLoc.to_string lv);
         Pack.singleton lv )
 
   let get_all_octlocs itvinputof =
@@ -83,8 +84,8 @@ module PackConf = struct
               |> opt
                    (ItvDom.Val.itv_of_val v <> Itv.bot)
                    (Pack.add (OctLoc.of_loc x))
-              |> BatSet.fold (fun x -> Pack.add (OctLoc.of_size x)) plocs )
-          mem pack )
+              |> BatSet.fold (fun x -> Pack.add (OctLoc.of_size x)) plocs)
+          mem pack)
       itvinputof Pack.bot
 
   let fullpack itvinputof = get_all_octlocs itvinputof |> singleton
@@ -98,9 +99,9 @@ module PackConf = struct
   let print packconf =
     BatSet.iter
       (fun s ->
-        prerr_string "{" ;
-        Pack.iter (fun x -> prerr_string (OctLoc.to_string x ^ ", ")) s ;
-        prerr_string "}, " )
+        prerr_string "{";
+        Pack.iter (fun x -> prerr_string (OctLoc.to_string x ^ ", ")) s;
+        prerr_string "}, ")
       packconf
 
   let print_info packconf =
@@ -109,20 +110,20 @@ module PackConf = struct
       fold
         (fun x (pack, var) ->
           if Pack.cardinal x > 1 then (pack + 1, var + Pack.cardinal x)
-          else (pack, var) )
+          else (pack, var))
         packconf (0, 0)
     in
-    prerr_endline "=== Packing Configuration ===" ;
-    prerr_endline ("=== # total packs         : " ^ string_of_int total) ;
-    prerr_endline ("=== # non-singleton packs : " ^ string_of_int non_singleton) ;
-    prerr_endline ("=== # relational variables : " ^ string_of_int rel_var) ;
+    prerr_endline "=== Packing Configuration ===";
+    prerr_endline ("=== # total packs         : " ^ string_of_int total);
+    prerr_endline ("=== # non-singleton packs : " ^ string_of_int non_singleton);
+    prerr_endline ("=== # relational variables : " ^ string_of_int rel_var);
     iter
       (fun x ->
         if Pack.cardinal x > 1 then (
-          prerr_int (Pack.cardinal x) ;
-          prerr_string " : {" ;
-          Pack.iter (fun x -> prerr_string (OctLoc.to_string x ^ ", ")) x ;
-          prerr_endline "}, " ) )
+          prerr_int (Pack.cardinal x);
+          prerr_string " : {";
+          Pack.iter (fun x -> prerr_string (OctLoc.to_string x ^ ", ")) x;
+          prerr_endline "}, " ))
       packconf
 end
 
@@ -192,19 +193,19 @@ module Octagon = struct
                     Abstract1.bound_texpr man o
                       (Texpr1.of_expr env
                          (Texpr1.Binop
-                            ( Texpr1.Sub
-                            , Texpr1.Var x
-                            , Texpr1.Var y
-                            , Texpr1.Int
-                            , Texpr1.Near )))
+                            ( Texpr1.Sub,
+                              Texpr1.Var x,
+                              Texpr1.Var y,
+                              Texpr1.Int,
+                              Texpr1.Near )))
                   in
                   s
                   ^
                   if Interval.is_top sub then ""
                   else
                     Var.to_string x ^ " - " ^ Var.to_string y ^ " = "
-                    ^ interval_to_string sub ^ "\n" )
-              s vars )
+                    ^ interval_to_string sub ^ "\n")
+              s vars)
           "\n" vars
 
   let pp fmt x = Format.fprintf fmt "%s" (to_string x)
@@ -220,11 +221,11 @@ module Octagon = struct
       | -1 -> Itv.Integer.minf
       | 1 -> Itv.Integer.pinf
       | _ -> (
-        match scalar with
-        | Scalar.Float f -> Itv.Integer.of_int (int_of_float f)
-        | Scalar.Mpqf f -> Itv.Integer.of_int (int_of_float (Mpqf.to_float f))
-        | Scalar.Mpfrf f ->
-            Itv.Integer.of_int (int_of_float (Mpfrf.to_float f)) )
+          match scalar with
+          | Scalar.Float f -> Itv.Integer.of_int (int_of_float f)
+          | Scalar.Mpqf f -> Itv.Integer.of_int (int_of_float (Mpqf.to_float f))
+          | Scalar.Mpfrf f ->
+              Itv.Integer.of_int (int_of_float (Mpfrf.to_float f)) )
     in
     let lb, ub = (f i.Interval.inf, f i.Interval.sup) in
     if not (Itv.Integer.le lb ub) then Itv.bot else Itv.of_integer lb ub
@@ -261,7 +262,7 @@ module Octagon = struct
 
   let forget lv oct =
     match oct with
-    | V o -> V (Abstract1.forget_array man o [|OctLoc.to_var lv|] false)
+    | V o -> V (Abstract1.forget_array man o [| OctLoc.to_var lv |] false)
     | Bot -> bot
 
   let prune lv texpr typ oct =
@@ -270,7 +271,7 @@ module Octagon = struct
         let env = Abstract1.env o in
         let tcons = Tcons1.make (Texpr1.of_expr env texpr) typ in
         let earray = Tcons1.array_make env 1 in
-        Tcons1.array_set earray 0 tcons ;
+        Tcons1.array_set earray 0 tcons;
         V (Abstract1.meet_tcons_array man o earray)
     | _ -> oct
 
@@ -308,6 +309,6 @@ module Mem = struct
         (fun pack v s ->
           if Pack.cardinal pack > 2 then
             s ^ Pack.to_string pack ^ " -> " ^ Octagon.to_string v
-          else s )
+          else s)
         x ""
 end

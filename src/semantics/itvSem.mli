@@ -12,16 +12,16 @@
 
 include
   AbsSem.S
-  with type Dom.t = ItvDom.Mem.t
-   and type Dom.A.t = BasicDom.Loc.t
-   and type Dom.PowA.t = BasicDom.PowLoc.t
+    with type Dom.t = ItvDom.Mem.t
+     and type Dom.A.t = BasicDom.Loc.t
+     and type Dom.PowA.t = BasicDom.PowLoc.t
 
 val eval_lv :
-     ?spec:Spec.t
-  -> BasicDom.Proc.t
-  -> Cil.lval
-  -> ItvDom.Mem.t
-  -> BasicDom.PowLoc.t
+  ?spec:Spec.t ->
+  BasicDom.Proc.t ->
+  Cil.lval ->
+  ItvDom.Mem.t ->
+  BasicDom.PowLoc.t
 
 val eval :
   ?spec:Spec.t -> BasicDom.Proc.t -> Cil.exp -> ItvDom.Mem.t -> ItvDom.Val.t

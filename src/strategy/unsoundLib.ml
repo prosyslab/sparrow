@@ -21,7 +21,7 @@ module AccessSem = struct
   include AccessSem.Make (ItvSem)
 
   let accessof_eval pid e mem =
-    Dom.init_access () ;
+    Dom.init_access ();
     let _ = ItvSem.eval pid e mem in
     Dom.return_access ()
 end
@@ -31,61 +31,64 @@ module Access = ItvSem.Dom.Access
 
 type lib = string
 
-type feature =
-  { (* Whether the parameters contain constants or not *)
-    constant: bool
-  ; (* Whether the lib has a return value or not *)
-    return: bool
-  ; (* Whether the return type is int or not *)
-    return_int: bool
-  ; (* Whether the function is declared in string.h or not *)
-    from_string: bool
-  ; (* Whether the function is called in a loop or not *)
-    inside_loop: bool
-  ; (* The (normalized) number of arguments *)
-    size: float
-  ; (* Whether a parameter are defined in a loop or not *)
-    update_param_in_loop: bool
-  ; (* Whether the return value is used in a loop or not *)
-    use_ret_in_loop: bool
-  ; (* Whether a parameter is update via the library call *)
-    update_param_itself: bool
-  ; (* Whether the return value escapes the caller *)
-    out_of_fun: bool
-  ; (* Whether a parameters points to a global variable *)
-    gvar: bool
-  ; (* Whether a parameters are determined by external inputs *)
-    extern: float
-  ; (* Whether a parameter have a finite interval value *)
-    finite: float
-  ; (* The normalized number of abstract locations accessed in the arguments *)
-    points_to: float
-  ; (* The normalized number of string arguments *)
-    cstring: float }
+type feature = {
+  (* Whether the parameters contain constants or not *)
+  constant : bool;
+  (* Whether the lib has a return value or not *)
+  return : bool;
+  (* Whether the return type is int or not *)
+  return_int : bool;
+  (* Whether the function is declared in string.h or not *)
+  from_string : bool;
+  (* Whether the function is called in a loop or not *)
+  inside_loop : bool;
+  (* The (normalized) number of arguments *)
+  size : float;
+  (* Whether a parameter are defined in a loop or not *)
+  update_param_in_loop : bool;
+  (* Whether the return value is used in a loop or not *)
+  use_ret_in_loop : bool;
+  (* Whether a parameter is update via the library call *)
+  update_param_itself : bool;
+  (* Whether the return value escapes the caller *)
+  out_of_fun : bool;
+  (* Whether a parameters points to a global variable *)
+  gvar : bool;
+  (* Whether a parameters are determined by external inputs *)
+  extern : float;
+  (* Whether a parameter have a finite interval value *)
+  finite : float;
+  (* The normalized number of abstract locations accessed in the arguments *)
+  points_to : float;
+  (* The normalized number of string arguments *)
+  cstring : float;
+}
 
 type data = (lib, feature) BatMap.t
 
 let empty_feature =
-  { constant= false
-  ; size= 0.0
-  ; return= false
-  ; return_int= false
-  ; extern= 0.0
-  ; gvar= false
-  ; from_string= false
-  ; inside_loop= false
-  ; update_param_in_loop= false
-  ; use_ret_in_loop= false
-  ; update_param_itself= false
-  ; out_of_fun= false
-  ; finite= 0.0
-  ; points_to= 0.0
-  ; cstring= 0.0 }
+  {
+    constant = false;
+    size = 0.0;
+    return = false;
+    return_int = false;
+    extern = 0.0;
+    gvar = false;
+    from_string = false;
+    inside_loop = false;
+    update_param_in_loop = false;
+    use_ret_in_loop = false;
+    update_param_itself = false;
+    out_of_fun = false;
+    finite = 0.0;
+    points_to = 0.0;
+    cstring = 0.0;
+  }
 
 let string_of_feature f =
   "constant : " ^ string_of_bool f.constant ^ "\n" ^ "size : "
-  ^ string_of_float f.size ^ "\n" ^ "return : " ^ string_of_bool f.return
-  ^ "\n" ^ "return_int : "
+  ^ string_of_float f.size ^ "\n" ^ "return : " ^ string_of_bool f.return ^ "\n"
+  ^ "return_int : "
   ^ string_of_bool f.return_int
   ^ "\n" ^ "extern : " ^ string_of_float f.extern ^ "\n" ^ "gvar : "
   ^ string_of_bool f.constant ^ "\n" ^ "from_string : "
@@ -119,21 +122,23 @@ let string_of_raw_feature f =
 let float_of_bool b = if b then 1.0 else 0.0
 
 let feature_vector_of f =
-  [ float_of_bool f.constant
-  ; f.size
-  ; float_of_bool f.return
-  ; float_of_bool f.return_int
-  ; f.extern
-  ; float_of_bool f.gvar
-  ; float_of_bool f.from_string
-  ; float_of_bool f.inside_loop
-  ; float_of_bool f.update_param_in_loop
-  ; float_of_bool f.use_ret_in_loop
-  ; float_of_bool f.update_param_itself
-  ; float_of_bool f.out_of_fun
-  ; f.finite
-  ; f.points_to
-  ; f.cstring ]
+  [
+    float_of_bool f.constant;
+    f.size;
+    float_of_bool f.return;
+    float_of_bool f.return_int;
+    f.extern;
+    float_of_bool f.gvar;
+    float_of_bool f.from_string;
+    float_of_bool f.inside_loop;
+    float_of_bool f.update_param_in_loop;
+    float_of_bool f.use_ret_in_loop;
+    float_of_bool f.update_param_itself;
+    float_of_bool f.out_of_fun;
+    f.finite;
+    f.points_to;
+    f.cstring;
+  ]
 
 let string_of_trset trset =
   BatMap.foldi
@@ -146,24 +151,24 @@ let add_constant exps feat =
     | UnOp (_, e, _) -> const_condition e
     | _ -> false
   in
-  if exps = [] then {feat with constant= true}
+  if exps = [] then { feat with constant = true }
   else
     List.fold_left
       (fun feat exp ->
         if const_condition (CilHelper.remove_cast exp) then
-          {feat with constant= true}
-        else feat )
+          { feat with constant = true }
+        else feat)
       feat exps
 
-let add_size exps feat = {feat with size= float_of_int (List.length exps)}
+let add_size exps feat = { feat with size = float_of_int (List.length exps) }
 
 let add_return lvo feat =
-  match lvo with Some _ -> {feat with return= true} | _ -> feat
+  match lvo with Some _ -> { feat with return = true } | _ -> feat
 
 let add_return_int pid lvo cfg feat =
   match lvo with
   | Some x ->
-      {feat with return_int= Cil.isIntegralType (Cil.typeOf (Cil.Lval x))}
+      { feat with return_int = Cil.isIntegralType (Cil.typeOf (Cil.Lval x)) }
   | _ -> feat
 
 let sem_fun = ItvSem.run AbsSem.Strong ItvSem.Spec.empty
@@ -176,10 +181,11 @@ let add_points_to global node exps feat =
         (Access.Info.accessof
            (AccessSem.accessof global node sem_fun global.mem))
     in
-    { feat with
-      points_to=
-        float_of_int (PowLoc.cardinal locset)
-        /. float_of_int (List.length exps) }
+    {
+      feat with
+      points_to =
+        float_of_int (PowLoc.cardinal locset) /. float_of_int (List.length exps);
+    }
 
 let add_extern global node exps feat =
   if exps = [] then feat
@@ -204,9 +210,10 @@ let add_extern global node exps feat =
         (fun count e -> if has_extern e then count +. 1.0 else count)
         0.0 exps
     in
-    { feat with
-      extern=
-        (if count /. float_of_int (List.length exps) > 0.0 then 1.0 else 0.0)
+    {
+      feat with
+      extern =
+        (if count /. float_of_int (List.length exps) > 0.0 then 1.0 else 0.0);
     }
 
 let add_gvar global node feat =
@@ -223,7 +230,7 @@ let add_gvar global node feat =
   if
     PowLoc.exists Loc.is_gvar locset
     || PowLoc.exists (fun x -> String.sub (Loc.to_string x) 0 3 = "_G_") locset
-  then {feat with gvar= true}
+  then { feat with gvar = true }
   else feat
 
 let add_finite global node exps feat =
@@ -239,7 +246,7 @@ let add_finite global node exps feat =
     || (List.length exps = 2 && is_finite (List.nth exps 1))
     || (List.length exps = 1 && is_finite (List.nth exps 0))
     || List.length exps = 0
-  then {feat with finite= 1.0}
+  then { feat with finite = 1.0 }
   else feat
 
 let add_cstring global cond_node cfg exps feat =
@@ -263,32 +270,33 @@ let add_cstring global cond_node cfg exps feat =
         let strlib =
           List.map
             (fun x -> "__extern__" ^ x)
-            [ "getenv"
-            ; "rindex"
-            ; "index"
-            ; "strdup"
-            ; "strrchr"
-            ; "strstr"
-            ; "basename"
-            ; "strtok"
-            ; "fgets"
-            ; "_IO_getc" ]
+            [
+              "getenv";
+              "rindex";
+              "index";
+              "strdup";
+              "strrchr";
+              "strstr";
+              "basename";
+              "strtok";
+              "fgets";
+              "_IO_getc";
+            ]
         in
         BatSet.exists (fun x -> List.mem x strlib) locset
-        || ((not (Itv.is_bot nullpos)) && Itv.is_finite nullpos) )
+        || ((not (Itv.is_bot nullpos)) && Itv.is_finite nullpos))
       use
   in
   if
     (List.length exps = 2 && is_cstring (List.nth exps 1))
     || (List.length exps = 1 && is_cstring (List.nth exps 0))
     || List.length exps = 0
-  then {feat with cstring= 1.0}
+  then { feat with cstring = 1.0 }
   else feat
 
 let add_inside_loop global node exps pid scc_list feat =
-  if
-    List.exists (fun x -> List.mem (InterCfg.Node.get_cfgnode node) x) scc_list
-  then {feat with inside_loop= true}
+  if List.exists (fun x -> List.mem (InterCfg.Node.get_cfgnode node) x) scc_list
+  then { feat with inside_loop = true }
   else feat
 
 let add_use_ret_in_loop global node exps pid scc_list feat =
@@ -307,11 +315,11 @@ let add_use_ret_in_loop global node exps pid scc_list feat =
               Access.Info.useof
                 (AccessSem.accessof global inter_node sem_fun global.mem)
             in
-            inter_node <> node && PowLoc.meet use def <> PowLoc.bot )
-          loop )
+            inter_node <> node && PowLoc.meet use def <> PowLoc.bot)
+          loop)
       scc_list
   in
-  {feat with use_ret_in_loop= b}
+  { feat with use_ret_in_loop = b }
 
 let add_update_param_in_loop global node exps pid scc_list feat =
   let b =
@@ -320,7 +328,7 @@ let add_update_param_in_loop global node exps pid scc_list feat =
         let use =
           List.fold_left
             (fun use e ->
-              Access.Info.useof (AccessSem.accessof_eval pid e global.mem) )
+              Access.Info.useof (AccessSem.accessof_eval pid e global.mem))
             PowLoc.bot exps
         in
         List.exists
@@ -330,11 +338,11 @@ let add_update_param_in_loop global node exps pid scc_list feat =
               Access.Info.defof
                 (AccessSem.accessof global inter_node sem_fun global.mem)
             in
-            inter_node <> node && PowLoc.meet use def <> PowLoc.bot )
-          loop )
+            inter_node <> node && PowLoc.meet use def <> PowLoc.bot)
+          loop)
       scc_list
   in
-  {feat with update_param_in_loop= b}
+  { feat with update_param_in_loop = b }
 
 let add_update_param_itself global node exps pid scc_list feat =
   let access = AccessSem.accessof global node sem_fun global.mem in
@@ -349,7 +357,7 @@ let add_update_param_itself global node exps pid scc_list feat =
       (Access.Info.useof access)
   in
   let b = PowLoc.bot <> PowLoc.meet def use in
-  {feat with update_param_itself= b}
+  { feat with update_param_itself = b }
 
 let add_out_of_fun global node cfg feat =
   let def =
@@ -366,36 +374,38 @@ let add_out_of_fun global node cfg feat =
                 (AccessSem.accessof global node sem_fun global.mem)
             in
             PowLoc.join use locset
-        | _ -> locset )
+        | _ -> locset)
       cfg PowLoc.bot
   in
-  if PowLoc.meet def use_of_ret <> PowLoc.bot then {feat with out_of_fun= true}
+  if PowLoc.meet def use_of_ret <> PowLoc.bot then
+    { feat with out_of_fun = true }
   else feat
 
 let add_from f feat =
-  if
-    Str.string_match (Str.regexp ".*string.*") (CilHelper.s_location f.vdecl) 0
-  then {feat with from_string= true}
+  if Str.string_match (Str.regexp ".*string.*") (CilHelper.s_location f.vdecl) 0
+  then { feat with from_string = true }
   else feat
 
 let ignore_libs =
-  [ "fprintf"
-  ; "printf"
-  ; "close"
-  ; "exit"
-  ; "perror"
-  ; "fileno"
-  ; "unlink"
-  ; "free"
-  ; "sprintf"
-  ; "fflush"
-  ; "fclose"
-  ; "__builtin_va_end"
-  ; "vfprintf"
-  ; "__builtin_va_start"
-  ; "signal"
-  ; "__assert_fail"
-  ; "putchar" ]
+  [
+    "fprintf";
+    "printf";
+    "close";
+    "exit";
+    "perror";
+    "fileno";
+    "unlink";
+    "free";
+    "sprintf";
+    "fflush";
+    "fclose";
+    "__builtin_va_end";
+    "vfprintf";
+    "__builtin_va_start";
+    "signal";
+    "__assert_fail";
+    "putchar";
+  ]
 
 let lib_feature global cfg trset =
   let scc_list =
@@ -427,7 +437,7 @@ let lib_feature global cfg trset =
             |> add_cstring global node cfg exps
           in
           BatMap.add libid feat trset
-      | _ -> trset )
+      | _ -> trset)
     cfg trset
 
 let normalize trset =
@@ -441,9 +451,11 @@ let normalize trset =
   in
   BatMap.map
     (fun feat ->
-      { feat with
-        size= feat.size /. max_size; points_to= feat.points_to /. max_points_to
-      } )
+      {
+        feat with
+        size = feat.size /. max_size;
+        points_to = feat.points_to /. max_points_to;
+      })
     trset
 
 let extract_feature global =
@@ -452,18 +464,18 @@ let extract_feature global =
       (fun trset glob ->
         match glob with
         | Cil.GFun (fd, _) -> (
-          try
-            let cfg = InterCfg.cfgof global.icfg fd.svar.vname in
-            lib_feature global cfg trset
-          with _ -> trset )
-        | _ -> trset )
+            try
+              let cfg = InterCfg.cfgof global.icfg fd.svar.vname in
+              lib_feature global cfg trset
+            with _ -> trset )
+        | _ -> trset)
       BatMap.empty
   in
   if !Options.debug then (
-    prerr_endline "== features for library ==" ;
+    prerr_endline "== features for library ==";
     BatMap.iter
       (fun k v -> prerr_endline (k ^ "\n" ^ string_of_feature v))
-      trset ) ;
+      trset );
   normalize trset
 
 let print_feature data = string_of_trset data |> print_string
@@ -479,18 +491,19 @@ let get_harmless_libs global =
     let classifier =
       Lymp.Pyref
         (Lymp.get_ref py_module "load"
-           [Lymp.Pystr (sparrow_data_path ^ "/harmless_lib_clf")])
+           [ Lymp.Pystr (sparrow_data_path ^ "/harmless_lib_clf") ])
     in
     let set =
       BatMap.foldi
         (fun l fvec loops ->
           let vec = feature_vector_of fvec in
           let vec = Lymp.Pylist (List.map (fun x -> Lymp.Pyfloat x) vec) in
-          let b = Lymp.get_bool py_module "is_harmless" [classifier; vec] in
-          if b then BatSet.add l loops else loops )
+          let b = Lymp.get_bool py_module "is_harmless" [ classifier; vec ] in
+          if b then BatSet.add l loops else loops)
         data BatSet.empty
     in
-    Lymp.close py ; set
+    Lymp.close py;
+    set
 
 let collect global =
   BatSet.union (get_harmless_libs global) !Options.unsound_lib

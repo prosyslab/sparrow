@@ -52,16 +52,16 @@ let to_string t =
 
 let location_of = function
   | ArrayExp (_, _, l)
-   |DerefExp (_, l)
-   |DivExp (_, _, l)
-   |Strcpy (_, _, l)
-   |Strncpy (_, _, _, l)
-   |Memcpy (_, _, _, l)
-   |Memmove (_, _, _, l)
-   |Strcat (_, _, l)
-   |BufferOverrunLib (_, _, l)
-   |AllocSize (_, _, l)
-   |Printf (_, _, l) ->
+  | DerefExp (_, l)
+  | DivExp (_, _, l)
+  | Strcpy (_, _, l)
+  | Strncpy (_, _, _, l)
+  | Memcpy (_, _, _, l)
+  | Memmove (_, _, _, l)
+  | Strcat (_, _, l)
+  | BufferOverrunLib (_, _, l)
+  | AllocSize (_, _, l)
+  | Printf (_, _, l) ->
       l
 
 (* NOTE: you may use Cil.addOffset or Cil.addOffsetLval instead of
@@ -97,9 +97,9 @@ and c_exp e loc =
   | AlignOfE e -> c_exp e loc
   | UnOp (_, e, _) -> c_exp e loc
   | BinOp (bop, e1, e2, _) -> (
-    match bop with
-    | Div | Mod -> (DivExp (e1, e2, loc) :: c_exp e1 loc) @ c_exp e2 loc
-    | _ -> c_exp e1 loc @ c_exp e2 loc )
+      match bop with
+      | Div | Mod -> (DivExp (e1, e2, loc) :: c_exp e1 loc) @ c_exp e2 loc
+      | _ -> c_exp e1 loc @ c_exp e2 loc )
   | CastE (_, e) -> c_exp e loc
   | AddrOf lv -> c_lv lv loc
   | StartOf lv -> c_lv lv loc
@@ -108,14 +108,13 @@ and c_exp e loc =
 and c_exps exps loc = List.fold_left (fun q e -> q @ c_exp e loc) [] exps
 
 let query_lib =
-  ["strcpy"; "memcpy"; "memmove"; "strncpy"; "strcat"; "memchr"; "strncmp"]
+  [ "strcpy"; "memcpy"; "memmove"; "strncpy"; "strcat"; "memchr"; "strncmp" ]
 
 let c_lib f es loc =
   match f.vname with
   | "strcpy" -> Strcpy (List.nth es 0, List.nth es 1, loc) :: c_exps es loc
   | "memcpy" ->
-      Memcpy (List.nth es 0, List.nth es 1, List.nth es 2, loc)
-      :: c_exps es loc
+      Memcpy (List.nth es 0, List.nth es 1, List.nth es 2, loc) :: c_exps es loc
   | "memmove" ->
       Memmove (List.nth es 0, List.nth es 1, List.nth es 2, loc)
       :: c_exps es loc
@@ -125,20 +124,19 @@ let c_lib f es loc =
   | "strcat" -> Strcat (List.nth es 0, List.nth es 1, loc) :: c_exps es loc
   | "memchr" | "strncmp" ->
       BufferOverrunLib
-        (f.vname, [List.nth es 0; List.nth es 1; List.nth es 2], loc)
+        (f.vname, [ List.nth es 0; List.nth es 1; List.nth es 2 ], loc)
       :: c_exps es loc
   | _ -> []
 
 let c_lib_taint f es loc =
   match f.vname with
-  | "mmap" | "realloc" -> [AllocSize (f.vname, List.nth es 1, loc)]
-  | "calloc" -> [AllocSize (f.vname, List.nth es 0, loc)]
-  | "printf" -> [Printf (f.vname, List.nth es 0, loc)]
-  | "fprintf" | "sprintf" | "vfprintf" | "vsprintf" | "vasprintf"
-   |"__asprintf" | "asprintf" | "vdprintf" | "dprintf" | "easprintf"
-   |"evasprintf" ->
-      [Printf (f.vname, List.nth es 1, loc)]
-  | "snprintf" | "vsnprintf" -> [Printf (f.vname, List.nth es 2, loc)]
+  | "mmap" | "realloc" -> [ AllocSize (f.vname, List.nth es 1, loc) ]
+  | "calloc" -> [ AllocSize (f.vname, List.nth es 0, loc) ]
+  | "printf" -> [ Printf (f.vname, List.nth es 0, loc) ]
+  | "fprintf" | "sprintf" | "vfprintf" | "vsprintf" | "vasprintf" | "__asprintf"
+  | "asprintf" | "vdprintf" | "dprintf" | "easprintf" | "evasprintf" ->
+      [ Printf (f.vname, List.nth es 1, loc) ]
+  | "snprintf" | "vsnprintf" -> [ Printf (f.vname, List.nth es 2, loc) ]
   | _ -> []
 
 let collect_interval = function
@@ -152,12 +150,11 @@ let collect_interval = function
     when List.mem f.vname query_lib ->
       c_lib f es loc
   | Cmd.Ccall (None, e, es, loc) -> c_exp e loc @ c_exps es loc
-  | Cmd.Ccall (Some lv, e, es, loc) ->
-      c_lv lv loc @ c_exp e loc @ c_exps es loc
+  | Cmd.Ccall (Some lv, e, es, loc) -> c_lv lv loc @ c_exp e loc @ c_exps es loc
   | _ -> []
 
 let collect_taint = function
-  | Cmd.Calloc (lv, Array e, _, loc) -> [AllocSize ("malloc", e, loc)]
+  | Cmd.Calloc (lv, Array e, _, loc) -> [ AllocSize ("malloc", e, loc) ]
   | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) -> c_lib_taint f es loc
   | _ -> []
 

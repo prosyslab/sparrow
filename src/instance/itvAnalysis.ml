@@ -36,10 +36,10 @@ let print_abslocs_info locs =
   let gvars = BatSet.filter Loc.is_gvar locs in
   let allocsites = BatSet.filter Loc.is_allocsite locs in
   let fields = BatSet.filter Loc.is_field locs in
-  prerr_endline ("#abslocs    : " ^ i2s (BatSet.cardinal locs)) ;
-  prerr_endline ("#lvars      : " ^ i2s (BatSet.cardinal lvars)) ;
-  prerr_endline ("#gvars      : " ^ i2s (BatSet.cardinal gvars)) ;
-  prerr_endline ("#allocsites : " ^ i2s (BatSet.cardinal allocsites)) ;
+  prerr_endline ("#abslocs    : " ^ i2s (BatSet.cardinal locs));
+  prerr_endline ("#lvars      : " ^ i2s (BatSet.cardinal lvars));
+  prerr_endline ("#gvars      : " ^ i2s (BatSet.cardinal gvars));
+  prerr_endline ("#allocsites : " ^ i2s (BatSet.cardinal allocsites));
   prerr_endline ("#fields     : " ^ i2s (BatSet.cardinal fields))
 
 (* **************** *
@@ -59,7 +59,7 @@ let ignore_alarm a arr offset =
 
 let check_bo v1 v2opt =
   let arr = Val.array_of_val v1 in
-  if ArrayBlk.eq arr ArrayBlk.bot then [(BotAlarm, None, "Array is Bot")]
+  if ArrayBlk.eq arr ArrayBlk.bot then [ (BotAlarm, None, "Array is Bot") ]
   else
     ArrayBlk.foldi
       (fun a arr lst ->
@@ -78,14 +78,14 @@ let check_bo v1 v2opt =
               if ou >= sl || ol < 0 then UnProven else Proven
           with _ -> UnProven
         in
-        (status, Some a, string_of_alarminfo offset arr.ArrInfo.size) :: lst )
+        (status, Some a, string_of_alarminfo offset arr.ArrInfo.size) :: lst)
       arr []
 
 let check_nd v1 =
   let ploc = Val.pow_loc_of_val v1 in
-  if PowLoc.eq ploc PowLoc.bot then [(BotAlarm, None, "PowLoc is Bot")]
-  else if PowLoc.mem Loc.null ploc then [(UnProven, None, "Null Dereference")]
-  else [(Proven, None, "")]
+  if PowLoc.eq ploc PowLoc.bot then [ (BotAlarm, None, "PowLoc is Bot") ]
+  else if PowLoc.mem Loc.null ploc then [ (UnProven, None, "Null Dereference") ]
+  else [ (Proven, None, "") ]
 
 let inspect_aexp_bo node aexp mem queries =
   ( match aexp with
@@ -97,7 +97,7 @@ let inspect_aexp_bo node aexp mem queries =
       let lst = check_bo v1 (Some v2) in
       List.map
         (fun (status, a, desc) ->
-          {node; exp= aexp; loc; allocsite= a; status; desc; src= None} )
+          { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         lst
   | DerefExp (e, loc) ->
       let v = ItvSem.eval (InterCfg.Node.get_pid node) e mem in
@@ -105,21 +105,23 @@ let inspect_aexp_bo node aexp mem queries =
       if Val.eq Val.bot v then
         List.map
           (fun (status, a, desc) ->
-            {node; exp= aexp; loc; allocsite= a; status; desc; src= None} )
+            { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
           lst
       else
         List.map
           (fun (status, a, desc) ->
             if status = BotAlarm then
-              { node
-              ; exp= aexp
-              ; loc
-              ; status= Proven
-              ; allocsite= a
-              ; desc= "valid pointer dereference"
-              ; src= None }
-            else {node; exp= aexp; loc; status; allocsite= a; desc; src= None}
-            )
+              {
+                node;
+                exp = aexp;
+                loc;
+                status = Proven;
+                allocsite = a;
+                desc = "valid pointer dereference";
+                src = None;
+              }
+            else
+              { node; exp = aexp; loc; status; allocsite = a; desc; src = None })
           lst
   | Strcpy (e1, e2, loc) ->
       let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
@@ -128,7 +130,7 @@ let inspect_aexp_bo node aexp mem queries =
       let lst = check_bo v1 (Some v2) in
       List.map
         (fun (status, a, desc) ->
-          {node; exp= aexp; loc; allocsite= a; status; desc; src= None} )
+          { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         lst
   | Strcat (e1, e2, loc) ->
       let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
@@ -139,12 +141,12 @@ let inspect_aexp_bo node aexp mem queries =
       let lst = check_bo v1 (Some np) in
       List.map
         (fun (status, a, desc) ->
-          {node; exp= aexp; loc; allocsite= a; status; desc; src= None} )
+          { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         lst
   | Strncpy (e1, e2, e3, loc)
-   |Memcpy (e1, e2, e3, loc)
-   |Memmove (e1, e2, e3, loc)
-   |BufferOverrunLib ("strncmp", [e1; e2; e3], loc) ->
+  | Memcpy (e1, e2, e3, loc)
+  | Memmove (e1, e2, e3, loc)
+  | BufferOverrunLib ("strncmp", [ e1; e2; e3 ], loc) ->
       let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
       let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e2 mem in
       let e3_1 = Cil.BinOp (Cil.MinusA, e3, Cil.one, Cil.intType) in
@@ -153,16 +155,16 @@ let inspect_aexp_bo node aexp mem queries =
       let lst2 = check_bo v2 (Some v3) in
       List.map
         (fun (status, a, desc) ->
-          {node; exp= aexp; loc; allocsite= a; status; desc; src= None} )
+          { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         (lst1 @ lst2)
-  | BufferOverrunLib ("memchr", [e1; _; e3], loc) ->
+  | BufferOverrunLib ("memchr", [ e1; _; e3 ], loc) ->
       let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
       let e3_1 = Cil.BinOp (Cil.MinusA, e3, Cil.one, Cil.intType) in
       let v3 = ItvSem.eval (InterCfg.Node.get_pid node) e3_1 mem in
       let lst1 = check_bo v1 (Some v3) in
       List.map
         (fun (status, a, desc) ->
-          {node; exp= aexp; loc; allocsite= a; status; desc; src= None} )
+          { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         lst1
   | _ -> [] )
   @ queries
@@ -175,29 +177,31 @@ let inspect_aexp_nd node aexp mem queries =
       if Val.eq Val.bot v then
         List.map
           (fun (status, a, desc) ->
-            {node; exp= aexp; loc; allocsite= a; status; desc; src= None} )
+            { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
           lst
       else
         List.map
           (fun (status, a, desc) ->
             if status = BotAlarm then
-              { node
-              ; exp= aexp
-              ; loc
-              ; status= Proven
-              ; allocsite= a
-              ; desc= "valid pointer dereference"
-              ; src= None }
-            else {node; exp= aexp; loc; status; allocsite= a; desc; src= None}
-            )
+              {
+                node;
+                exp = aexp;
+                loc;
+                status = Proven;
+                allocsite = a;
+                desc = "valid pointer dereference";
+                src = None;
+              }
+            else
+              { node; exp = aexp; loc; status; allocsite = a; desc; src = None })
           lst
   | _ -> [] )
   @ queries
 
 let check_dz v =
   let v = Val.itv_of_val v in
-  if Itv.le Itv.zero v then [(UnProven, None, "Divide by " ^ Itv.to_string v)]
-  else [(Proven, None, "")]
+  if Itv.le Itv.zero v then [ (UnProven, None, "Divide by " ^ Itv.to_string v) ]
+  else [ (Proven, None, "") ]
 
 let inspect_aexp_dz node aexp mem queries =
   ( match aexp with
@@ -206,7 +210,7 @@ let inspect_aexp_dz node aexp mem queries =
       let lst = check_dz v in
       List.map
         (fun (status, a, desc) ->
-          {node; exp= aexp; loc; allocsite= None; status; desc; src= None} )
+          { node; exp = aexp; loc; allocsite = None; status; desc; src = None })
         lst
   | _ -> [] )
   @ queries
@@ -217,7 +221,7 @@ let machine_gen_code q =
   || Filename.check_suffix q.loc.Cil.file ".yy.c"
   || Filename.check_suffix q.loc.Cil.file ".simple"
   || (* sparrow-generated code *)
-     InterCfg.Node.get_pid q.node = InterCfg.global_proc
+  InterCfg.Node.get_pid q.node = InterCfg.global_proc
 
 let rec unsound_exp = function
   | Cil.BinOp (Cil.PlusPI, Cil.Lval (Cil.Mem _, _), _, _) -> true
@@ -235,8 +239,7 @@ let rec unsound_exp = function
 
 and unsound_lv = function
   | _, Cil.Index _ -> true
-  | Cil.Var v, _ ->
-      is_global_integer v || is_union v.vtype || is_temp_integer v
+  | Cil.Var v, _ -> is_global_integer v || is_union v.vtype || is_temp_integer v
   | Cil.Mem _, Cil.NoOffset -> true
   | _, _ -> false
 
@@ -278,21 +281,21 @@ let unsound_filter global ql =
     List.filter
       (fun q ->
         (not (machine_gen_code q)) && not (unsound_aexp q.exp)
-        (*     not (formal_param global q)*) )
+        (*     not (formal_param global q)*))
       ql
   in
   let partition =
     list_fold
       (fun q m ->
         let p_als = try BatMap.find (q.loc, q.node) m with _ -> [] in
-        BatMap.add (q.loc, q.node) (q :: p_als) m )
+        BatMap.add (q.loc, q.node) (q :: p_als) m)
       filtered BatMap.empty
   in
   BatMap.fold
     (fun ql result ->
       if List.length (Report.get ql UnProven) > 3 then
-        List.map (fun q -> {q with status= Proven}) ql @ result
-      else ql @ result )
+        List.map (fun q -> { q with status = Proven }) ql @ result
+      else ql @ result)
     partition []
 
 let filter qs s = List.filter (fun q -> q.status = s) qs
@@ -302,7 +305,7 @@ let generate (global, inputof, target) =
   let total = List.length nodes in
   list_fold
     (fun node (qs, k) ->
-      prerr_progressbar ~itv:1000 k total ;
+      prerr_progressbar ~itv:1000 k total;
       let mem = Table.find node inputof in
       let cmd = InterCfg.cmdof global.icfg node in
       let aexps = AlarmExp.collect analysis cmd in
@@ -314,10 +317,10 @@ let generate (global, inputof, target) =
               match target with
               | BO -> inspect_aexp_bo node aexp mem
               | ND -> inspect_aexp_nd node aexp mem
-              | DZ -> inspect_aexp_dz node aexp mem )
+              | DZ -> inspect_aexp_dz node aexp mem)
           aexps qs
       in
-      (qs, k + 1) )
+      (qs, k + 1))
     nodes ([], 0)
   |> fst
   |> opt (!Options.bugfinder > 0) (unsound_filter global)
@@ -333,7 +336,7 @@ let generate_with_mem (global, mem, target) =
         match target with
         | BO -> list_fold (fun aexp -> inspect_aexp_bo node aexp mem) aexps
         | ND -> list_fold (fun aexp -> inspect_aexp_nd node aexp mem) aexps
-        | DZ -> list_fold (fun aexp -> inspect_aexp_dz node aexp mem) aexps )
+        | DZ -> list_fold (fun aexp -> inspect_aexp_dz node aexp mem) aexps)
     nodes []
 
 (* ********** *
@@ -349,10 +352,10 @@ let marshal_in global =
 
 let marshal_out (global, dug, input, output) =
   let filename = Filename.basename global.file.fileName in
-  MarshalManager.output (filename ^ ".itv.global") global ;
-  MarshalManager.output (filename ^ ".itv.dug") dug ;
-  MarshalManager.output (filename ^ ".itv.input") input ;
-  MarshalManager.output (filename ^ ".itv.output") output ;
+  MarshalManager.output (filename ^ ".itv.global") global;
+  MarshalManager.output (filename ^ ".itv.dug") dug;
+  MarshalManager.output (filename ^ ".itv.input") input;
+  MarshalManager.output (filename ^ ".itv.output") output;
   (global, dug, input, output)
 
 let inspect_alarm global _ inputof =
@@ -367,7 +370,7 @@ let get_locset mem =
       |> PowLoc.union (Val.pow_loc_of_val v)
       |> BatSet.fold
            (fun a -> PowLoc.add (Loc.of_allocsite a))
-           (Val.allocsites_of_val v) )
+           (Val.allocsites_of_val v))
     mem PowLoc.empty
 
 module LMap = BatMap.Make (Loc)
@@ -378,7 +381,7 @@ let connect_from_start g =
   DUGraph.fold_node
     (fun node l ->
       if DUGraph.pred node g = [] && node <> InterCfg.start_node then node :: l
-      else l )
+      else l)
     g []
   |> List.fold_left (fun g n -> DUGraph.add_edge InterCfg.start_node n g) g
 
@@ -386,12 +389,12 @@ let print_datalog_fact spec global dug alarms =
   let dug = connect_from_start dug in
   let alarms =
     List.rev_map
-      (fun q -> {q with src= Some (InterCfg.start_node, Cil.locUnknown)})
+      (fun q -> { q with src = Some (InterCfg.start_node, Cil.locUnknown) })
       alarms
   in
-  RelSyntax.print analysis global.icfg ;
-  Provenance.print analysis global.relations ;
-  RelDUGraph.print analysis global dug alarms ;
+  RelSyntax.print analysis global.icfg;
+  Provenance.print analysis global.relations;
+  RelDUGraph.print analysis global dug alarms;
   RelDUGraph.print_alarm analysis alarms
 
 let ignore_file file =
@@ -403,7 +406,7 @@ let ignore_node node =
   BatSet.elements !Options.filter_node
   |> List.map Str.regexp
   |> List.exists (fun re ->
-         Str.string_match re (InterCfg.Node.to_string node) 0 )
+         Str.string_match re (InterCfg.Node.to_string node) 0)
 
 let ignore_function node =
   BatSet.elements !Options.filter_function
@@ -423,7 +426,7 @@ let post_process spec (global, dug, inputof, outputof) =
     |> List.filter (fun q ->
            match q.Report.allocsite with
            | Some a -> not (ignore_allocsite (Allocsite.to_string a))
-           | None -> true )
+           | None -> true)
     |> List.filter (fun a -> not (ignore_file a.Report.loc.file))
     |> List.filter (fun a -> not (ignore_function a.Report.node))
     |> List.filter (fun a -> not (ignore_node a.Report.node))
@@ -432,10 +435,10 @@ let post_process spec (global, dug, inputof, outputof) =
     open_out (FileManager.analysis_dir analysis ^ "/report.txt")
   in
   let fmt = F.formatter_of_out_channel report_file in
-  Report.print ~fmt:(Some fmt) global alarms ;
-  close_out report_file ;
+  Report.print ~fmt:(Some fmt) global alarms;
+  close_out report_file;
   if !Options.extract_datalog_fact then
-    print_datalog_fact spec global dug alarms ;
+    print_datalog_fact spec global dug alarms;
   (global, dug, inputof, outputof, alarms)
 
 let do_analysis global =
@@ -446,14 +449,16 @@ let do_analysis global =
   let unsound_update = !Options.bugfinder >= 2 in
   let unsound_bitwise = !Options.bugfinder >= 1 in
   let spec =
-    { Spec.empty with
-      analysis
-    ; locset
-    ; locset_fs
-    ; premem= global.mem
-    ; unsound_lib
-    ; unsound_update
-    ; unsound_bitwise }
+    {
+      Spec.empty with
+      analysis;
+      locset;
+      locset_fs;
+      premem = global.mem;
+      unsound_lib;
+      unsound_update;
+      unsound_bitwise;
+    }
   in
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global
   |> opt !Options.marshal_out marshal_out

@@ -53,7 +53,7 @@ module UserInput = struct
 end
 
 module Val = struct
-  type t = {int_overflow: IntOverflow.t; user_input: UserInput.t}
+  type t = { int_overflow : IntOverflow.t; user_input : UserInput.t }
 
   let int_overflow x = x.int_overflow
 
@@ -68,11 +68,11 @@ module Val = struct
 
   let compare = compare
 
-  let bot = {int_overflow= IntOverflow.bot; user_input= UserInput.bot}
+  let bot = { int_overflow = IntOverflow.bot; user_input = UserInput.bot }
 
-  let top = {int_overflow= IntOverflow.top; user_input= UserInput.top}
+  let top = { int_overflow = IntOverflow.top; user_input = UserInput.top }
 
-  let input_value node loc = {top with user_input= UserInput.make node loc}
+  let input_value node loc = { top with user_input = UserInput.make node loc }
 
   let le x y =
     IntOverflow.le x.int_overflow y.int_overflow
@@ -83,12 +83,16 @@ module Val = struct
     && UserInput.eq x.user_input y.user_input
 
   let join x y =
-    { int_overflow= IntOverflow.join x.int_overflow y.int_overflow
-    ; user_input= UserInput.join x.user_input y.user_input }
+    {
+      int_overflow = IntOverflow.join x.int_overflow y.int_overflow;
+      user_input = UserInput.join x.user_input y.user_input;
+    }
 
   let meet x y =
-    { int_overflow= IntOverflow.meet x.int_overflow y.int_overflow
-    ; user_input= UserInput.meet x.user_input y.user_input }
+    {
+      int_overflow = IntOverflow.meet x.int_overflow y.int_overflow;
+      user_input = UserInput.meet x.user_input y.user_input;
+    }
 
   let is_bot x = x = bot
 

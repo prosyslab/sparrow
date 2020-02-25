@@ -10,14 +10,15 @@
 (***********************************************************************)
 (** Global information *)
 
-type t =
-  { file: Cil.file
-  ; icfg: InterCfg.t
-  ; callgraph: CallGraph.t
-  ; dump: BasicDom.Dump.t
-  ; mem: ItvDom.Mem.t
-  ; table: ItvDom.Table.t
-  ; relations: RelSemantics.Set.t }
+type t = {
+  file : Cil.file;
+  icfg : InterCfg.t;
+  callgraph : CallGraph.t;
+  dump : BasicDom.Dump.t;
+  mem : ItvDom.Mem.t;
+  table : ItvDom.Table.t;
+  relations : RelSemantics.Set.t;
+}
 
 val init : Cil.file -> t
 

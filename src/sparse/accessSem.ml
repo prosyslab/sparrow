@@ -20,12 +20,12 @@ module type S = sig
     Access.S with type t = Dom.Access.t and type Info.t = Dom.Access.Info.t
 
   val accessof :
-       ?locset:Dom.PowA.t
-    -> Global.t
-    -> BasicDom.Node.t
-    -> (BasicDom.Node.t -> Dom.t * Global.t -> Dom.t * Global.t)
-    -> Dom.t
-    -> Access.info
+    ?locset:Dom.PowA.t ->
+    Global.t ->
+    BasicDom.Node.t ->
+    (BasicDom.Node.t -> Dom.t * Global.t -> Dom.t * Global.t) ->
+    Dom.t ->
+    Access.info
 end
 
 module Make (Sem : AbsSem.S) = struct
@@ -33,7 +33,7 @@ module Make (Sem : AbsSem.S) = struct
   module Access = Sem.Dom.Access
 
   let accessof ?(locset = Dom.PowA.empty) global node f mem =
-    Dom.init_access () ;
+    Dom.init_access ();
     let _ = f node (mem, global) in
     Dom.return_access ()
 end

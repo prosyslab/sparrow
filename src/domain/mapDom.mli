@@ -75,10 +75,10 @@ end
 
 module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) :
   CPO
-  with type t = B.t BatMap.Make(A).t
-   and type PowA.t = PowDom.MakeCPO(A).t
-   and type A.t = A.t
-   and type B.t = B.t
+    with type t = B.t BatMap.Make(A).t
+     and type PowA.t = PowDom.MakeCPO(A).t
+     and type A.t = A.t
+     and type B.t = B.t
 
 module MakeLAT (A : AbsDom.SET) (B : AbsDom.CPO) :
   LAT with type A.t = A.t and type B.t = B.t

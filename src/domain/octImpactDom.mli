@@ -34,19 +34,18 @@ module AbsOct : sig
   val check : OctDom.OctLoc.t -> OctDom.OctLoc.t -> t -> bool
 end
 
-module Mem :
-  sig
-    include InstrumentedMem.S
+module Mem : sig
+  include InstrumentedMem.S
 
-    val init : OctDom.PackConf.t -> t
+  val init : OctDom.PackConf.t -> t
 
-    val top : OctDom.PackConf.t -> t
+  val top : OctDom.PackConf.t -> t
 
-    val lookup : t -> AbsOct.t
-  end
-  with type A.t = OctDom.Pack.t
-   and type B.t = AbsOct.t
-   and type PowA.t = OctDom.PackConf.t
+  val lookup : t -> AbsOct.t
+end
+with type A.t = OctDom.Pack.t
+ and type B.t = AbsOct.t
+ and type PowA.t = OctDom.PackConf.t
 
 module Relation : sig
   type t

@@ -153,9 +153,9 @@ let rec remove_cast = function
 
 let rec remove_coeff = function
   | Cil.BinOp (Cil.Mult, Cil.SizeOfE _, e1, _)
-   |Cil.BinOp (Cil.Mult, e1, Cil.SizeOfE _, _)
-   |Cil.BinOp (Cil.Mult, Cil.SizeOf _, e1, _)
-   |Cil.BinOp (Cil.Mult, e1, Cil.SizeOf _, _) ->
+  | Cil.BinOp (Cil.Mult, e1, Cil.SizeOfE _, _)
+  | Cil.BinOp (Cil.Mult, Cil.SizeOf _, e1, _)
+  | Cil.BinOp (Cil.Mult, e1, Cil.SizeOf _, _) ->
       remove_coeff e1
   | Cil.BinOp (b, e1, e2, t) ->
       Cil.BinOp (b, remove_coeff e1, remove_coeff e2, t)
@@ -172,9 +172,10 @@ let is_unsigned = function
  * Adhoc solution: To avoid this failure, translate original C sources
  * into "CIL" (using -il option) and analyze the CIL program. *)
 let byteSizeOf typ =
-  try Cil.bitsSizeOf typ / 8 with e ->
+  try Cil.bitsSizeOf typ / 8
+  with e ->
     if !Options.verbose >= 2 then
-      prerr_endline ("warn: Cil.bitsSizeOf (" ^ s_type typ ^ ")") ;
+      prerr_endline ("warn: Cil.bitsSizeOf (" ^ s_type typ ^ ")");
     raise e
 
 module Lval = struct

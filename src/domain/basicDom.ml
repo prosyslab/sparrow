@@ -101,8 +101,7 @@ module Loc = struct
         let c = compare l1 l2 in
         if c = 0 then
           let c = String.compare f1 f2 in
-          if c = 0 then Stdlib.compare (Cil.typeSig t1) (Cil.typeSig t2)
-          else c
+          if c = 0 then Stdlib.compare (Cil.typeSig t1) (Cil.typeSig t2) else c
         else c
     | _, _ -> Stdlib.compare (tag_of_t x) (tag_of_t y)
 

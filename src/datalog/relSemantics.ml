@@ -30,7 +30,7 @@ module LocPairSet = struct
 
   let pp_premise fmt set =
     let x = elements set in
-    F.fprintf fmt "NOT " ;
+    F.fprintf fmt "NOT ";
     F.pp_print_list
       ~pp_sep:(fun fmt () -> F.fprintf fmt ", NOT ")
       LocPair.pp fmt x
@@ -65,12 +65,12 @@ module PointsTo = struct
     | Alloc (n, lv, e, _) ->
         let lv_id = Hashtbl.find RelSyntax.lv_map lv in
         let exp_id = Hashtbl.find RelSyntax.exp_map e in
-        F.fprintf fmt "R0: NOT Alloc(%a,%s,%s), PointsTo(%a,%a)" Node.pp n
-          lv_id exp_id Loc.pp l Loc.pp r
+        F.fprintf fmt "R0: NOT Alloc(%a,%s,%s), PointsTo(%a,%a)" Node.pp n lv_id
+          exp_id Loc.pp l Loc.pp r
     | Assign (x, y, z) ->
         F.fprintf fmt
-          "R1: NOT Assign(%a,%a), NOT PointsTo(%a,%a), points_to(%a, %a)"
-          Loc.pp x Loc.pp y Loc.pp y Loc.pp z Loc.pp l Loc.pp r
+          "R1: NOT Assign(%a,%a), NOT PointsTo(%a,%a), points_to(%a, %a)" Loc.pp
+          x Loc.pp y Loc.pp y Loc.pp z Loc.pp l Loc.pp r
     | AssignSet (n, lv, e, set) ->
         let lv_id = Hashtbl.find RelSyntax.lv_map lv in
         let exp_id = Hashtbl.find RelSyntax.exp_map e in

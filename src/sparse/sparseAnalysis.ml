@@ -27,17 +27,17 @@ module type S = sig
 
   module Table :
     MapDom.CPO
-    with type t = MapDom.MakeCPO(BasicDom.Node)(Dom).t
-     and type A.t = BasicDom.Node.t
-     and type B.t = Dom.t
+      with type t = MapDom.MakeCPO(BasicDom.Node)(Dom).t
+       and type A.t = BasicDom.Node.t
+       and type B.t = Dom.t
 
   module DUGraph : Dug.S with type PowLoc.t = Dom.PowA.t
 
   module Spec :
     Spec.S
-    with type Dom.t = Dom.t
-     and type Dom.A.t = Dom.A.t
-     and type Dom.PowA.t = Dom.PowA.t
+      with type Dom.t = Dom.t
+       and type Dom.A.t = Dom.A.t
+       and type Dom.PowA.t = Dom.PowA.t
 
   val perform : Spec.t -> Global.t -> Global.t * DUGraph.t * Table.t * Table.t
 end
@@ -58,20 +58,19 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
   let def_locs_cache = Hashtbl.create 251
 
   let get_def_locs idx dug =
-    try Hashtbl.find def_locs_cache idx with Not_found ->
+    try Hashtbl.find def_locs_cache idx
+    with Not_found ->
       let def_locs =
-        let union_locs succ =
-          PowLoc.union (DUGraph.get_abslocs idx succ dug)
-        in
+        let union_locs succ = PowLoc.union (DUGraph.get_abslocs idx succ dug) in
         DUGraph.fold_succ union_locs dug idx PowLoc.empty
       in
-      Hashtbl.add def_locs_cache idx def_locs ;
+      Hashtbl.add def_locs_cache idx def_locs;
       def_locs
 
   let print_iteration () =
-    total_iterations := !total_iterations + 1 ;
+    total_iterations := !total_iterations + 1;
     if !total_iterations = 1 then (
-      g_clock := Sys.time () ;
+      g_clock := Sys.time ();
       l_clock := Sys.time () )
     else if !total_iterations mod 10000 = 0 then (
       let g_time = Format.sprintf "%.2f" (Sys.time () -. !g_clock) in
@@ -79,8 +78,8 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
       my_prerr_string
         ( "\r#iters: "
         ^ string_of_int !total_iterations
-        ^ " took " ^ g_time ^ "s  (" ^ l_time ^ "s / last 10000 iters)" ) ;
-      flush stderr ;
+        ^ " took " ^ g_time ^ "s  (" ^ l_time ^ "s / last 10000 iters)" );
+      flush stderr;
       l_clock := Sys.time () )
 
   let propagate dug idx (works, inputof, outputof)
@@ -123,22 +122,22 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
       Some (u, new_output, global)
 
   let prdbg_input node (mem, global) =
-    prerr_endline (Node.to_string node) ;
-    prerr_endline (IntraCfg.Cmd.to_string (InterCfg.cmdof global.icfg node)) ;
-    prerr_endline "== Input ==" ;
-    prerr_endline (Dom.to_string mem) ;
+    prerr_endline (Node.to_string node);
+    prerr_endline (IntraCfg.Cmd.to_string (InterCfg.cmdof global.icfg node));
+    prerr_endline "== Input ==";
+    prerr_endline (Dom.to_string mem);
     (mem, global)
 
   let prdbg_output old_output (new_output, global) =
-    prerr_endline "== Old Output ==" ;
-    prerr_endline (Dom.to_string old_output) ;
-    prerr_endline "== New Output ==" ;
-    prerr_endline (Dom.to_string new_output) ;
+    prerr_endline "== Old Output ==";
+    prerr_endline (Dom.to_string old_output);
+    prerr_endline "== New Output ==";
+    prerr_endline (Dom.to_string new_output);
     (new_output, global)
 
   (* fixpoint iterator specialized to the widening phase *)
   let analyze_node spec dug idx (works, global, inputof, outputof) =
-    print_iteration () ;
+    print_iteration ();
     let old_output = Table.find idx outputof in
     (Table.find idx inputof, global)
     |> opt !Options.debug (prdbg_input idx)
@@ -148,12 +147,14 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
          (get_unstable dug idx works old_output)
     &> Profiler.event "SparseAnalysis.propagating"
          (propagate dug idx (works, inputof, outputof))
-    |> function None -> (works, global, inputof, outputof) | Some x -> x
+    |> function
+    | None -> (works, global, inputof, outputof)
+    | Some x -> x
 
   (* fixpoint iterator that can be used in both widening and narrowing phases *)
   let analyze_node_with_otable (widen, order) spec dug idx
       (works, global, inputof, outputof) =
-    print_iteration () ;
+    print_iteration ();
     let pred = DUGraph.pred idx dug in
     let input =
       List.fold_left
@@ -164,8 +165,8 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
             (fun l m ->
               let v1 = Dom.find l pmem in
               let v2 = Dom.find l m in
-              Dom.add l (Dom.B.join v1 v2) m )
-            locs_on_edge m )
+              Dom.add l (Dom.B.join v1 v2) m)
+            locs_on_edge m)
         Dom.bot pred
     in
     let inputof = Table.add idx input inputof in
@@ -186,44 +187,44 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
         (rest, global, inputof, outputof) |> f dug idx |> iterate f dug
 
   let widening spec dug (worklist, global, inputof, outputof) =
-    total_iterations := 0 ;
-    worklist
-    |> Worklist.push_set InterCfg.start_node (DUGraph.nodesof dug)
-    |> (fun init_worklist ->
-         iterate (analyze_node spec) dug
-           (init_worklist, global, inputof, outputof) )
+    total_iterations := 0;
+    ( worklist |> Worklist.push_set InterCfg.start_node (DUGraph.nodesof dug)
+    |> fun init_worklist ->
+      iterate (analyze_node spec) dug (init_worklist, global, inputof, outputof)
+    )
     |> fun x ->
-    L.info ~level:1 "\n#iteration in widening : %d\n" !total_iterations ;
+    L.info ~level:1 "\n#iteration in widening : %d\n" !total_iterations;
     x
 
   let narrowing ?(initnodes = BatSet.empty) spec dug
       (worklist, global, inputof, outputof) =
-    total_iterations := 0 ;
-    worklist
+    total_iterations := 0;
+    ( worklist
     |> Worklist.push_set InterCfg.start_node
          (if BatSet.is_empty initnodes then DUGraph.nodesof dug else initnodes)
-    |> (fun init_worklist ->
-         iterate
-           (analyze_node_with_otable (Dom.narrow, fun x y -> Dom.le y x) spec)
-           dug
-           (init_worklist, global, inputof, outputof) )
+    |> fun init_worklist ->
+      iterate
+        (analyze_node_with_otable (Dom.narrow, fun x y -> Dom.le y x) spec)
+        dug
+        (init_worklist, global, inputof, outputof) )
     |> fun x ->
-    L.info ~level:1 "#iteration in narrowing : %d\n" !total_iterations ;
+    L.info ~level:1 "#iteration in narrowing : %d\n" !total_iterations;
     x
 
   let print_dug spec (access, global, dug) =
     if !Options.dug then (
       `Assoc
-        [ ("callgraph", CallGraph.to_json global.callgraph)
-        ; ("cfgs", InterCfg.to_json global.icfg)
-        ; ("dugraph", DUGraph.to_json dug)
-        (*          ("dugraph-inter", DUGraph.to_json_inter dug access);*)
-         ]
-      |> Yojson.Safe.pretty_to_channel stdout ;
+        [
+          ("callgraph", CallGraph.to_json global.callgraph);
+          ("cfgs", InterCfg.to_json global.icfg);
+          ("dugraph", DUGraph.to_json dug);
+          (*          ("dugraph-inter", DUGraph.to_json_inter dug access);*)
+        ]
+      |> Yojson.Safe.pretty_to_channel stdout;
       exit 0 )
     else (
-      prerr_memory_usage () ;
-      L.info "#Nodes in def-use graph : %d\n" (DUGraph.nb_node dug) ;
+      prerr_memory_usage ();
+      L.info "#Nodes in def-use graph : %d\n" (DUGraph.nb_node dug);
       L.info "#Locs on def-use graph : %d\n" (DUGraph.nb_loc dug) )
 
   let bind_fi_locs global mem_fi dug access inputof =
@@ -242,7 +243,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
             (fun loc mem -> Dom.add loc (Dom.find loc mem_fi) mem)
             locs_not_on_edge (Table.find n inputof)
         in
-        Table.add n mem_with_locs_not_on_edge t )
+        Table.add n mem_with_locs_not_on_edge t)
       dug inputof
 
   (* add pre-analysis memory to unanalyzed nodes *)
@@ -259,7 +260,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
               (Access.Info.useof (Access.find_node node access))
               Dom.bot
           in
-          Table.add node mem_with_access t )
+          Table.add node mem_with_access t)
       nodes inputof
 
   let initialize spec global dug access =
@@ -278,12 +279,12 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
 
   let print_spec spec =
     L.info ~level:1 "#total abstract locations  = %d\n"
-      (PowLoc.cardinal spec.Spec.locset) ;
+      (PowLoc.cardinal spec.Spec.locset);
     L.info ~level:1 "#flow-sensitive abstract locations  = %d\n"
       (PowLoc.cardinal spec.Spec.locset_fs)
 
   let perform spec global =
-    print_spec spec ;
+    print_spec spec;
     let access =
       StepManager.stepf false "Access Analysis"
         (AccessAnalysis.perform global spec.Spec.locset (Sem.run Strong spec))
@@ -293,7 +294,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
       StepManager.stepf false "Def-use graph construction" SsaDug.make
         (global, access, spec.Spec.locset_fs)
     in
-    print_dug spec (access, global, dug) ;
+    print_dug spec (access, global, dug);
     let worklist =
       StepManager.stepf false "Workorder computation" Worklist.init dug
     in

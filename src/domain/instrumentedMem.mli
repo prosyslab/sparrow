@@ -21,7 +21,7 @@ end
 
 module Make (Mem : MapDom.CPO) :
   S
-  with type t = Mem.t
-   and type A.t = Mem.A.t
-   and type B.t = Mem.B.t
-   and type PowA.t = Mem.PowA.t
+    with type t = Mem.t
+     and type A.t = Mem.A.t
+     and type B.t = Mem.B.t
+     and type PowA.t = Mem.PowA.t

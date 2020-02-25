@@ -34,16 +34,16 @@ let incr_recursive name =
     if BatMap.mem name !recursive_log then BatMap.find name !recursive_log
     else
       let v = ref 0 in
-      recursive_log := BatMap.add name v !recursive_log ;
+      recursive_log := BatMap.add name v !recursive_log;
       v
   in
-  v := !v + 1 ;
+  v := !v + 1;
   !v
 
 (* (internal procedure) *)
 let decr_recursive name =
   let v = BatMap.find name !recursive_log in
-  v := !v - 1 ;
+  v := !v - 1;
   !v
 
 (* (internal procedure) *)
@@ -52,10 +52,10 @@ let record_arguments name args =
     if BatMap.mem name !arguments_log then BatMap.find name !arguments_log
     else
       let v = ref "" in
-      arguments_log := BatMap.add name v !arguments_log ;
+      arguments_log := BatMap.add name v !arguments_log;
       v
   in
-  v := Marshal.to_string args [Marshal.No_sharing; Marshal.Closures]
+  v := Marshal.to_string args [ Marshal.No_sharing; Marshal.Closures ]
 
 (* (internal procedure) *)
 let max_check name t args =
@@ -63,7 +63,7 @@ let max_check name t args =
     if BatMap.mem name !max_log then BatMap.find name !max_log
     else
       let v = ref 0. in
-      max_log := BatMap.add name v !max_log ;
+      max_log := BatMap.add name v !max_log;
       v
   in
   if !v < t then (* record_arguments name args; *)
@@ -85,7 +85,7 @@ let update_log name interval =
     if BatMap.mem name !log then BatMap.find name !log
     else
       let v = ref 0. in
-      log := BatMap.add name v !log ;
+      log := BatMap.add name v !log;
       v
   in
   v := !v +. interval
@@ -101,19 +101,20 @@ let start_event name =
 let finish_event name =
   if !Options.profile then (
     let ft = Sys.time () in
-    count_one name ;
+    count_one name;
     let v = decr_recursive name in
     if v == 0 then (
       let t0 = BatMap.find name !events in
       let el = ft -. t0 in
-      events := BatMap.remove name !events ;
+      events := BatMap.remove name !events;
       update_log name el ) )
   else ()
 
 let event name f x =
-  start_event name ;
+  start_event name;
   let y = f x in
-  finish_event name ; y
+  finish_event name;
+  y
 
 let make_filename () =
   let name : int -> string = fun i -> "marshal_" ^ string_of_int i ^ ".out" in
@@ -125,18 +126,20 @@ let make_filename () =
 let make_file txt =
   let name = make_filename () in
   let fileout = open_out_bin name in
-  output_string fileout txt ; close_out fileout ; name
+  output_string fileout txt;
+  close_out fileout;
+  name
 
 let report c =
   if !Options.profile then (
     let tot = Sys.time () -. !log_start in
     (* print_endline("------- Profiler report -------"); *)
-    Printf.fprintf c " - Total time" ;
-    Printf.fprintf c "  %.2fs\n" tot ;
+    Printf.fprintf c " - Total time";
+    Printf.fprintf c "  %.2fs\n" tot;
     (* print_endline(" - Elapsed time"); *)
     BatMap.iter
       (fun x v ->
-        Printf.fprintf c "  -%s - %.2fs(%.2f%%)\n" x !v (!v /. tot *. 100.) )
+        Printf.fprintf c "  -%s - %.2fs(%.2f%%)\n" x !v (!v /. tot *. 100.))
       !log
     (* print_endline(" -------------------------------"); *)
     (* print_endline("- Calling frequency");
@@ -148,9 +151,9 @@ let report c =
        print_endline("- Marshaled datas");
        BatMap.iter (fun x v -> Printf.fprintf c "4. %s - %s\n" x (make_file !v)) !arguments_log;
        print_endline("-------------------------------");
-*) )
+    *) )
   else ()
 
 let reset () =
-  log := BatMap.empty ;
+  log := BatMap.empty;
   log_start := Sys.time ()

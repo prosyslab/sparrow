@@ -14,7 +14,7 @@ let rec fix next reachable works g =
       List.fold_left
         (fun (reachable, works) p ->
           if PowNode.mem p reachable then (reachable, works)
-          else (PowNode.add p reachable, PowNode.add p works) )
+          else (PowNode.add p reachable, PowNode.add p works))
         (reachable, works) succs
     in
     fix next reachable works g
@@ -30,7 +30,7 @@ let optimize_reachability alarms g =
       (fun set alarm ->
         match alarm.Report.src with
         | Some (src, _) -> PowNode.add src set
-        | _ -> set )
+        | _ -> set)
       PowNode.empty alarms
   in
   let reachable_from_node = fix G.pred node_set node_set g in
@@ -39,7 +39,7 @@ let optimize_reachability alarms g =
     (fun n g ->
       if PowNode.mem n reachable_from_src && PowNode.mem n reachable_from_node
       then g
-      else G.remove_node n g )
+      else G.remove_node n g)
     g g
 
 let optimize_inter_edge global old_g =
@@ -54,7 +54,7 @@ let optimize_inter_edge global old_g =
       else if
         InterCfg.is_callnode src global.Global.icfg && InterCfg.is_entry dst
       then new_g
-      else new_g )
+      else new_g)
     old_g (G.create ())
 
 module ReachingDef = BatSet.Make (struct
@@ -77,16 +77,14 @@ let reachability2 global alarms g =
               let defs_pred = G.Access.Info.defof access in
               if G.PowLoc.mem use defs_pred then
                 let uses_pred = G.Access.Info.useof access in
-                ( G.PowLoc.fold
-                    (fun u -> ReachingDef.add (p, u))
-                    uses_pred works
-                , ReachingDef.add (p, use) results )
+                ( G.PowLoc.fold (fun u -> ReachingDef.add (p, u)) uses_pred works,
+                  ReachingDef.add (p, use) results )
               else
-                ( ReachingDef.add (p, use) works
-                , ReachingDef.add (p, use) results )
+                ( ReachingDef.add (p, use) works,
+                  ReachingDef.add (p, use) results )
           else if p = InterCfg.start_node then
             (works, ReachingDef.add (p, use) results)
-          else (works, results) )
+          else (works, results))
         g node (works, results)
       |> fun (works, results) -> fix works results g
   in
@@ -96,7 +94,7 @@ let reachability2 global alarms g =
         let node = alarm.Report.node in
         let access_node = G.Access.find_node node access in
         let uses = G.Access.Info.useof access_node in
-        G.PowLoc.fold (fun x -> ReachingDef.add (node, x)) uses set )
+        G.PowLoc.fold (fun x -> ReachingDef.add (node, x)) uses set)
       ReachingDef.empty alarms
   in
   let reachable_from_node = fix works works g in
@@ -107,18 +105,18 @@ let reachability2 global alarms g =
   in
   G.fold_node
     (fun n g ->
-      if PowNode.mem n reachable_from_node then g else G.remove_node n g )
+      if PowNode.mem n reachable_from_node then g else G.remove_node n g)
     g g
 
 let optimize global alarms g =
   L.info "%d nodes and %d edges before optimization\n" (G.nb_node g)
-    (G.nb_edge g) ;
+    (G.nb_edge g);
   let g = optimize_reachability alarms g in
   L.info "%d nodes and %d edges after reachability\n" (G.nb_node g)
-    (G.nb_edge g) ;
+    (G.nb_edge g);
   let g = reachability2 global alarms g in
   L.info "%d nodes and %d edges after reachability2\n" (G.nb_node g)
-    (G.nb_edge g) ;
+    (G.nb_edge g);
   (*   let g = optimize_inter_edge global g in *)
   g
 
@@ -135,13 +133,13 @@ let print analysis global dug alarms =
             if List.length succs = 2 then
               ( PowNode.add
                   (InterCfg.Node.make pid (List.nth succs 1))
-                  true_branch
-              , PowNode.add
+                  true_branch,
+                PowNode.add
                   (InterCfg.Node.make pid (List.nth succs 0))
                   false_branch )
-            else (true_branch, false_branch) )
+            else (true_branch, false_branch))
           cfg
-          (true_branch, false_branch) )
+          (true_branch, false_branch))
       global.Global.icfg
       (PowNode.empty, PowNode.empty)
   in
@@ -159,17 +157,17 @@ let print analysis global dug alarms =
   G.iter_edges
     (fun src dst ->
       if PowNode.mem dst true_branch then (
-        F.fprintf fmt_tc "%a\n" Node.pp src ;
+        F.fprintf fmt_tc "%a\n" Node.pp src;
         F.fprintf fmt_tb "%a\t%a\n" Node.pp src Node.pp dst )
       else if PowNode.mem dst false_branch then (
-        F.fprintf fmt_fc "%a\n" Node.pp src ;
+        F.fprintf fmt_fc "%a\n" Node.pp src;
         F.fprintf fmt_fb "%a\t%a\n" Node.pp src Node.pp dst )
-      else F.fprintf fmt_edge "%a\t%a\n" Node.pp src Node.pp dst )
-    dug ;
-  close_out oc_edge ;
-  close_out oc_tc ;
-  close_out oc_tb ;
-  close_out oc_fc ;
+      else F.fprintf fmt_edge "%a\t%a\n" Node.pp src Node.pp dst)
+    dug;
+  close_out oc_edge;
+  close_out oc_tc;
+  close_out oc_tb;
+  close_out oc_fc;
   close_out oc_fb
 
 module AlarmSet = Set.Make (struct
@@ -185,11 +183,11 @@ let print_alarm analysis alarms =
     (List.fold_left
        (fun set alarm ->
          match alarm.Report.src with
-         | Some (src_node, _)
-           when not (AlarmSet.mem (src_node, alarm.node) set) ->
-             F.fprintf fmt "%a\t%a\n" Node.pp src_node Node.pp alarm.node ;
+         | Some (src_node, _) when not (AlarmSet.mem (src_node, alarm.node) set)
+           ->
+             F.fprintf fmt "%a\t%a\n" Node.pp src_node Node.pp alarm.node;
              AlarmSet.add (src_node, alarm.node) set
-         | _ -> set )
-       AlarmSet.empty alarms) ;
-  F.pp_print_flush fmt () ;
+         | _ -> set)
+       AlarmSet.empty alarms);
+  F.pp_print_flush fmt ();
   close_out oc

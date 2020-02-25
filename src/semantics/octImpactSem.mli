@@ -12,6 +12,6 @@
 
 include
   AbsSem.S
-  with type Dom.t = OctImpactDom.Mem.t
-   and type Dom.A.t = OctDom.Pack.t
-   and type Dom.PowA.t = OctDom.PackConf.t
+    with type Dom.t = OctImpactDom.Mem.t
+     and type Dom.A.t = OctDom.Pack.t
+     and type Dom.PowA.t = OctDom.PackConf.t

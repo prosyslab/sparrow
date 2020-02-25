@@ -10,8 +10,8 @@
 (***********************************************************************)
 (** Call-graph *)
 
-(** Abstract type of call graph *)
 type t
+(** Abstract type of call graph *)
 
 val empty : t
 

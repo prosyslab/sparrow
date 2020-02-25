@@ -28,9 +28,9 @@ module type S = sig
   type loc
 
   val make :
-       ?skip_nodes:BasicDom.Node.t BatSet.t
-    -> Global.t * Access.t * PowLoc.t
-    -> DUGraph.t
+    ?skip_nodes:BasicDom.Node.t BatSet.t ->
+    Global.t * Access.t * PowLoc.t ->
+    DUGraph.t
 
   val to_json_intra : DUGraph.t -> Access.t -> Yojson.Safe.t
 
@@ -51,8 +51,8 @@ module Make (DUGraph : Dug.S) = struct
 
   type loc = Loc.t
 
-  (** Def-use graph construction *)
   module Access = DUGraph.Access
+  (** Def-use graph construction *)
 
   type phi_points = PowLoc.t NodeMap.t
 
@@ -77,7 +77,8 @@ module Make (DUGraph : Dug.S) = struct
   let access_wo_local_table = Hashtbl.create 10000
 
   let uses_of_function global access pid locset =
-    try Hashtbl.find use_table pid with _ ->
+    try Hashtbl.find use_table pid
+    with _ ->
       let locset =
         if Global.is_rec pid global && not !Options.unsound_recursion then
           let uses = Access.Info.useof (Access.find_proc_reach pid access) in
@@ -88,11 +89,12 @@ module Make (DUGraph : Dug.S) = struct
           in
           PowLoc.inter locset uses
       in
-      Hashtbl.add use_table pid locset ;
+      Hashtbl.add use_table pid locset;
       locset
 
   let defs_of_function global access pid locset =
-    try Hashtbl.find def_table pid with _ ->
+    try Hashtbl.find def_table pid
+    with _ ->
       let locset =
         if Global.is_rec pid global && not !Options.unsound_recursion then
           let defs = Access.Info.defof (Access.find_proc_reach pid access) in
@@ -103,11 +105,12 @@ module Make (DUGraph : Dug.S) = struct
           in
           PowLoc.inter locset defs
       in
-      Hashtbl.add def_table pid locset ;
+      Hashtbl.add def_table pid locset;
       locset
 
   let access_of_function global access pid locset =
-    try Hashtbl.find access_table pid with _ ->
+    try Hashtbl.find access_table pid
+    with _ ->
       let locset =
         if Global.is_rec pid global && not !Options.unsound_recursion then
           let access_proc_reach = Access.find_proc_reach pid access in
@@ -122,7 +125,7 @@ module Make (DUGraph : Dug.S) = struct
           let access = PowLoc.union defs uses in
           PowLoc.inter locset access
       in
-      Hashtbl.add access_table pid locset ;
+      Hashtbl.add access_table pid locset;
       locset
 
   (* locations considered as being used in the given node *)
@@ -140,7 +143,7 @@ module Make (DUGraph : Dug.S) = struct
       if InterCfg.is_returnnode node global.icfg then
         ProcSet.fold
           (fun callee ->
-            PowLoc.union (defs_of_function global access callee locset) )
+            PowLoc.union (defs_of_function global access callee locset))
           (InterCfg.get_callees (InterCfg.callof node global.icfg) global.icfg)
           PowLoc.empty
       else PowLoc.empty
@@ -153,8 +156,7 @@ module Make (DUGraph : Dug.S) = struct
     let ordinary_uses = get_ordinary_uses access node in
     (* exit uses defs(f) *)
     let uses_at_exit =
-      if IntraCfg.is_exit cfgnode then
-        defs_of_function global access pid locset
+      if IntraCfg.is_exit cfgnode then defs_of_function global access pid locset
       else PowLoc.empty
     in
     (* return node inside recursive functions uses local variables of pid *)
@@ -186,17 +188,19 @@ module Make (DUGraph : Dug.S) = struct
       if InterCfg.is_callnode node global.icfg then
         ProcSet.fold
           (fun callee ->
-            PowLoc.union (uses_of_function global access callee locset) )
+            PowLoc.union (uses_of_function global access callee locset))
           (InterCfg.get_callees node global.icfg)
           PowLoc.empty
       else PowLoc.empty
     in
     list_fold PowLoc.union
-      [ ordinary_uses
-      ; uses_at_exit
-      ; uses_at_call
-      ; uses_at_rec_return
-      ; uses_at_return ]
+      [
+        ordinary_uses;
+        uses_at_exit;
+        uses_at_call;
+        uses_at_rec_return;
+        uses_at_return;
+      ]
       PowLoc.empty
 
   let prepare_defs_uses (global, access, locset) cfg =
@@ -205,7 +209,7 @@ module Make (DUGraph : Dug.S) = struct
         (fun m node ->
           IntraNodeMap.add node
             (f (global, access) (Node.make (IntraCfg.get_pid cfg) node) locset)
-            m )
+            m)
         IntraNodeMap.empty (IntraCfg.nodesof cfg)
     in
     (collect lhsof, collect rhsof)
@@ -219,8 +223,8 @@ module Make (DUGraph : Dug.S) = struct
               let set =
                 try LocMap.find addr map with _ -> IntraNodeSet.empty
               in
-              LocMap.add addr (IntraNodeSet.add node set) map )
-            (IntraNodeMap.find node defs_of) )
+              LocMap.add addr (IntraNodeSet.add node set) map)
+            (IntraNodeMap.find node defs_of))
         (IntraCfg.nodesof cfg) LocMap.empty
     with _ -> failwith "Dug.prepare_defnodes"
 
@@ -230,8 +234,8 @@ module Make (DUGraph : Dug.S) = struct
       LocMap.fold (fun k _ -> PowLoc.add k) defnodes_of PowLoc.empty
     in
     let map_set_add k v map =
-      try NodeMap.add k (PowLoc.add v (NodeMap.find k map)) map with _ ->
-        NodeMap.add k (PowLoc.singleton v) map
+      try NodeMap.add k (PowLoc.add v (NodeMap.find k map)) map
+      with _ -> NodeMap.add k (PowLoc.singleton v) map
     in
     let rec iterate_node w var itercount hasalready work joinpoints =
       match w with
@@ -250,7 +254,7 @@ module Make (DUGraph : Dug.S) = struct
                     else (work, rest)
                   in
                   (rest, hasalready, work, joinpoints)
-                else (rest, hasalready, work, joinpoints) )
+                else (rest, hasalready, work, joinpoints))
               (IntraCfg.dom_fronts node cfg)
               (rest, hasalready, work, joinpoints)
           in
@@ -264,7 +268,7 @@ module Make (DUGraph : Dug.S) = struct
           let w, work =
             IntraNodeSet.fold
               (fun node (w, work) ->
-                (node :: w, IntraNodeMap.add node itercount work) )
+                (node :: w, IntraNodeMap.add node itercount work))
               (LocMap.find v defnodes_of)
               ([], work)
           in
@@ -290,27 +294,25 @@ module Make (DUGraph : Dug.S) = struct
       NodeMap.empty
 
   let cfg2dug (global, access, locset) cfg dug =
-    Profiler.start_event "DugGen.cfg2dug init" ;
+    Profiler.start_event "DugGen.cfg2dug init";
     let pid = IntraCfg.get_pid cfg in
-    Profiler.finish_event "DugGen.cfg2dug init" ;
-    Profiler.start_event "DugGen.cfg2dug prepare_du" ;
-    let node2defs, node2uses =
-      prepare_defs_uses (global, access, locset) cfg
-    in
-    Profiler.finish_event "DugGen.cfg2dug prepare_du" ;
-    Profiler.start_event "DugGen.cfg2dug prepare_def" ;
+    Profiler.finish_event "DugGen.cfg2dug init";
+    Profiler.start_event "DugGen.cfg2dug prepare_du";
+    let node2defs, node2uses = prepare_defs_uses (global, access, locset) cfg in
+    Profiler.finish_event "DugGen.cfg2dug prepare_du";
+    Profiler.start_event "DugGen.cfg2dug prepare_def";
     let loc2defnodes = prepare_defnodes (global, access) cfg node2defs in
-    Profiler.finish_event "DugGen.cfg2dug prepare_def" ;
-    Profiler.start_event "DugGen.cfg2dug get_phi" ;
+    Profiler.finish_event "DugGen.cfg2dug prepare_def";
+    Profiler.start_event "DugGen.cfg2dug get_phi";
     let phi_points =
       get_phi_points cfg access (node2defs, node2uses, loc2defnodes)
     in
-    Profiler.finish_event "DugGen.cfg2dug get_phi" ;
+    Profiler.finish_event "DugGen.cfg2dug get_phi";
     let defs_of node = IntraNodeMap.find node node2defs in
     let uses_of node = IntraNodeMap.find node node2uses in
     let phi_vars_of cfgnode =
-      try NodeMap.find (Node.make pid cfgnode) phi_points with _ ->
-        PowLoc.empty
+      try NodeMap.find (Node.make pid cfgnode) phi_points
+      with _ -> PowLoc.empty
     in
     let draw_from_lastdef loc2lastdef loc here dug =
       try
@@ -326,35 +328,35 @@ module Make (DUGraph : Dug.S) = struct
       (* 1: draw non-phi uses from their last definition points
        *    do not draw for phi-vars since their the last defpoints are the
        *    current node *)
-      Profiler.start_event "DugGen.cfg2dug draw_from_lastdef" ;
+      Profiler.start_event "DugGen.cfg2dug draw_from_lastdef";
       let dug =
         PowLoc.fold
           (fun loc -> draw_from_lastdef loc2lastdef loc node)
           non_phi_uses dug
       in
-      Profiler.finish_event "DugGen.cfg2dug draw_from_lastdef" ;
+      Profiler.finish_event "DugGen.cfg2dug draw_from_lastdef";
       (* 2: update the last definitions:
        * (1) phi-variables are defined here
        * (2) lhs are defined here *)
-      Profiler.start_event "DugGen.cfg2dug loc2lastdef" ;
+      Profiler.start_event "DugGen.cfg2dug loc2lastdef";
       let loc2lastdef =
         PowLoc.fold
           (fun loc -> LocMap.add loc node)
           (PowLoc.union (defs_of node) (phi_vars_of node))
           loc2lastdef
       in
-      Profiler.finish_event "DugGen.cfg2dug loc2lastdef" ;
+      Profiler.finish_event "DugGen.cfg2dug loc2lastdef";
       (* 3: draw phi-vars of successors from their last definitions *)
-      Profiler.start_event "DugGen.cfg2dug draw phi" ;
+      Profiler.start_event "DugGen.cfg2dug draw phi";
       let dug =
         list_fold
           (fun succ ->
             PowLoc.fold
               (fun phi_var -> draw_from_lastdef loc2lastdef phi_var succ)
-              (phi_vars_of succ) )
+              (phi_vars_of succ))
           (IntraCfg.succ node cfg) dug
       in
-      Profiler.finish_event "DugGen.cfg2dug draw phi" ;
+      Profiler.finish_event "DugGen.cfg2dug draw phi";
       (* 4: process children of dominator trees *)
       IntraNodeSet.fold (search loc2lastdef)
         (IntraCfg.children_of_dom_tree node cfg)
@@ -363,44 +365,42 @@ module Make (DUGraph : Dug.S) = struct
     search LocMap.empty IntraCfg.Node.entry dug
 
   let draw_intraedges (global, access, locset) dug =
-    Profiler.start_event "DugGen.draw_intraedges" ;
+    Profiler.start_event "DugGen.draw_intraedges";
     let n_pids = List.length (InterCfg.pidsof global.icfg) in
-    L.info ~level:1 "draw intra-procedural edges\n" ;
+    L.info ~level:1 "draw intra-procedural edges\n";
     let r =
       snd
         (InterCfg.fold_cfgs
            (fun pid cfg (k, dug) ->
-             prerr_progressbar k n_pids ;
-             (k + 1, cfg2dug (global, access, locset) cfg dug) )
+             prerr_progressbar k n_pids;
+             (k + 1, cfg2dug (global, access, locset) cfg dug))
            global.icfg (1, dug))
     in
-    Profiler.finish_event "DugGen.draw_intraedges" ;
+    Profiler.finish_event "DugGen.draw_intraedges";
     r
 
   let draw_interedges (global, access, locset) dug =
     let calls = InterCfg.callnodesof global.icfg in
     let n_calls = List.length calls in
-    L.info ~level:1 "draw inter-procedural edges\n" ;
+    L.info ~level:1 "draw inter-procedural edges\n";
     list_fold
       (fun call (k, dug) ->
-        prerr_progressbar k n_calls ;
+        prerr_progressbar k n_calls;
         let return = InterCfg.returnof call global.icfg in
-        ( k + 1
-        , ProcSet.fold
+        ( k + 1,
+          ProcSet.fold
             (fun callee dug ->
               let entry = InterCfg.entryof global.icfg callee in
               let exit = InterCfg.exitof global.icfg callee in
-              let locs_on_call =
-                uses_of_function global access callee locset
-              in
+              let locs_on_call = uses_of_function global access callee locset in
               let locs_on_return =
                 defs_of_function global access callee locset
               in
               dug
               |> DUGraph.add_abslocs call locs_on_call entry
-              |> DUGraph.add_abslocs exit locs_on_return return )
+              |> DUGraph.add_abslocs exit locs_on_return return)
             (InterCfg.get_callees call global.icfg)
-            dug ) )
+            dug ))
       calls (1, dug)
     |> snd
 
@@ -417,8 +417,8 @@ module Make (DUGraph : Dug.S) = struct
           (fun use_point ->
             if PowNode.mem def_point nodes && PowNode.mem use_point nodes then
               DUGraph.add_absloc def_point x use_point
-            else id )
-          use_points dug )
+            else id)
+          use_points dug)
       single_defs dug
 
   let make ?(skip_nodes = BatSet.empty) (global, access, locset) =
@@ -450,17 +450,19 @@ module Make (DUGraph : Dug.S) = struct
                if PowLoc.is_empty localset then edges
                else
                  `List
-                   [ `String (Node.to_string src)
-                   ; `String (Node.to_string dst)
-                   ; `String
+                   [
+                     `String (Node.to_string src);
+                     `String (Node.to_string dst);
+                     `String
                        (PowLoc.fold
                           (fun addr s -> Loc.to_string addr ^ "," ^ s)
-                          localset "") ]
+                          localset "");
+                   ]
                  :: edges
-             else edges )
+             else edges)
            g [])
     in
-    `Assoc [("nodes", nodes); ("edges", edges)]
+    `Assoc [ ("nodes", nodes); ("edges", edges) ]
 
   let to_json_inter g access =
     let nodes =
@@ -484,15 +486,17 @@ module Make (DUGraph : Dug.S) = struct
                if PowLoc.is_empty localset then edges
                else
                  `List
-                   [ `String (Node.to_string src)
-                   ; `String (Node.to_string dst)
-                   ; `String
+                   [
+                     `String (Node.to_string src);
+                     `String (Node.to_string dst);
+                     `String
                        (PowLoc.fold
                           (fun addr s -> Loc.to_string addr ^ "," ^ s)
-                          localset "") ]
+                          localset "");
+                   ]
                  :: edges
-             else edges )
+             else edges)
            g [])
     in
-    `Assoc [("nodes", nodes); ("edges", edges)]
+    `Assoc [ ("nodes", nodes); ("edges", edges) ]
 end
