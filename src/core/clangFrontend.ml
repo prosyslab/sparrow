@@ -261,8 +261,13 @@ and trans_builtin_type scope t =
   | Invalid | Unexposed | Char16 | Char32 -> failwith "type 1"
   | UInt128 | WChar | Int128 | NullPtr | Overload | Dependent | ObjCId ->
       failwith "9"
-  | ObjCClass | ObjCSel | Float128 | Half | Float16 | ShortAccum | Accum ->
-      failwith "8"
+  | ObjCClass -> failwith "objc class"
+  | ObjCSel -> failwith "objc sel"
+  | Float128 -> failwith "float 128"
+  | Half -> failwith "half"
+  | Float16 -> failwith "float 16"
+  | ShortAccum -> failwith "short accum"
+  | Accum -> failwith "accum"
   | LongAccum | UShortAccum | UAccum | ULongAccum | Complex | BlockPointer
   | LValueReference | RValueReference | Record ->
       failwith "7"
@@ -1033,7 +1038,6 @@ let parse fname =
       ([], scope) tu.desc.items
     |> fst
   in
-  prerr_endline (string_of_int (List.length globals));
   {
     Cil.fileName = fname;
     Cil.globals;
