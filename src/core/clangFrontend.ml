@@ -364,9 +364,7 @@ and trans_builtin_type scope t =
 
 and trans_function_type scope typ =
   let return_typ = trans_type scope typ.C.Ast.result in
-  let param_types, var_arg =
-    trans_parameter_types scope typ.C.Ast.parameters
-  in
+  let param_types, var_arg = trans_parameter_types scope typ.C.Ast.parameters in
   Cil.TFun (return_typ, param_types, var_arg, [])
 
 and trans_parameter_types scope = function
@@ -505,8 +503,7 @@ let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
         in
         (sl1 @ sl2, Some (Cil.Lval new_lval))
     | C.Ast.ConditionalOperator co ->
-        trans_cond_op scope fundec_opt loc co.cond co.then_branch
-          co.else_branch
+        trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
     | C.Ast.UnaryExpr ue ->
         trans_unary_expr scope fundec_opt loc ue.kind ue.argument
     | C.Ast.InitList el ->
@@ -590,9 +587,9 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
   let lhs_expr = match lhs_opt with Some x -> x | None -> failwith "lhs" in
   let rhs_expr = match rhs_opt with Some x -> x | None -> failwith "rhs" in
   match kind with
-  (*  | C.PtrMemD
-  | C.PtrMemI
-*)
+  (* | C.PtrMemD
+     | C.PtrMemI
+  *)
   | C.Mul
   | C.Div
   | C.Rem
@@ -664,7 +661,7 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
       (rhs_sl @ lhs_sl @ [stmt], lhs_expr)
   | C.Comma ->
       failwith "Unsupported syntax (MulAssign)"
-  | C.Invalid | _ ->
+  | C.InvalidBinaryOperator | _ ->
       failwith "unsupported expr"
 
 and trans_call scope fundec_opt loc action callee args =
@@ -677,9 +674,7 @@ and trans_call scope fundec_opt loc action callee args =
     List.fold_left
       (fun (args_insts, args_exprs) arg ->
         let insts, expr_opt = trans_expr scope fundec_opt loc AExp arg in
-        let expr =
-          match expr_opt with Some x -> x | None -> failwith "arg"
-        in
+        let expr = match expr_opt with Some x -> x | None -> failwith "arg" in
         (args_insts @ insts, args_exprs @ [expr]))
       ([], []) args
   in
@@ -788,18 +783,14 @@ and trans_unary_expr scope fundec_opt loc kind argument =
   match (kind, argument) with
   | C.SizeOf, C.Ast.ArgumentExpr e -> (
       let _, exp = trans_expr scope fundec_opt loc ADrop e in
-      match exp with Some e -> ([], Some (Cil.SizeOfE e)) | None -> ([], None)
-      )
+      match exp with Some e -> ([], Some (Cil.SizeOfE e)) | None -> ([], None) )
   | C.SizeOf, C.Ast.ArgumentType t ->
       let typ = trans_type scope t in
       ([], Some (Cil.SizeOf typ))
   | C.AlignOf, C.Ast.ArgumentExpr e -> (
       let _, exp = trans_expr scope fundec_opt loc ADrop e in
-      match exp with
-      | Some e ->
-          ([], Some (Cil.AlignOfE e))
-      | None ->
-          ([], None) )
+      match exp with Some e -> ([], Some (Cil.AlignOfE e)) | None -> ([], None)
+      )
   | C.AlignOf, C.Ast.ArgumentType t ->
       let typ = trans_type scope t in
       ([], Some (Cil.AlignOf typ))
@@ -880,9 +871,7 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
     (fun (sl, scope) (d : C.Ast.decl) ->
       match d.C.Ast.desc with
       | C.Ast.Var desc ->
-          let decl_stmts, scope =
-            trans_var_decl scope fundec loc action desc
-          in
+          let decl_stmts, scope = trans_var_decl scope fundec loc action desc in
           (sl @ decl_stmts, scope)
       | _ ->
           (sl, scope))
@@ -918,8 +907,7 @@ and trans_var_decl (scope : Scope.t) fundec loc action
   | _ ->
       ([], scope)
 
-and trans_var_decl_opt scope fundec loc action (vdecl : C.Ast.var_decl option)
-    =
+and trans_var_decl_opt scope fundec loc action (vdecl : C.Ast.var_decl option) =
   match vdecl with
   | Some v ->
       let sl, scope = trans_var_decl scope fundec loc AExp v.C.Ast.desc in
@@ -1221,8 +1209,7 @@ let initialize_builtins scope =
   H.fold
     (fun name (rtyp, argtyps, isva) scope ->
       let argtyps = Some (List.map (fun at -> ("", at, [])) argtyps) in
-      create_new_global_variable scope name
-        (Cil.TFun (rtyp, argtyps, isva, []))
+      create_new_global_variable scope name (Cil.TFun (rtyp, argtyps, isva, []))
       |> snd)
     Cil.builtinFunctions scope
 
