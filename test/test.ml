@@ -55,8 +55,13 @@ let test_suites =
       opt = "-frontend clang -il";
       files =
         [
-          "clang/test1.c";
-          "clang/test2.c";
+          "clang/global-array0.c";
+          "clang/local-array0.c";
+          "clang/struct0.c";
+          "clang/struct1.c";
+          "clang/implicit-cast0.c";
+          "clang/implicit-cast1.c";
+          "clang/implicit-cast2.c";
           "clang/test3.c";
           "clang/test4.c";
           "clang/test5.c";

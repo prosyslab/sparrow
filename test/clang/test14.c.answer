@@ -19,7 +19,7 @@ int g(void)
   {
   {
 #line 2
-  __cil_tmp1 = ((int (*)())f)();
+  __cil_tmp1 = f();
   }
 #line 2
   return (__cil_tmp1);

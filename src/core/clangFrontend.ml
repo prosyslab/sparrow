@@ -350,6 +350,15 @@ let trans_decl_ref scope allow_undef idref =
   | EnvEnum enum -> ([], Some enum)
   | _ -> failwith "no found"
 
+let should_ignore_implicit_cast expr qual_type =
+  let expr_kind = C.Ast.cursor_of_node expr |> C.ext_get_cursor_kind in
+  let type_kind =
+    C.get_pointee_type qual_type.C.Ast.cxtype |> C.ext_type_get_kind
+  in
+  (* ignore FunctionToPointerDecay and BuiltinFnToFnPtr *)
+  expr_kind = C.ImplicitCastExpr
+  && (type_kind = C.FunctionNoProto || type_kind = C.FunctionProto)
+
 let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
     (expr : C.Ast.expr) =
   try
@@ -379,12 +388,14 @@ let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
     | C.Ast.Call call ->
         trans_call scope fundec_opt loc action call.callee call.args
     | C.Ast.Cast cast ->
-        let typ = trans_type scope cast.qual_type in
         let sl, expr_opt =
           trans_expr ~allow_undef scope fundec_opt loc action cast.operand
         in
-        let expr = Option.get expr_opt in
-        (sl, Some (Cil.CastE (typ, expr)))
+        let e = Option.get expr_opt in
+        if should_ignore_implicit_cast expr cast.qual_type then (sl, Some e)
+        else
+          let typ = trans_type scope cast.qual_type in
+          (sl, Some (Cil.CastE (typ, e)))
     | C.Ast.Member mem ->
         ( [],
           Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field)
