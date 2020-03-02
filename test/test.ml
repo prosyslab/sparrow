@@ -79,6 +79,8 @@ let test_suites =
           "clang/stmtexpr0.c";
           "clang/duplication0.c";
           "clang/switch0.c";
+          "clang/while0.c";
+          "clang/while1.c";
         ];
     };
   ]

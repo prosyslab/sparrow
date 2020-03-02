@@ -723,6 +723,9 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       ( trans_for scope fundec loc fdesc.init fdesc.condition_variable
           fdesc.cond fdesc.inc fdesc.body,
         scope )
+  | C.Ast.While desc ->
+      ( trans_while scope fundec loc desc.condition_variable desc.cond desc.body,
+        scope )
   | C.Ast.If desc ->
       ( trans_if scope fundec loc desc.init desc.condition_variable desc.cond
           desc.then_branch desc.else_branch,
@@ -751,6 +754,8 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   | C.Ast.Case desc ->
       (trans_case scope fundec loc desc.lhs desc.rhs desc.body, scope)
   | C.Ast.Default stmt -> (trans_default scope fundec loc stmt, scope)
+  | C.Ast.Break ->
+      ({ Chunk.stmts = [ Cil.mkStmt (Cil.Break loc) ]; cases = [] }, scope)
   | _ ->
       (*       C.Ast.pp_stmt F.err_formatter stmt ; *)
       let stmts = [ Cil.dummyStmt ] in
@@ -838,6 +843,27 @@ and trans_for scope fundec loc init cond_var cond inc body =
   in
   let cases = init_stmt.cases @ body_stmt.cases @ inc_stmt.cases in
   { Chunk.stmts; cases }
+
+and trans_while scope fundec loc condition_variable cond body =
+  let scope = Scope.enter scope in
+  let decl_stmt, scope =
+    trans_var_decl_opt scope fundec loc AExp condition_variable
+  in
+  let cond_expr =
+    trans_expr scope (Some fundec) loc AExp cond |> snd |> get_opt "while_cond"
+  in
+  let break_stmt = Cil.mkBlock [ Cil.mkStmt (Cil.Break loc) ] in
+  let body_stmt = trans_block scope fundec body in
+  let bstmts =
+    match Cil.constFold false cond_expr |> Cil.isInteger with
+    | Some i64 when Cil.i64_to_int i64 = 1 -> body_stmt.Chunk.stmts
+    | _ ->
+        Cil.mkStmt (Cil.If (cond_expr, empty_block, break_stmt, loc))
+        :: body_stmt.Chunk.stmts
+  in
+  let block = { Cil.battrs = []; bstmts } in
+  let stmts = decl_stmt @ [ Cil.mkStmt (Cil.Loop (block, loc, None, None)) ] in
+  { Chunk.stmts; cases = body_stmt.cases }
 
 and trans_if scope fundec loc init cond_var cond then_branch else_branch =
   let init_stmt = trans_stmt_opt scope fundec init |> fst in
