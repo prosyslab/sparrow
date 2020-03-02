@@ -228,7 +228,7 @@ let rec trans_type ?(compinfo = None) scope typ =
   | C.Ast.Record rt -> Scope.find_type ~compinfo (name_of_ident_ref rt) scope
   | C.Ast.Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
   | C.Ast.InvalidType -> failwith "invalid type"
-  | C.Ast.Vector _ -> failwith "vector"
+  | C.Ast.Vector _ -> failwith "vector type"
   | C.Ast.BuiltinType _ -> trans_builtin_type scope typ.C.Ast.cxtype
   | x -> trans_builtin_type scope typ.C.Ast.cxtype
 
@@ -280,7 +280,7 @@ and trans_builtin_type scope t =
       (*       C.pp_cxtypekind F.err_formatter x ; *)
       F.fprintf F.err_formatter "\n";
       F.pp_print_flush F.err_formatter ();
-      failwith "zxcv"
+      failwith "trans_builtin_type"
 
 and trans_function_type scope typ =
   let return_typ = trans_type scope typ.C.Ast.result in
@@ -350,7 +350,7 @@ let trans_decl_ref scope allow_undef idref =
   | EnvEnum enum -> ([], Some enum)
   | _ -> failwith "no found"
 
-let should_ignore_implicit_cast expr qual_type =
+let should_ignore_implicit_cast1 expr qual_type =
   let expr_kind = C.Ast.cursor_of_node expr |> C.ext_get_cursor_kind in
   let type_kind =
     C.get_pointee_type qual_type.C.Ast.cxtype |> C.ext_type_get_kind
@@ -358,6 +358,23 @@ let should_ignore_implicit_cast expr qual_type =
   (* ignore FunctionToPointerDecay and BuiltinFnToFnPtr *)
   expr_kind = C.ImplicitCastExpr
   && (type_kind = C.FunctionNoProto || type_kind = C.FunctionProto)
+
+let rec should_ignore_implicit_cast2 e typ =
+  (* ignore LValueToRValue *)
+  match (typ, Cil.typeOf e) with
+  | Cil.TVoid _, Cil.TVoid _
+  | Cil.TInt (_, _), Cil.TInt (_, _)
+  | Cil.TFloat (_, _), Cil.TFloat (_, _)
+  | Cil.TPtr (_, _), Cil.TPtr (_, _)
+  | Cil.TArray (_, _, _), Cil.TArray (_, _, _)
+  | Cil.TFun (_, _, _, _), Cil.TFun (_, _, _, _)
+  | Cil.TNamed (_, _), Cil.TNamed (_, _)
+  | Cil.TComp (_, _), Cil.TComp (_, _)
+  | Cil.TEnum (_, _), Cil.TEnum (_, _)
+  | Cil.TBuiltin_va_list _, Cil.TBuiltin_va_list _ ->
+      (* enumerate all to preserve typedef because typeSig unrolls TNamed *)
+      Cil.typeSig typ = (Cil.typeOf e |> Cil.typeSig)
+  | _, _ -> false
 
 let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
     (expr : C.Ast.expr) =
@@ -392,10 +409,10 @@ let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
           trans_expr ~allow_undef scope fundec_opt loc action cast.operand
         in
         let e = Option.get expr_opt in
-        if should_ignore_implicit_cast expr cast.qual_type then (sl, Some e)
-        else
-          let typ = trans_type scope cast.qual_type in
-          (sl, Some (Cil.CastE (typ, e)))
+        let typ = trans_type scope cast.qual_type in
+        if should_ignore_implicit_cast1 expr cast.qual_type then (sl, Some e)
+        else if should_ignore_implicit_cast2 e typ then (sl, Some e)
+        else (sl, Some (Cil.CastE (typ, e)))
     | C.Ast.Member mem ->
         ( [],
           Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field)
@@ -410,6 +427,10 @@ let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
         in
         let new_lval =
           match idx with
+          | Some x when Cil.isPointerType (Cil.typeOfLval base) ->
+              ( Cil.Mem
+                  (Cil.BinOp (Cil.PlusPI, Cil.Lval base, x, Cil.typeOfLval base)),
+                Cil.NoOffset )
           | Some x -> Cil.addOffsetLval (Cil.Index (x, Cil.NoOffset)) base
           | _ -> failwith "lval"
         in
@@ -423,6 +444,9 @@ let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
         failwith "Unsupported syntax (ImaginaryLiteral)"
     | C.Ast.BoolLiteral _ -> failwith "Unsupported syntax (BoolLiteral)"
     | C.Ast.NullPtrLiteral -> failwith "Unsupported syntax (NullPtrLiteral)"
+    | C.Ast.UnknownExpr (C.StmtExpr, C.StmtExpr) ->
+        (* StmtExpr is not supported yet *)
+        raise UnknownSyntax
     | C.Ast.UnknownExpr (_, _) ->
         prerr_endline ("warning unknown expr " ^ CilHelper.s_location loc);
         Clangml_show.pp_expr F.err_formatter expr;
@@ -620,20 +644,40 @@ and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
       else if then_expr = None then ([], None)
       else ([], Some (Option.get then_expr |> Cil.constFold false))
   | Some fundec ->
-      let vi, scope = create_local_variable scope fundec "tmp" Cil.intType in
+      let typ =
+        match then_expr with
+        | Some e -> Cil.typeOf e
+        | None -> Cil.typeOf else_expr
+      in
+      let vi, scope = create_local_variable scope fundec "tmp" typ in
       let var = (Cil.Var vi, Cil.NoOffset) in
       let bstmts =
         match then_expr with
-        | Some e -> [ Cil.mkStmt (Cil.Instr [ Cil.Set (var, e, loc) ]) ]
+        | Some e when should_ignore_implicit_cast2 e typ ->
+            [ Cil.mkStmt (Cil.Instr [ Cil.Set (var, e, loc) ]) ]
+        | Some e ->
+            [
+              Cil.mkStmt (Cil.Instr [ Cil.Set (var, Cil.CastE (typ, e), loc) ]);
+            ]
         | None -> []
       in
       let tb = { Cil.battrs = []; bstmts = then_sl @ bstmts } in
       let bstmts =
-        [ Cil.mkStmt (Cil.Instr [ Cil.Set (var, else_expr, loc) ]) ]
+        if should_ignore_implicit_cast2 else_expr typ then
+          [ Cil.mkStmt (Cil.Instr [ Cil.Set (var, else_expr, loc) ]) ]
+        else
+          [
+            Cil.mkStmt
+              (Cil.Instr [ Cil.Set (var, Cil.CastE (typ, else_expr), loc) ]);
+          ]
       in
       let fb = { Cil.battrs = []; bstmts = else_sl @ bstmts } in
-      ( cond_sl @ [ Cil.mkStmt (Cil.If (cond_expr, tb, fb, loc)) ],
-        Some (Cil.Lval var) )
+      let return_exp =
+        if should_ignore_implicit_cast2 (Cil.Lval var) Cil.intType then
+          Some (Cil.Lval var)
+        else Some (Cil.CastE (Cil.intType, Cil.Lval var))
+      in
+      (cond_sl @ [ Cil.mkStmt (Cil.If (cond_expr, tb, fb, loc)) ], return_exp)
 
 and trans_unary_expr scope fundec_opt loc kind argument =
   match (kind, argument) with
