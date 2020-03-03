@@ -81,6 +81,8 @@ let test_suites =
           "clang/switch0.c";
           "clang/while0.c";
           "clang/while1.c";
+          "clang/goto0.c";
+          "clang/goto1.c";
         ];
     };
   ]

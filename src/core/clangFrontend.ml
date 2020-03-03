@@ -698,19 +698,50 @@ and trans_unary_expr scope fundec_opt loc kind argument =
 
 let get_opt msg = function Some x -> x | None -> failwith msg
 
+let goto_count = ref 0
+
 module Chunk = struct
-  type t = { stmts : Cil.stmt list; cases : Cil.stmt list }
+  module LabelMap = struct
+    include Map.Make (String)
 
-  let empty = { stmts = []; cases = [] }
+    let append xm ym = union (fun k x y -> failwith "duplicated labels") xm ym
+  end
 
-  let append x y = { stmts = x.stmts @ y.stmts; cases = x.cases @ y.cases }
+  module GotoMap = struct
+    include Map.Make (struct
+      type t = Cil.stmt ref
+
+      let compare = compare
+    end)
+
+    let append xm ym =
+      union (fun k x y -> failwith "duplicated goto targets") xm ym
+  end
+
+  type t = {
+    stmts : Cil.stmt list;
+    cases : Cil.stmt list;
+    labels : Cil.stmt ref LabelMap.t;
+    gotos : string GotoMap.t;
+  }
+
+  let empty =
+    { stmts = []; cases = []; labels = LabelMap.empty; gotos = GotoMap.empty }
+
+  let append x y =
+    {
+      stmts = x.stmts @ y.stmts;
+      cases = x.cases @ y.cases;
+      labels = LabelMap.append x.labels y.labels;
+      gotos = GotoMap.append x.gotos y.gotos;
+    }
 end
 
 let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   let loc = trans_location stmt in
   if !Options.debug then prerr_endline (CilHelper.s_location loc);
   match stmt.C.Ast.desc with
-  | C.Ast.Null -> ({ stmts = []; cases = [] }, scope)
+  | C.Ast.Null -> (Chunk.empty, scope)
   | C.Ast.Compound sl ->
       let chunk = trans_compound scope fundec sl in
       let stmts =
@@ -718,13 +749,10 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
           Cil.mkStmt (Cil.Block { Cil.battrs = []; bstmts = chunk.Chunk.stmts });
         ]
       in
-      ({ Chunk.stmts; cases = chunk.cases }, scope)
+      ({ chunk with Chunk.stmts }, scope)
   | C.Ast.For fdesc ->
       ( trans_for scope fundec loc fdesc.init fdesc.condition_variable
           fdesc.cond fdesc.inc fdesc.body,
-        scope )
-  | C.Ast.While desc ->
-      ( trans_while scope fundec loc desc.condition_variable desc.cond desc.body,
         scope )
   | C.Ast.If desc ->
       ( trans_if scope fundec loc desc.init desc.condition_variable desc.cond
@@ -754,8 +782,14 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   | C.Ast.Case desc ->
       (trans_case scope fundec loc desc.lhs desc.rhs desc.body, scope)
   | C.Ast.Default stmt -> (trans_default scope fundec loc stmt, scope)
+  | C.Ast.While desc ->
+      ( trans_while scope fundec loc desc.condition_variable desc.cond desc.body,
+        scope )
+  | C.Ast.Label desc ->
+      (trans_label scope fundec loc desc.label desc.body, scope)
+  | C.Ast.Goto label -> (trans_goto scope fundec loc label, scope)
   | C.Ast.Break ->
-      ({ Chunk.stmts = [ Cil.mkStmt (Cil.Break loc) ]; cases = [] }, scope)
+      ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Break loc) ] }, scope)
   | _ ->
       (*       C.Ast.pp_stmt F.err_formatter stmt ; *)
       let stmts = [ Cil.dummyStmt ] in
@@ -842,7 +876,7 @@ and trans_for scope fundec loc init cond_var cond inc body =
     @ inc_stmt.Chunk.stmts
   in
   let cases = init_stmt.cases @ body_stmt.cases @ inc_stmt.cases in
-  { Chunk.stmts; cases }
+  { Chunk.stmts; cases; labels = body_stmt.labels; gotos = body_stmt.gotos }
 
 and trans_while scope fundec loc condition_variable cond body =
   let scope = Scope.enter scope in
@@ -863,7 +897,12 @@ and trans_while scope fundec loc condition_variable cond body =
   in
   let block = { Cil.battrs = []; bstmts } in
   let stmts = decl_stmt @ [ Cil.mkStmt (Cil.Loop (block, loc, None, None)) ] in
-  { Chunk.stmts; cases = body_stmt.cases }
+  {
+    Chunk.stmts;
+    cases = body_stmt.cases;
+    labels = body_stmt.labels;
+    gotos = body_stmt.gotos;
+  }
 
 and trans_if scope fundec loc init cond_var cond then_branch else_branch =
   let init_stmt = trans_stmt_opt scope fundec init |> fst in
@@ -884,7 +923,12 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
       ]
   in
   let cases = init_stmt.cases @ then_stmt.cases @ else_stmt.cases in
-  { Chunk.stmts; cases }
+  {
+    Chunk.stmts;
+    cases;
+    labels = Chunk.LabelMap.append then_stmt.labels else_stmt.labels;
+    gotos = Chunk.GotoMap.append then_stmt.gotos else_stmt.gotos;
+  }
 
 and trans_block scope fundec body =
   match body.C.Ast.desc with
@@ -930,6 +974,34 @@ and trans_default scope fundec loc stmt =
       { chunk with cases = chunk.cases @ [ h ] }
   | [] -> chunk
 
+and trans_label scope fundec loc label body =
+  let chunk = trans_stmt scope fundec body |> fst in
+  let l = Cil.Label (label, loc, true) in
+  match chunk.Chunk.stmts with
+  | h :: t ->
+      h.labels <- h.labels @ [ l ];
+      { chunk with labels = Chunk.LabelMap.add label (ref h) chunk.labels }
+  | [] -> chunk
+
+and trans_goto scope fundec loc label =
+  let dummy_instr =
+    Cil.Asm
+      ( [],
+        [ "dummy goto target " ^ string_of_int !goto_count ],
+        [],
+        [],
+        [],
+        Cil.locUnknown )
+  in
+  goto_count := !goto_count + 1;
+  let placeholder = Cil.mkStmt (Cil.Instr [ dummy_instr ]) in
+  let reference = ref placeholder in
+  {
+    Chunk.empty with
+    stmts = [ Cil.mkStmt (Cil.Goto (reference, loc)) ];
+    gotos = Chunk.GotoMap.add reference label Chunk.GotoMap.empty;
+  }
+
 and trans_stmt_opt scope fundec = function
   | Some s -> trans_stmt scope fundec s
   | None -> (Chunk.empty, scope)
@@ -964,9 +1036,28 @@ let trans_storage decl =
   | C.Static -> Cil.Static
   | _ -> Cil.NoStorage
 
+class replaceGotoVisitor gotos labels =
+  object
+    inherit Cil.nopCilVisitor
+
+    method! vstmt stmt =
+      match stmt.Cil.skind with
+      | Cil.Goto (placeholder, loc) -> (
+          match Chunk.GotoMap.find placeholder gotos with
+          | label ->
+              let target = Chunk.LabelMap.find label labels in
+              Cil.ChangeTo (Cil.mkStmt (Cil.Goto (target, loc)))
+          | exception Not_found -> Cil.DoChildren )
+      | _ -> Cil.DoChildren
+  end
+
 let trans_function_body scope fundec body =
   let chunk = trans_block scope fundec body in
-  { Cil.battrs = []; bstmts = chunk.Chunk.stmts }
+  let vis = new replaceGotoVisitor chunk.Chunk.gotos chunk.Chunk.labels in
+  {
+    Cil.battrs = [];
+    bstmts = List.map (Cil.visitCilStmt vis) chunk.Chunk.stmts;
+  }
 
 let rec trans_global_decl scope (decl : C.Ast.decl) =
   let loc = trans_location decl in
