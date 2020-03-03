@@ -754,13 +754,39 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       ( trans_for scope fundec loc fdesc.init fdesc.condition_variable
           fdesc.cond fdesc.inc fdesc.body,
         scope )
+  | C.Ast.ForRange _ ->
+      failwith ("Unsupported syntax : " ^ CilHelper.s_location loc)
   | C.Ast.If desc ->
       ( trans_if scope fundec loc desc.init desc.condition_variable desc.cond
           desc.then_branch desc.else_branch,
         scope )
-  | C.Ast.Decl dl ->
-      let stmts, scope = trans_var_decl_list scope fundec loc AExp dl in
-      ({ Chunk.empty with stmts }, scope)
+  | C.Ast.Switch desc ->
+      ( trans_switch scope fundec loc desc.init desc.condition_variable
+          desc.cond desc.body,
+        scope )
+  | C.Ast.Case desc ->
+      (trans_case scope fundec loc desc.lhs desc.rhs desc.body, scope)
+  | C.Ast.Default stmt -> (trans_default scope fundec loc stmt, scope)
+  | C.Ast.While desc ->
+      ( trans_while scope fundec loc desc.condition_variable desc.cond desc.body,
+        scope )
+  | C.Ast.Do desc -> (trans_do scope fundec loc desc.body desc.cond, scope)
+  | C.Ast.Label desc ->
+      (trans_label scope fundec loc desc.label desc.body, scope)
+  | C.Ast.Goto label -> (trans_goto scope fundec loc label, scope)
+  | C.Ast.IndirectGoto _ ->
+      failwith ("Unsupported syntax (IndirectGoto): " ^ CilHelper.s_location loc)
+  | C.Ast.Continue ->
+      ( { Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Continue loc) ] },
+        scope )
+  | C.Ast.Break ->
+      ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Break loc) ] }, scope)
+  | C.Ast.Asm desc ->
+      let instr =
+        Cil.Asm ([], [ desc.asm_string ], [], [], [], Cil.locUnknown)
+      in
+      ( { Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr [ instr ]) ] },
+        scope )
   | C.Ast.Return None ->
       let stmts = [ Cil.mkStmt (Cil.Return (None, loc)) ] in
       ({ Chunk.empty with stmts }, scope)
@@ -772,25 +798,18 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
         else sl @ [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
       in
       ({ Chunk.empty with stmts }, scope)
+  | C.Ast.Decl dl ->
+      let stmts, scope = trans_var_decl_list scope fundec loc AExp dl in
+      ({ Chunk.empty with stmts }, scope)
   | C.Ast.Expr e ->
       let stmts, _ = trans_expr scope (Some fundec) loc ADrop e in
       ({ Chunk.empty with stmts }, scope)
-  | C.Ast.Switch desc ->
-      ( trans_switch scope fundec loc desc.init desc.condition_variable
-          desc.cond desc.body,
-        scope )
-  | C.Ast.Case desc ->
-      (trans_case scope fundec loc desc.lhs desc.rhs desc.body, scope)
-  | C.Ast.Default stmt -> (trans_default scope fundec loc stmt, scope)
-  | C.Ast.While desc ->
-      ( trans_while scope fundec loc desc.condition_variable desc.cond desc.body,
-        scope )
-  | C.Ast.Label desc ->
-      (trans_label scope fundec loc desc.label desc.body, scope)
-  | C.Ast.Goto label -> (trans_goto scope fundec loc label, scope)
-  | C.Ast.Break ->
-      ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Break loc) ] }, scope)
-  | _ ->
+  | C.Ast.Try _ ->
+      failwith ("Unsupported syntax (Try): " ^ CilHelper.s_location loc)
+  | C.Ast.AttributedStmt _ ->
+      failwith
+        ("Unsupported syntax (AttributedStmt)): " ^ CilHelper.s_location loc)
+  | C.Ast.UnknownStmt (_, _) ->
       (*       C.Ast.pp_stmt F.err_formatter stmt ; *)
       let stmts = [ Cil.dummyStmt ] in
       ({ Chunk.empty with stmts }, scope)
@@ -897,6 +916,33 @@ and trans_while scope fundec loc condition_variable cond body =
   in
   let block = { Cil.battrs = []; bstmts } in
   let stmts = decl_stmt @ [ Cil.mkStmt (Cil.Loop (block, loc, None, None)) ] in
+  {
+    Chunk.stmts;
+    cases = body_stmt.cases;
+    labels = body_stmt.labels;
+    gotos = body_stmt.gotos;
+  }
+
+and trans_do scope fundec loc body cond =
+  let scope = Scope.enter scope in
+  let cond_expr =
+    trans_expr scope (Some fundec) loc AExp cond |> snd |> get_opt "do_cond"
+  in
+  let break_stmt = Cil.mkStmt (Cil.Break loc) in
+  let body_stmt = trans_block scope fundec body in
+  let bstmts =
+    match Cil.constFold false cond_expr |> Cil.isInteger with
+    | Some i64 when Cil.i64_to_int i64 = 1 -> body_stmt.Chunk.stmts
+    | Some i64 when Cil.i64_to_int i64 = 0 ->
+        body_stmt.Chunk.stmts @ [ break_stmt ]
+    | _ ->
+        let break_stmt = Cil.mkBlock [ break_stmt ] in
+        body_stmt.Chunk.stmts
+        @ [ Cil.mkStmt (Cil.If (cond_expr, empty_block, break_stmt, loc)) ]
+  in
+
+  let block = { Cil.battrs = []; bstmts } in
+  let stmts = [ Cil.mkStmt (Cil.Loop (block, loc, None, None)) ] in
   {
     Chunk.stmts;
     cases = body_stmt.cases;
