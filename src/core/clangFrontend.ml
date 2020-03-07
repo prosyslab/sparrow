@@ -179,7 +179,8 @@ let trans_int_kind : C.Ast.builtin_type -> Cil.ikind = function
   | C.UInt -> Cil.IUInt
   | C.ULong -> Cil.IULong
   | C.ULongLong -> Cil.IULongLong
-  | C.Char_S | C.SChar -> Cil.ISChar
+  | C.Char_S -> Cil.IChar
+  | C.SChar -> Cil.ISChar
   | C.Short -> Cil.IShort
   | C.Long -> Cil.ILong
   | C.LongLong -> Cil.ILongLong
@@ -569,7 +570,8 @@ and trans_call scope fundec_opt loc action callee args =
   in
   let retvar =
     match Cil.typeOf callee with
-    | Cil.TFun (rt, _, _, _) | TPtr (TFun (rt, _, _, _), _) ->
+    | (Cil.TFun (rt, _, _, _) | TPtr (TFun (rt, _, _, _), _))
+      when not (Cil.isVoidType rt) ->
         let temp = (Cil.Var (Cil.makeTempVar fundec rt), Cil.NoOffset) in
         Some temp
     | _ -> None

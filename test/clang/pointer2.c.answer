@@ -2,12 +2,12 @@
 /* print_CIL_Input is false */
 
 #line 1 "clang/pointer2.c"
-void f(signed char *p ) 
+void f(char *p ) 
 { 
 
 
   {
 #line 2
-  *(p + 1) = (signed char )10;
+  *(p + 1) = (char )10;
 }
 }
