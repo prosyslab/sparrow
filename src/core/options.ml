@@ -305,7 +305,7 @@ let capture_opts =
     ("-skip-build", Arg.Set skip_build, "Skip build");
     ( "-frontend",
       Arg.String
-        (fun s -> if s == "clang" then frontend := Clang else frontend := Cil),
+        (fun s -> if s = "clang" then frontend := Clang else frontend := Cil),
       "Frontend" );
   ]
 

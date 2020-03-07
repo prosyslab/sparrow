@@ -1117,6 +1117,20 @@ let get_compinfo typ =
   | Cil.TComp (ci, _) -> ci
   | _ -> failwith ("invalid type: " ^ CilHelper.s_type typ)
 
+let trans_decl_attribute decl =
+  let attrs = ref [] in
+  ignore
+    (C.visit_children (C.Ast.cursor_of_node decl) (fun c p ->
+         ( if C.get_cursor_kind c |> C.is_attribute then
+           match C.ext_attr_get_kind c with
+           | C.NoThrow ->
+               attrs := Cil.addAttribute (Cil.Attr ("nothrow", [])) !attrs
+           | C.GNUInline ->
+               attrs := Cil.addAttribute (Cil.Attr ("gnu_inline", [])) !attrs
+           | _ -> () );
+         C.Recurse));
+  !attrs
+
 let rec trans_global_decl scope (decl : C.Ast.decl) =
   let loc = trans_location decl in
   let storage = trans_storage decl in
@@ -1126,6 +1140,7 @@ let rec trans_global_decl scope (decl : C.Ast.decl) =
       let typ = trans_function_type scope fdecl.C.Ast.function_type in
       let svar, scope = find_global_variable scope name typ in
       svar.vstorage <- storage;
+      svar.vattr <- trans_decl_attribute decl;
       ([ Cil.GVarDecl (svar, loc) ], scope)
   | C.Ast.Function fdecl ->
       let name = string_of_declaration_name fdecl.name in
@@ -1135,6 +1150,7 @@ let rec trans_global_decl scope (decl : C.Ast.decl) =
       let scope = Scope.enter scope in
       let scope = trans_params scope fdecl.function_type.parameters fundec in
       fundec.svar.vstorage <- storage;
+      fundec.svar.vattr <- trans_decl_attribute decl;
       fundec.svar.vinline <-
         C.Ast.cursor_of_node decl |> C.cursor_is_function_inlined;
       fundec.sbody <- trans_function_body scope fundec (Option.get fdecl.body);
