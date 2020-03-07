@@ -46,7 +46,7 @@ module Scope = struct
 
   let empty = []
 
-  let initial = [ Env.create () ]
+  let create () = [ Env.create () ]
 
   let enter scope = Env.create () :: scope
 
@@ -1105,6 +1105,11 @@ let trans_function_body scope fundec body =
     bstmts = List.map (Cil.visitCilStmt vis) chunk.Chunk.stmts;
   }
 
+let get_compinfo typ =
+  match Cil.unrollType typ with
+  | Cil.TComp (ci, _) -> ci
+  | _ -> failwith ("invalid type: " ^ CilHelper.s_type typ)
+
 let rec trans_global_decl scope (decl : C.Ast.decl) =
   let loc = trans_location decl in
   let storage = trans_storage decl in
@@ -1162,11 +1167,7 @@ let rec trans_global_decl scope (decl : C.Ast.decl) =
       compinfo.cdefined <- true;
       if Scope.mem_typ name scope then (
         let typ = Scope.find_type name scope in
-        let prev_ci =
-          match typ with
-          | Cil.TComp (ci, _) -> ci
-          | _ -> failwith "invalid type"
-        in
+        let prev_ci = get_compinfo typ in
         prev_ci.cfields <- compinfo.cfields;
         (globals @ [ Cil.GCompTag (prev_ci, loc) ], scope) )
       else
@@ -1180,11 +1181,7 @@ let rec trans_global_decl scope (decl : C.Ast.decl) =
       in
       if Scope.mem_typ name scope then
         let typ = Scope.find_type name scope in
-        let prev_ci =
-          match typ with
-          | Cil.TComp (ci, _) -> ci
-          | _ -> failwith "invalid type"
-        in
+        let prev_ci = get_compinfo typ in
         ([ Cil.GCompTagDecl (prev_ci, loc) ], scope)
       else
         let callback compinfo = [] in
@@ -1247,7 +1244,7 @@ let initialize_builtins scope =
 let parse fname =
   let options = { C.Ast.Options.default with ignore_implicit_cast = false } in
   let tu = C.Ast.parse_file ~options fname in
-  let scope = initialize_builtins Scope.initial in
+  let scope = initialize_builtins (Scope.create ()) in
   let globals =
     List.fold_left
       (fun (globals, scope) decl ->
