@@ -220,9 +220,13 @@ let string_of_declaration_name name =
 
 let name_of_ident_ref idref = string_of_declaration_name idref.C.Ast.name
 
+let trans_attribute typ =
+  if typ.C.Ast.const then [ Cil.Attr ("const", []) ] else []
+
 let rec trans_type ?(compinfo = None) scope typ =
   match typ.C.Ast.desc with
-  | C.Ast.Pointer pt -> Cil.TPtr (trans_type ~compinfo scope pt, [])
+  | C.Ast.Pointer pt ->
+      Cil.TPtr (trans_type ~compinfo scope pt, trans_attribute typ)
   | C.Ast.FunctionType ft -> trans_function_type scope ft
   | C.Ast.Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
   | C.Ast.Elaborated et -> trans_type ~compinfo scope et.named_type
@@ -230,35 +234,37 @@ let rec trans_type ?(compinfo = None) scope typ =
   | C.Ast.Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
   | C.Ast.InvalidType -> failwith "invalid type"
   | C.Ast.Vector _ -> failwith "vector type"
-  | C.Ast.BuiltinType _ -> trans_builtin_type scope typ.C.Ast.cxtype
-  | x -> trans_builtin_type scope typ.C.Ast.cxtype
+  | C.Ast.BuiltinType _ -> trans_builtin_type scope typ
+  | x -> trans_builtin_type scope typ
 
 and trans_builtin_type scope t =
-  let k = C.get_type_kind t in
+  let k = C.get_type_kind t.C.Ast.cxtype in
+  let attr = trans_attribute t in
   match k with
-  | C.Void -> Cil.TVoid []
+  | C.Void -> Cil.TVoid attr
   (* integer types *)
   | C.Int | C.Bool | C.Char_U | C.UChar | C.UShort | C.UInt | C.ULong
   | C.ULongLong | C.Char_S | C.SChar | C.Short | C.Long | C.LongLong ->
-      Cil.TInt (trans_int_kind (k : C.Ast.builtin_type), [])
-  | C.Float | C.Double | C.LongDouble -> Cil.TFloat (trans_float_kind k, [])
+      Cil.TInt (trans_int_kind (k : C.Ast.builtin_type), attr)
+  | C.Float | C.Double | C.LongDouble -> Cil.TFloat (trans_float_kind k, attr)
   | C.Pointer -> failwith "pointer"
-  (*       Cil.TPtr (C.get_pointee_type t |> trans_builtin_type, [])  *)
   | C.Enum -> failwith "enum"
   | C.Typedef -> failwith "typedef"
   | C.FunctionNoProto -> failwith "typedef"
   | C.FunctionProto -> failwith "typedef"
   | C.ConstantArray ->
-      let size = C.get_array_size t |> Cil.integer in
+      let size = C.get_array_size t.cxtype |> Cil.integer in
       let elem_type =
-        C.get_array_element_type t |> C.Type.of_cxtype |> trans_type scope
+        C.get_array_element_type t.cxtype
+        |> C.Type.of_cxtype |> trans_type scope
       in
-      Cil.TArray (elem_type, Some size, [])
+      Cil.TArray (elem_type, Some size, attr)
   | C.VariableArray | C.IncompleteArray ->
       let elem_type =
-        C.get_array_element_type t |> C.Type.of_cxtype |> trans_type scope
+        C.get_array_element_type t.cxtype
+        |> C.Type.of_cxtype |> trans_type scope
       in
-      Cil.TArray (elem_type, None, [])
+      Cil.TArray (elem_type, None, attr)
   | Invalid | Unexposed | Char16 | Char32 -> failwith "type 1"
   | UInt128 | WChar | Int128 | NullPtr | Overload | Dependent | ObjCId ->
       failwith "9"
@@ -277,8 +283,7 @@ and trans_builtin_type scope t =
   | MemberPointer -> failwith "6"
   | Auto | Elaborated | Pipe -> failwith "5"
   | x ->
-      F.fprintf F.err_formatter "%s" (C.get_type_spelling t);
-      (*       C.pp_cxtypekind F.err_formatter x ; *)
+      F.fprintf F.err_formatter "%s" (C.get_type_spelling t.cxtype);
       F.fprintf F.err_formatter "\n";
       F.pp_print_flush F.err_formatter ();
       failwith "trans_builtin_type"
@@ -1118,18 +1123,20 @@ let rec trans_global_decl scope (decl : C.Ast.decl) =
   match decl.desc with
   | C.Ast.Function fdecl when fdecl.body = None ->
       let name = string_of_declaration_name fdecl.name in
-      let typ = trans_function_type scope fdecl.function_type in
+      let typ = trans_function_type scope fdecl.C.Ast.function_type in
       let svar, scope = find_global_variable scope name typ in
       svar.vstorage <- storage;
       ([ Cil.GVarDecl (svar, loc) ], scope)
   | C.Ast.Function fdecl ->
       let name = string_of_declaration_name fdecl.name in
-      let typ = trans_function_type scope fdecl.function_type in
+      let typ = trans_function_type scope fdecl.C.Ast.function_type in
       let svar, scope = find_global_variable scope name typ in
       let fundec = { Cil.dummyFunDec with svar } in
       let scope = Scope.enter scope in
       let scope = trans_params scope fdecl.function_type.parameters fundec in
       fundec.svar.vstorage <- storage;
+      fundec.svar.vinline <-
+        C.Ast.cursor_of_node decl |> C.cursor_is_function_inlined;
       fundec.sbody <- trans_function_body scope fundec (Option.get fdecl.body);
       let scope = Scope.exit scope in
       ([ Cil.GFun (fundec, loc) ], scope)

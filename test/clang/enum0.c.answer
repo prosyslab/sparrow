@@ -14,7 +14,7 @@ int main(void)
   {
   {
 #line 7
-  __cil_tmp2 = printf((char *)"%d\n", 11);
+  __cil_tmp2 = printf((char const   *)((char *)"%d\n"), 11);
   }
 #line 8
   return (0);

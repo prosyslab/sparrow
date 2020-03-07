@@ -6,7 +6,7 @@ typedef int __int32_t;
 #line 3
 extern __int32_t **__ctype_tolower_loc(void) ;
 #line 7 "clang/ternop1.c"
-extern int tolower(int __c ) 
+__inline extern int tolower(int __c ) 
 { 
   __int32_t **__cil_tmp2 ;
   __int32_t tmp ;
