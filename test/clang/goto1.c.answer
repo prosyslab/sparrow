@@ -17,6 +17,7 @@ void f(void)
 #line 6
   goto L;
   }
+
 #line 8
   goto L;
 #line 9

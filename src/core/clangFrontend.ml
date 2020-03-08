@@ -748,7 +748,8 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   let loc = trans_location stmt in
   if !Options.debug then prerr_endline (CilHelper.s_location loc);
   match stmt.C.Ast.desc with
-  | C.Ast.Null -> (Chunk.empty, scope)
+  | C.Ast.Null ->
+      ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr []) ] }, scope)
   | C.Ast.Compound sl ->
       let chunk = trans_compound scope fundec sl in
       let stmts =
