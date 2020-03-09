@@ -192,11 +192,17 @@ let trans_float_kind : C.Ast.builtin_type -> Cil.fkind = function
   | C.LongDouble -> Cil.FLongDouble
   | _ -> invalid_arg "float kind"
 
-let trans_binop = function
+let trans_binop lhs rhs = function
   | C.Mul -> Cil.Mult
   | C.Div -> Cil.Div
   | C.Rem -> Cil.Mod
+  | C.Add when Cil.typeOf lhs |> Cil.isPointerType -> Cil.PlusPI
   | C.Add -> Cil.PlusA
+  | C.Sub
+    when Cil.typeOf lhs |> Cil.isPointerType
+         && Cil.typeOf rhs |> Cil.isPointerType ->
+      Cil.MinusPP
+  | C.Sub when Cil.typeOf lhs |> Cil.isPointerType -> Cil.MinusPI
   | C.Sub -> Cil.MinusA
   | C.Shl -> Cil.Shiftlt
   | C.Shr -> Cil.Shiftrt
@@ -477,28 +483,40 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
   in
   match kind with
   | C.PostInc ->
+      let op =
+        if Cil.typeOf var |> Cil.isPointerType then Cil.PlusPI else Cil.PlusA
+      in
       let fundec = Option.get fundec_opt in
       (* i++ ==> temp = i; i = i + 1; temp *)
       let temp = (Cil.Var (Cil.makeTempVar fundec typ), Cil.NoOffset) in
-      let exp = Cil.BinOp (Cil.PlusA, var, Cil.one, Cil.intType) in
+      let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr2 = Cil.Set (lval_of_expr var, exp, loc) in
       if action = ADrop then (sl @ [ Cil.mkStmt (Cil.Instr [ instr2 ]) ], var)
       else
         let instr1 = Cil.Set (temp, var, loc) in
         (sl @ [ Cil.mkStmt (Cil.Instr [ instr1; instr2 ]) ], Cil.Lval temp)
   | C.PostDec ->
+      let op =
+        if Cil.typeOf var |> Cil.isPointerType then Cil.MinusPI else Cil.MinusA
+      in
       let fundec = Option.get fundec_opt in
       let temp = (Cil.Var (Cil.makeTempVar fundec typ), Cil.NoOffset) in
       let instr1 = Cil.Set (temp, var, loc) in
-      let exp = Cil.BinOp (Cil.MinusA, var, Cil.one, Cil.intType) in
+      let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr2 = Cil.Set (lval_of_expr var, exp, loc) in
       (sl @ [ Cil.mkStmt (Cil.Instr [ instr1; instr2 ]) ], Cil.Lval temp)
   | C.PreInc ->
-      let exp = Cil.BinOp (Cil.PlusA, var, Cil.one, Cil.intType) in
+      let op =
+        if Cil.typeOf var |> Cil.isPointerType then Cil.PlusPI else Cil.PlusA
+      in
+      let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr = Cil.Set (lval_of_expr var, exp, loc) in
       (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], var)
   | C.PreDec ->
-      let exp = Cil.BinOp (Cil.MinusA, var, Cil.one, Cil.intType) in
+      let op =
+        if Cil.typeOf var |> Cil.isPointerType then Cil.MinusPI else Cil.MinusA
+      in
+      let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr = Cil.Set (lval_of_expr var, exp, loc) in
       (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], var)
   | C.AddrOf -> (sl, Cil.AddrOf (lval_of_expr var))
@@ -518,16 +536,12 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
   let lhs_expr = match lhs_opt with Some x -> x | None -> failwith "lhs" in
   let rhs_expr = match rhs_opt with Some x -> x | None -> failwith "rhs" in
   match kind with
-  (* | C.PtrMemD
-     | C.PtrMemI
-  *)
-  | C.Mul | C.Div | C.Rem | C.Add | C.Sub | C.Shl | C.Shr
-  (*  | C.Cmp
-*)
-  | C.LT | C.GT | C.LE | C.GE | C.EQ | C.NE | C.And | C.Xor | C.Or | C.LAnd
-  | C.LOr ->
+  | C.Mul | C.Div | C.Rem | C.Add | C.Sub | C.Shl | C.Shr | C.LT | C.GT | C.LE
+  | C.GE | C.EQ | C.NE | C.And | C.Xor | C.Or | C.LAnd | C.LOr ->
       ( rhs_sl @ lhs_sl,
-        Cil.constFoldBinOp false (trans_binop kind) lhs_expr rhs_expr typ )
+        Cil.constFoldBinOp false
+          (trans_binop lhs_expr rhs_expr kind)
+          lhs_expr rhs_expr typ )
   | C.Assign ->
       let lval =
         match lhs_expr with Cil.Lval l -> l | _ -> failwith "invalid lhs"
@@ -553,11 +567,14 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
         match lhs_expr with Cil.Lval l -> l | _ -> failwith "invalid lhs"
       in
       let bop = drop_assign kind in
-      let rhs = Cil.BinOp (trans_binop bop, lhs_expr, rhs_expr, typ) in
+      let rhs =
+        Cil.BinOp (trans_binop lhs_expr rhs_expr bop, lhs_expr, rhs_expr, typ)
+      in
       let stmt = Cil.mkStmt (Cil.Instr [ Cil.Set (lval, rhs, loc) ]) in
       (rhs_sl @ lhs_sl @ [ stmt ], lhs_expr)
-  | C.Comma -> failwith "Unsupported syntax (MulAssign)"
-  | C.InvalidBinaryOperator | _ -> failwith "unsupported expr"
+  | C.Comma -> failwith "Unsupported syntax (Comma)"
+  | C.Cmp | C.PtrMemD | C.PtrMemI | C.InvalidBinaryOperator ->
+      failwith "unsupported expr"
 
 and trans_call scope fundec_opt loc action callee args =
   let fundec = Option.get fundec_opt in
