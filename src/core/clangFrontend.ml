@@ -2,6 +2,7 @@ open Vocab
 module H = Hashtbl
 module C = Clang
 module F = Format
+module L = Logging
 
 exception UnknownSyntax
 
@@ -1079,15 +1080,32 @@ and trans_stmt_opt scope fundec = function
 
 let rec trans_global_init scope loc (e : C.Ast.expr) =
   let typ = type_of_expr e |> trans_type scope in
-  match e.C.Ast.desc with
-  | C.Ast.InitList el ->
-      (* TODO: struct *)
+  match (e.C.Ast.desc, typ) with
+  | C.Ast.InitList el, Cil.TArray (_, _, _) ->
       let init_list, _ =
         List.fold_left
           (fun (r, o) i ->
             let init = trans_global_init scope loc i in
             (r @ [ (Cil.Index (Cil.integer o, Cil.NoOffset), init) ], o + 1))
           ([], 0) el
+      in
+      Cil.CompoundInit (typ, init_list)
+  | C.Ast.InitList el, Cil.TComp (ci, _) ->
+      let el, fields =
+        if List.length el > List.length ci.cfields then
+          let _ = L.warn "Field initializations do not match the delcaration" in
+          (BatList.take (List.length ci.cfields) el, ci.cfields)
+        else if List.length el < List.length ci.cfields then
+          let _ = L.warn "Field initializations do not match the delcaration" in
+          (el, BatList.take (List.length el) ci.cfields)
+        else (el, ci.cfields)
+      in
+      let init_list =
+        List.fold_left2
+          (fun r i fi ->
+            let init = trans_global_init scope loc i in
+            r @ [ (Cil.Field (fi, Cil.NoOffset), init) ])
+          [] el fields
       in
       Cil.CompoundInit (typ, init_list)
   | _ ->
