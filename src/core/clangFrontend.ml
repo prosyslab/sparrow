@@ -241,10 +241,10 @@ let rec trans_type ?(compinfo = None) scope typ =
   | C.Ast.Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
   | C.Ast.InvalidType -> failwith "invalid type"
   | C.Ast.Vector _ -> failwith "vector type"
-  | C.Ast.BuiltinType _ -> trans_builtin_type scope typ
-  | x -> trans_builtin_type scope typ
+  | C.Ast.BuiltinType _ -> trans_builtin_type ~compinfo scope typ
+  | x -> trans_builtin_type ~compinfo scope typ
 
-and trans_builtin_type scope t =
+and trans_builtin_type ?(compinfo = None) scope t =
   let k = C.get_type_kind t.C.Ast.cxtype in
   let attr = trans_attribute t in
   match k with
@@ -263,13 +263,13 @@ and trans_builtin_type scope t =
       let size = C.get_array_size t.cxtype |> Cil.integer in
       let elem_type =
         C.get_array_element_type t.cxtype
-        |> C.Type.of_cxtype |> trans_type scope
+        |> C.Type.of_cxtype |> trans_type ~compinfo scope
       in
       Cil.TArray (elem_type, Some size, attr)
   | C.VariableArray | C.IncompleteArray ->
       let elem_type =
         C.get_array_element_type t.cxtype
-        |> C.Type.of_cxtype |> trans_type scope
+        |> C.Type.of_cxtype |> trans_type ~compinfo scope
       in
       Cil.TArray (elem_type, None, attr)
   | Invalid | Unexposed | Char16 | Char32 -> failwith "type 1"
