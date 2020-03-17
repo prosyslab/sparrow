@@ -553,14 +553,14 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
   | C.ShlAssign | C.ShrAssign | C.AndAssign | C.XorAssign | C.OrAssign ->
       let drop_assign = function
         | C.MulAssign -> C.Mul
-        | C.DivAssign -> C.Mul
-        | C.RemAssign -> C.Mul
-        | C.AddAssign -> C.Mul
-        | C.SubAssign -> C.Mul
-        | C.ShlAssign -> C.Mul
-        | C.ShrAssign -> C.Mul
-        | C.AndAssign -> C.Mul
-        | C.XorAssign -> C.Mul
+        | C.DivAssign -> C.Div
+        | C.RemAssign -> C.Rem
+        | C.AddAssign -> C.Add
+        | C.SubAssign -> C.Sub
+        | C.ShlAssign -> C.Shl
+        | C.ShrAssign -> C.Shr
+        | C.AndAssign -> C.And
+        | C.XorAssign -> C.Xor
         | C.OrAssign -> C.Or
         | _ -> failwith "Invalid syntaxk"
       in
