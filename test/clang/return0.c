@@ -5,5 +5,4 @@ int f() {
 void g() {
   f();
   short x = f();
-  1;
 }
