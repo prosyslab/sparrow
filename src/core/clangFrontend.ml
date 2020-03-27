@@ -560,12 +560,21 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
         Cil.constFoldBinOp false
           (trans_binop lhs_expr rhs_expr kind)
           lhs_expr rhs_expr typ )
-  | C.Assign ->
+  | C.Assign -> (
       let lval =
         match lhs_expr with Cil.Lval l -> l | _ -> failwith "invalid lhs"
       in
-      let instr = Cil.Set (lval, rhs_expr, loc) in
-      (append_instr (rhs_sl @ lhs_sl) instr, lhs_expr)
+      match (rhs_expr, rhs_sl) with
+      | ( Cil.Lval _,
+          [ ({ Cil.skind = Cil.Instr [ Cil.Call (Some y, f, el, loc) ] } as s) ]
+        ) ->
+          let stmt =
+            { s with skind = Cil.Instr [ Cil.Call (Some lval, f, el, loc) ] }
+          in
+          (append_stmt_list lhs_sl [ stmt ], lhs_expr)
+      | _ ->
+          let instr = Cil.Set (lval, rhs_expr, loc) in
+          (append_instr (rhs_sl @ lhs_sl) instr, lhs_expr) )
   | C.MulAssign | C.DivAssign | C.RemAssign | C.AddAssign | C.SubAssign
   | C.ShlAssign | C.ShrAssign | C.AndAssign | C.XorAssign | C.OrAssign ->
       let drop_assign = function

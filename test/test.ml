@@ -89,6 +89,7 @@ let test_suites =
           "clang/attribute1.c";
           "clang/return0.c";
           "clang/block0.c";
+          "clang/function0.c";
         ];
     };
   ]
