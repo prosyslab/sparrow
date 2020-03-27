@@ -372,6 +372,23 @@ let should_ignore_implicit_cast1 expr qual_type =
   expr_kind = C.ImplicitCastExpr
   && (type_kind = C.FunctionNoProto || type_kind = C.FunctionProto)
 
+let rec append_instr sl instr =
+  match sl with
+  | [ ({ Cil.skind = Cil.Instr l } as h) ] ->
+      [ { h with skind = Cil.Instr (l @ [ instr ]) } ]
+  | [] -> [ Cil.mkStmt (Cil.Instr [ instr ]) ]
+  | h :: t -> h :: append_instr t instr
+
+let rec append_stmt_list sl1 sl2 =
+  match (sl1, sl2) with
+  | ( [ ({ Cil.skind = Cil.Instr l1 } as h1) ],
+      ({ Cil.skind = Cil.Instr l2 } as h2) :: t2 )
+  (* merging statements with labels may break goto targets *)
+    when h1.labels = [] && h2.labels = [] ->
+      { h1 with skind = Cil.Instr (l1 @ l2) } :: t2
+  | [], _ -> sl2
+  | h1 :: t1, _ -> h1 :: append_stmt_list t1 sl2
+
 let rec should_ignore_implicit_cast2 e typ =
   (* ignore LValueToRValue *)
   match (typ, Cil.typeOf e) with
@@ -389,8 +406,8 @@ let rec should_ignore_implicit_cast2 e typ =
       Cil.typeSig typ = (Cil.typeOf e |> Cil.typeSig)
   | _, _ -> false
 
-let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
-    (expr : C.Ast.expr) =
+let rec trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt
+    loc action (expr : C.Ast.expr) =
   try
     match expr.C.Ast.desc with
     | C.Ast.IntegerLiteral il ->
@@ -416,7 +433,7 @@ let rec trans_expr ?(allow_undef = false) scope fundec_opt loc action
         (il, Some exp)
     | C.Ast.DeclRef idref -> trans_decl_ref scope allow_undef idref
     | C.Ast.Call call ->
-        trans_call scope fundec_opt loc action call.callee call.args
+        trans_call scope skip_lhs fundec_opt loc action call.callee call.args
     | C.Ast.Cast cast ->
         let sl, expr_opt =
           trans_expr ~allow_undef scope fundec_opt loc action cast.operand
@@ -547,8 +564,8 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
       let lval =
         match lhs_expr with Cil.Lval l -> l | _ -> failwith "invalid lhs"
       in
-      let stmt = Cil.mkStmt (Cil.Instr [ Cil.Set (lval, rhs_expr, loc) ]) in
-      (rhs_sl @ lhs_sl @ [ stmt ], lhs_expr)
+      let instr = Cil.Set (lval, rhs_expr, loc) in
+      (append_instr (rhs_sl @ lhs_sl) instr, lhs_expr)
   | C.MulAssign | C.DivAssign | C.RemAssign | C.AddAssign | C.SubAssign
   | C.ShlAssign | C.ShrAssign | C.AndAssign | C.XorAssign | C.OrAssign ->
       let drop_assign = function
@@ -577,7 +594,7 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
   | C.Cmp | C.PtrMemD | C.PtrMemI | C.InvalidBinaryOperator ->
       failwith "unsupported expr"
 
-and trans_call scope fundec_opt loc action callee args =
+and trans_call scope skip_lhs fundec_opt loc action callee args =
   let fundec = Option.get fundec_opt in
   let callee_insts, callee_opt =
     trans_expr ~allow_undef:true scope fundec_opt loc AExp callee
@@ -594,7 +611,7 @@ and trans_call scope fundec_opt loc action callee args =
   let retvar =
     match Cil.typeOf callee with
     | (Cil.TFun (rt, _, _, _) | TPtr (TFun (rt, _, _, _), _))
-      when not (Cil.isVoidType rt) ->
+      when (not (Cil.isVoidType rt)) && not skip_lhs ->
         let temp = (Cil.Var (Cil.makeTempVar fundec rt), Cil.NoOffset) in
         Some temp
     | _ -> None
@@ -602,10 +619,8 @@ and trans_call scope fundec_opt loc action callee args =
   let retvar_exp =
     match retvar with Some x -> Some (Cil.Lval x) | _ -> None
   in
-  let stmt =
-    Cil.mkStmt (Cil.Instr [ Cil.Call (retvar, callee, args_exprs, loc) ])
-  in
-  (callee_insts @ args_insts @ [ stmt ], retvar_exp)
+  let instr = Cil.Call (retvar, callee, args_exprs, loc) in
+  (append_instr (callee_insts @ args_insts) instr, retvar_exp)
 
 and trans_member scope fundec_opt loc base arrow field =
   match base with
@@ -755,7 +770,7 @@ module Chunk = struct
 
   let append x y =
     {
-      stmts = x.stmts @ y.stmts;
+      stmts = append_stmt_list x.stmts y.stmts;
       cases = x.cases @ y.cases;
       labels = LabelMap.append x.labels y.labels;
       gotos = GotoMap.append x.gotos y.gotos;
@@ -828,7 +843,11 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       let stmts, scope = trans_var_decl_list scope fundec loc AExp dl in
       ({ Chunk.empty with stmts }, scope)
   | C.Ast.Expr e ->
-      let stmts, _ = trans_expr scope (Some fundec) loc ADrop e in
+      (* skip_lhs is true only here: a function is called at the top-most level
+       * without a return variable *)
+      let stmts, _ =
+        trans_expr ~skip_lhs:true scope (Some fundec) loc ADrop e
+      in
       ({ Chunk.empty with stmts }, scope)
   | C.Ast.Try _ ->
       failwith ("Unsupported syntax (Try): " ^ CilHelper.s_location loc)
@@ -875,10 +894,8 @@ and trans_var_decl (scope : Scope.t) fundec loc action
                 let var =
                   (Cil.Var varinfo, Cil.Index (Cil.integer o, Cil.NoOffset))
                 in
-                let stmt =
-                  Cil.mkStmt (Cil.Instr [ Cil.Set (var, expr, loc) ])
-                in
-                (sl @ [ stmt ], o + 1))
+                let instr = Cil.Set (var, expr, loc) in
+                (append_instr sl instr, o + 1))
               ([], 0) el
           in
           (sl, scope)
@@ -886,8 +903,8 @@ and trans_var_decl (scope : Scope.t) fundec loc action
           let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
           let expr = get_opt "var_decl" expr_opt in
           let var = (Cil.Var varinfo, Cil.NoOffset) in
-          let stmt = Cil.mkStmt (Cil.Instr [ Cil.Set (var, expr, loc) ]) in
-          (sl_expr @ [ stmt ], scope) )
+          let instr = Cil.Set (var, expr, loc) in
+          (append_instr sl_expr instr, scope) )
   | _ -> ([], scope)
 
 and trans_var_decl_opt scope fundec loc action (vdecl : C.Ast.var_decl option) =

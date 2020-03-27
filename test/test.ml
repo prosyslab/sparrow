@@ -86,6 +86,7 @@ let test_suites =
           "clang/goto1.c";
           "clang/attribute0.c";
           "clang/attribute1.c";
+          "clang/return0.c";
         ];
     };
   ]

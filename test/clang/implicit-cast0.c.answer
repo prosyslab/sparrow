@@ -4,12 +4,12 @@
 #line 1 "clang/implicit-cast0.c"
 int f(int x ) 
 { 
-  int __cil_tmp2 ;
+
 
   {
   {
 #line 2
-  __cil_tmp2 = __builtin_bswap32((unsigned int )x);
+  __builtin_bswap32((unsigned int )x);
   }
 #line 3
   return (0);
