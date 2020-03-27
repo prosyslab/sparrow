@@ -772,6 +772,13 @@ module Chunk = struct
     }
 end
 
+let trans_storage decl =
+  match C.Ast.cursor_of_node decl |> C.cursor_get_storage_class with
+  | C.Extern -> Cil.Extern
+  | C.Register -> Cil.Register
+  | C.Static -> Cil.Static
+  | _ -> Cil.NoStorage
+
 let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   let loc = trans_location stmt in
   if !Options.debug then prerr_endline (CilHelper.s_location loc);
@@ -864,15 +871,19 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
     (fun (sl, scope) (d : C.Ast.decl) ->
       match d.C.Ast.desc with
       | C.Ast.Var desc ->
-          let decl_stmts, scope = trans_var_decl scope fundec loc action desc in
+          let storage = trans_storage d in
+          let decl_stmts, scope =
+            trans_var_decl ~storage scope fundec loc action desc
+          in
           (sl @ decl_stmts, scope)
       | _ -> (sl, scope))
     ([], scope) dl
 
-and trans_var_decl (scope : Scope.t) fundec loc action
-    (desc : C.Ast.var_decl_desc) =
+and trans_var_decl ?(storage = Cil.NoStorage) (scope : Scope.t) fundec loc
+    action (desc : C.Ast.var_decl_desc) =
   let typ = trans_type scope desc.C.Ast.var_type in
   let varinfo, scope = create_local_variable scope fundec desc.var_name typ in
+  varinfo.vstorage <- storage;
   match desc.var_init with
   | Some e -> (
       match e.C.Ast.desc with
@@ -1132,13 +1143,6 @@ let failwith_decl (decl : C.Ast.decl) =
   match decl.C.Ast.desc with
   | C.Ast.RecordDecl _ -> failwith "record decl"
   | _ -> failwith "unknown decl"
-
-let trans_storage decl =
-  match C.Ast.cursor_of_node decl |> C.cursor_get_storage_class with
-  | C.Extern -> Cil.Extern
-  | C.Register -> Cil.Register
-  | C.Static -> Cil.Static
-  | _ -> Cil.NoStorage
 
 class replaceGotoVisitor gotos labels =
   object
