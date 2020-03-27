@@ -84,9 +84,11 @@ let test_suites =
           "clang/while2.c";
           "clang/goto0.c";
           "clang/goto1.c";
+          "clang/goto2.c";
           "clang/attribute0.c";
           "clang/attribute1.c";
           "clang/return0.c";
+          "clang/block0.c";
         ];
     };
   ]

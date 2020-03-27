@@ -694,24 +694,19 @@ and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
       let bstmts =
         match then_expr with
         | Some e when should_ignore_implicit_cast2 e typ ->
-            [ Cil.mkStmt (Cil.Instr [ Cil.Set (var, e, loc) ]) ]
+            append_instr then_sl (Cil.Set (var, e, loc))
         | Some e ->
-            [
-              Cil.mkStmt (Cil.Instr [ Cil.Set (var, Cil.CastE (typ, e), loc) ]);
-            ]
+            append_instr then_sl (Cil.Set (var, Cil.CastE (typ, e), loc))
         | None -> []
       in
-      let tb = { Cil.battrs = []; bstmts = then_sl @ bstmts } in
+      let tb = { Cil.battrs = []; bstmts } in
       let bstmts =
         if should_ignore_implicit_cast2 else_expr typ then
-          [ Cil.mkStmt (Cil.Instr [ Cil.Set (var, else_expr, loc) ]) ]
+          append_instr else_sl (Cil.Set (var, else_expr, loc))
         else
-          [
-            Cil.mkStmt
-              (Cil.Instr [ Cil.Set (var, Cil.CastE (typ, else_expr), loc) ]);
-          ]
+          append_instr else_sl (Cil.Set (var, Cil.CastE (typ, else_expr), loc))
       in
-      let fb = { Cil.battrs = []; bstmts = else_sl @ bstmts } in
+      let fb = { Cil.battrs = []; bstmts } in
       let return_exp =
         if should_ignore_implicit_cast2 (Cil.Lval var) Cil.intType then
           Some (Cil.Lval var)
@@ -784,13 +779,9 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   | C.Ast.Null ->
       ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr []) ] }, scope)
   | C.Ast.Compound sl ->
+      (* CIL does not need to have local blocks because all variables have unique names *)
       let chunk = trans_compound scope fundec sl in
-      let stmts =
-        [
-          Cil.mkStmt (Cil.Block { Cil.battrs = []; bstmts = chunk.Chunk.stmts });
-        ]
-      in
-      ({ chunk with Chunk.stmts }, scope)
+      (chunk, scope)
   | C.Ast.For fdesc ->
       ( trans_for scope fundec loc fdesc.init fdesc.condition_variable
           fdesc.cond fdesc.inc fdesc.body,
@@ -1070,7 +1061,14 @@ and trans_label scope fundec loc label body =
   | h :: t ->
       h.labels <- h.labels @ [ l ];
       { chunk with labels = Chunk.LabelMap.add label (ref h) chunk.labels }
-  | [] -> chunk
+  | [] ->
+      let h = Cil.mkStmt (Cil.Instr []) in
+      h.labels <- [ l ];
+      {
+        chunk with
+        stmts = [ h ];
+        labels = Chunk.LabelMap.add label (ref h) chunk.labels;
+      }
 
 and trans_goto scope fundec loc label =
   let dummy_instr =
@@ -1151,7 +1149,12 @@ class replaceGotoVisitor gotos labels =
       | Cil.Goto (placeholder, loc) -> (
           match Chunk.GotoMap.find placeholder gotos with
           | label ->
-              let target = Chunk.LabelMap.find label labels in
+              let target =
+                try Chunk.LabelMap.find label labels
+                with Not_found ->
+                  failwith
+                    (CilHelper.s_location loc ^ ": " ^ label ^ " not found")
+              in
               Cil.ChangeTo (Cil.mkStmt (Cil.Goto (target, loc)))
           | exception Not_found -> Cil.DoChildren )
       | _ -> Cil.DoChildren

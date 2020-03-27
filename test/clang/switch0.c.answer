@@ -43,14 +43,11 @@ int main(void)
   }
 #line 23
   goto switch_default;
-  {
 #line 4
   x = 1;
-  {
   case_0: /* CIL Label */ 
 #line 7
   return (1);
-  }
 #line 9
   if (x) {
     case_8: /* CIL Label */ 
@@ -75,7 +72,6 @@ int main(void)
   switch_default: /* CIL Label */ 
 #line 24
   return (5);
-  }
   switch_break: /* CIL Label */ ;
   }
 }

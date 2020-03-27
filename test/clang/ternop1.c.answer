@@ -19,9 +19,9 @@ __inline extern int tolower(int __c )
     {
 #line 9
     __cil_tmp2 = __ctype_tolower_loc();
-    }
 #line 9
     tmp = *(*__cil_tmp2 + __c);
+    }
   } else {
 #line 9
     tmp = (__int32_t )__c;
