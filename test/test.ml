@@ -85,11 +85,15 @@ let test_suites =
           "clang/goto0.c";
           "clang/goto1.c";
           "clang/goto2.c";
+          "clang/goto3.c";
           "clang/attribute0.c";
           "clang/attribute1.c";
           "clang/return0.c";
           "clang/block0.c";
           "clang/function0.c";
+          "clang/if0.c";
+          "clang/if1.c";
+          "clang/if2.c";
         ];
     };
   ]

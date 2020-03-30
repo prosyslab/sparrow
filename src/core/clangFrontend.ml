@@ -7,23 +7,22 @@ module L = Logging
 exception UnknownSyntax
 
 module EnvData = struct
-  type t =
-    | EnvVar of Cil.varinfo
-    | EnvEnum of Cil.exp
-    | EnvTyp of Cil.typ
-    | EnvLabel of string
+  type t = EnvVar of Cil.varinfo | EnvEnum of Cil.exp | EnvTyp of Cil.typ
 
   let to_string = function
     | EnvVar vi -> vi.vname
     | EnvEnum e -> CilHelper.s_exp e
     | EnvTyp t -> CilHelper.s_type t
-    | EnvLabel l -> l
 end
 
 module Env = struct
-  type t = { var : (string, EnvData.t) H.t; typ : (string, Cil.typ) H.t }
+  type t = {
+    var : (string, EnvData.t) H.t;
+    typ : (string, Cil.typ) H.t;
+    label : (string, string) H.t;
+  }
 
-  let create () = { var = H.create 64; typ = H.create 64 }
+  let create () = { var = H.create 64; typ = H.create 64; label = H.create 64 }
 
   let add_var name vi env =
     H.add env.var name vi;
@@ -33,13 +32,21 @@ module Env = struct
     H.add env.typ name typ;
     env
 
+  let add_label name env =
+    H.add env.label name name;
+    env
+
   let mem_var name env = H.mem env.var name
 
   let mem_typ name env = H.mem env.typ name
 
+  let mem_label name env = H.mem env.label name
+
   let find_var name env = H.find env.var name
 
   let find_typ name env = H.find env.typ name
+
+  let find_label name env = H.find env.label name
 end
 
 module Scope = struct
@@ -65,12 +72,22 @@ module Scope = struct
         l
     | [] -> failwith "empty scope"
 
+  let add_label name = function
+    | h :: t as l ->
+        ignore (Env.add_label name h);
+        l
+    | [] -> failwith "empty scope"
+
   let rec mem_var name = function
     | h :: t -> if Env.mem_var name h then true else mem_var name t
     | [] -> false
 
   let rec mem_typ name = function
     | h :: t -> if Env.mem_typ name h then true else mem_typ name t
+    | [] -> false
+
+  let rec mem_label name = function
+    | h :: t -> if Env.mem_label name h then true else mem_label name t
     | [] -> false
 
   let rec find ?(allow_undef = false) ?(compinfo = None) name = function
@@ -162,6 +179,17 @@ let create_local_variable scope fundec name typ =
   let varinfo = Cil.makeLocalVar fundec new_name typ in
   let scope = Scope.add name (EnvData.EnvVar varinfo) scope in
   (varinfo, scope)
+
+let create_label scope label =
+  let new_name =
+    if Scope.mem_var label scope then (
+      let new_name = label ^ "___" ^ string_of_int !alpha_count in
+      alpha_count := !alpha_count + 1;
+      new_name )
+    else label
+  in
+  let scope = Scope.add_label new_name scope in
+  (new_name, scope)
 
 let trans_location node =
   let location =
@@ -781,6 +809,21 @@ module Chunk = struct
     }
 end
 
+let append_label chunk label loc in_origin =
+  let l = Cil.Label (label, loc, in_origin) in
+  match chunk.Chunk.stmts with
+  | h :: t ->
+      h.labels <- h.labels @ [ l ];
+      { chunk with labels = Chunk.LabelMap.add label (ref h) chunk.labels }
+  | [] ->
+      let h = Cil.mkStmt (Cil.Instr []) in
+      h.labels <- [ l ];
+      {
+        chunk with
+        stmts = [ h ];
+        labels = Chunk.LabelMap.add label (ref h) chunk.labels;
+      }
+
 let trans_storage decl =
   match C.Ast.cursor_of_node decl |> C.cursor_get_storage_class with
   | C.Extern -> Cil.Extern
@@ -819,8 +862,7 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       ( trans_while scope fundec loc desc.condition_variable desc.cond desc.body,
         scope )
   | C.Ast.Do desc -> (trans_do scope fundec loc desc.body desc.cond, scope)
-  | C.Ast.Label desc ->
-      (trans_label scope fundec loc desc.label desc.body, scope)
+  | C.Ast.Label desc -> trans_label scope fundec loc desc.label desc.body
   | C.Ast.Goto label -> (trans_goto scope fundec loc label, scope)
   | C.Ast.IndirectGoto _ ->
       failwith ("Unsupported syntax (IndirectGoto): " ^ CilHelper.s_location loc)
@@ -1014,20 +1056,80 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
     | Some s -> trans_block scope fundec s
     | None -> Chunk.empty
   in
-  let then_block = { Cil.battrs = []; bstmts = then_stmt.stmts } in
-  let else_block = { Cil.battrs = []; bstmts = else_stmt.stmts } in
+  (* let then_block = { Cil.battrs = []; bstmts = then_stmt.stmts } in
+     let else_block = { Cil.battrs = []; bstmts = else_stmt.stmts } in*)
+  let cond_expr = Option.get cond_expr in
+  let duplicate chunk =
+    if
+      chunk.Chunk.cases <> []
+      || not (Chunk.LabelMap.is_empty chunk.Chunk.labels)
+    then raise (Failure "cannot duplicate: has labels")
+    else
+      let count =
+        List.fold_left
+          (fun c stmt ->
+            match stmt.Cil.skind with
+            | Cil.If _ | Cil.Switch _ | Cil.Loop _ | Cil.Block _ ->
+                raise (Failure "cannot duplicate: complex stmt")
+            | Cil.Instr il -> c + List.length il
+            | _ -> c)
+          0 chunk.Chunk.stmts
+      in
+      if count > 5 then raise (Failure "cannot duplicate: too many instr")
+      else { Chunk.empty with stmts = chunk.Chunk.stmts }
+  in
+  (* Reference: https://github.com/cil-project/cil/blob/936b04103eb573f320c6badf280e8bb17f6e7b26/src/frontc/cabs2cil.ml#L4837 *)
+  let rec compile_cond scope ce st sf =
+    match ce with
+    | Cil.BinOp (Cil.LAnd, ce1, ce2, _) ->
+        let scope, sf1, sf2 =
+          try (scope, sf, duplicate sf)
+          with Failure _ ->
+            let lab, scope = create_label scope "_L" in
+            ( scope,
+              trans_goto scope fundec loc lab,
+              append_label sf lab loc false )
+        in
+        let scope, st' = compile_cond scope ce2 st sf1 in
+        compile_cond scope ce1 st' sf2
+    | Cil.BinOp (Cil.LOr, ce1, ce2, _) ->
+        let scope, st1, st2 =
+          try (scope, st, duplicate st)
+          with Failure _ ->
+            let lab, scope = create_label scope "_L" in
+            ( scope,
+              trans_goto scope fundec loc lab,
+              append_label st lab loc false )
+        in
+        let scope, sf' = compile_cond scope ce2 st1 sf in
+        compile_cond scope ce1 st2 sf'
+    | _ ->
+        let then_block = { Cil.battrs = []; bstmts = st.stmts } in
+        let else_block = { Cil.battrs = []; bstmts = sf.stmts } in
+        ( scope,
+          {
+            Chunk.stmts =
+              [ Cil.mkStmt (Cil.If (ce, then_block, else_block, loc)) ];
+            labels = Chunk.LabelMap.append st.labels sf.labels;
+            gotos = Chunk.GotoMap.append st.gotos sf.gotos;
+            cases = [];
+          } )
+  in
+  let scope, if_chunk = compile_cond scope cond_expr then_stmt else_stmt in
   let stmts =
     decl_stmt @ init_stmt.stmts @ cond_sl
-    @ [
-        Cil.mkStmt (Cil.If (Option.get cond_expr, then_block, else_block, loc));
-      ]
+    (*     @ [ Cil.mkStmt (Cil.If (cond_expr, then_block, else_block, loc)) ] *)
+    @ if_chunk.Chunk.stmts
   in
   let cases = init_stmt.cases @ then_stmt.cases @ else_stmt.cases in
   {
     Chunk.stmts;
     cases;
-    labels = Chunk.LabelMap.append then_stmt.labels else_stmt.labels;
-    gotos = Chunk.GotoMap.append then_stmt.gotos else_stmt.gotos;
+    labels =
+      if_chunk.labels
+      (* Chunk.LabelMap.append then_stmt.labels else_stmt.labels*);
+    gotos =
+      if_chunk.gotos (*Chunk.GotoMap.append then_stmt.gotos else_stmt.gotos*);
   }
 
 and trans_block scope fundec body =
@@ -1075,20 +1177,13 @@ and trans_default scope fundec loc stmt =
   | [] -> chunk
 
 and trans_label scope fundec loc label body =
+  (* Clang frontend guarantees the uniqueness of label names,
+   * so do not need to create unique names.
+   * Instead, we only add the label name to the scope,
+   * to avoid conflicts with CIL-generated label names *)
+  let scope = Scope.add_label label scope in
   let chunk = trans_stmt scope fundec body |> fst in
-  let l = Cil.Label (label, loc, true) in
-  match chunk.Chunk.stmts with
-  | h :: t ->
-      h.labels <- h.labels @ [ l ];
-      { chunk with labels = Chunk.LabelMap.add label (ref h) chunk.labels }
-  | [] ->
-      let h = Cil.mkStmt (Cil.Instr []) in
-      h.labels <- [ l ];
-      {
-        chunk with
-        stmts = [ h ];
-        labels = Chunk.LabelMap.add label (ref h) chunk.labels;
-      }
+  (append_label chunk label loc true, scope)
 
 and trans_goto scope fundec loc label =
   let dummy_instr =
@@ -1166,9 +1261,11 @@ class replaceGotoVisitor gotos labels =
                 try Chunk.LabelMap.find label labels
                 with Not_found ->
                   failwith
-                    (CilHelper.s_location loc ^ ": " ^ label ^ " not found")
+                    ( CilHelper.s_location loc ^ ": label " ^ label
+                    ^ " not found" )
               in
-              Cil.ChangeTo (Cil.mkStmt (Cil.Goto (target, loc)))
+              stmt.Cil.skind <- Cil.Goto (target, loc);
+              Cil.DoChildren
           | exception Not_found -> Cil.DoChildren )
       | _ -> Cil.DoChildren
   end
