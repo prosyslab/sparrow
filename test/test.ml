@@ -94,6 +94,7 @@ let test_suites =
           "clang/if0.c";
           "clang/if1.c";
           "clang/if2.c";
+          "clang/init-list0.c";
         ];
     };
   ]
