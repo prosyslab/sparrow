@@ -65,12 +65,10 @@ struct C {
 #line 59 "clang/init-list0.c"
 struct C my  = 
 #line 59
-     {(FuncPtr )1, (str )2, 3, 4, (double *(*)(char * , int * ))5, {6, (enum DayOfWeek )7,
-                                                                  {(char )8, (char )9},
-                                                                  {10, {(char *)11},
-                                                                   {(double )12, (double )13}},
-                                                                  14}, 15, {(float )16},
-    {17, 18}};
+     {(int (*)(int  , int  ))((FuncPtr )1), (str )2, 3, 4, (double *(*)(char * , int * ))5,
+    {6, (enum DayOfWeek )7, {(char )8, (char )9}, {10, {(char *)11}, {(double )12,
+                                                                      (double )13}},
+     14}, 15, {(float )16}, {17, 18}};
 #line 61 "clang/init-list0.c"
 int main(void) 
 { 

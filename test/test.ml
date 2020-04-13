@@ -95,6 +95,15 @@ let test_suites =
           "clang/if1.c";
           "clang/if2.c";
           "clang/init-list0.c";
+          "clang/init-list1.c";
+          "clang/nested-init-0.c";
+          "clang/nested-init-1.c";
+          "clang/nested-init-2.c";
+          "clang/local-init1.c";
+          "clang/local-init2.c";
+          "clang/local-init3.c";
+          "clang/local-init4.c";
+          "clang/local-init5.c";
         ];
     };
   ]
