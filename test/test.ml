@@ -145,7 +145,9 @@ let check f =
 
 let print_result = function
   | true -> print_endline (color_green ^ "All tests are passed" ^ color_reset)
-  | false -> print_endline (color_red ^ "Test failed" ^ color_reset)
+  | false ->
+      print_endline (color_red ^ "Test failed" ^ color_reset);
+      exit 1
 
 let _ =
   List.fold_left
