@@ -199,7 +199,7 @@ let create_local_variable scope fundec name typ =
 
 let create_label scope label =
   let new_name =
-    if Scope.mem_var label scope then (
+    if Scope.mem_label label scope then (
       let new_name = label ^ "___" ^ string_of_int !alpha_count in
       alpha_count := !alpha_count + 1;
       new_name )

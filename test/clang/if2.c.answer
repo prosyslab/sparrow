@@ -7,7 +7,6 @@ void f(int x )
   int y ;
 
   {
-  _L: 
 #line 4
   if (x < 1) {
 #line 4
@@ -16,10 +15,10 @@ void f(int x )
       y = x + 1;
     } else {
 #line 4
-      goto _L;
+      goto _L___0;
     }
   } else
-  _L: /* CIL Label */ 
+  _L___0: /* CIL Label */ 
 #line 4
   if (x == 0) {
 #line 5

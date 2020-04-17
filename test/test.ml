@@ -104,6 +104,9 @@ let test_suites =
           "clang/local-init3.c";
           "clang/local-init4.c";
           "clang/local-init5.c";
+          "clang/label0.c";
+          "clang/label1.c";
+          "clang/label2.c";
         ];
     };
   ]
