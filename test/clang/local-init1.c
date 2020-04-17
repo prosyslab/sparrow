@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 typedef int (*FuncPtr) (int, int);
 
 union U {

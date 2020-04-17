@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 struct B {
     char a[3];
     float f[2];

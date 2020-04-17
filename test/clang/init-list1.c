@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 typedef struct _A {
     int a;
     int b;

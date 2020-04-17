@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 typedef char* str;
 typedef int (*FuncPtr) (int, int);
 

@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 struct Base {
     float f;
 };
