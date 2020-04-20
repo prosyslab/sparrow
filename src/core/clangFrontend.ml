@@ -36,8 +36,6 @@ module Env = struct
     label : (string, string) H.t;
   }
 
-  (* let usertyps = ref [] *)
-
   let create () = { var = H.create 64; typ = H.create 64; label = H.create 64 }
 
   let add_var name vi env =
@@ -1008,44 +1006,16 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
       | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
           let is_struct = rdecl.keyword = C.Struct in
           let globals, scope =
-            List.fold_left
-              (fun (globals, scope) decl ->
-                let gs, scope = trans_global_decl scope decl in
-                (globals @ gs, scope))
-              ([], scope) rdecl.fields
+            trans_global_decl ~new_name:(new_record_id is_struct) scope d
           in
-          let callback compinfo =
-            List.fold_left
-              (fun fl (decl : C.Ast.decl) ->
-                match decl.C.Ast.desc with
-                | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
-                | _ -> fl)
-              [] rdecl.fields
-          in
-          let name = new_record_id is_struct in
-          let compinfo = Cil.mkCompInfo is_struct name callback [] in
-          compinfo.cdefined <- true;
-          if Scope.mem_typ name scope then (
-            let typ = Scope.find_type name scope in
-            let prev_ci = get_compinfo typ in
-            prev_ci.cfields <- compinfo.cfields;
-
-            (sl, user_typs @ globals @ [ Cil.GCompTag (prev_ci, loc) ], scope) )
-          else
-            let typ = Cil.TComp (compinfo, []) in
-            let scope = Scope.add_type rdecl.name typ scope in
-
-            (sl, user_typs @ globals @ [ Cil.GCompTag (compinfo, loc) ], scope)
+          (sl, user_typs @ globals, scope)
       | C.Ast.RecordDecl rdecl ->
           let is_struct = rdecl.keyword = C.Struct in
           let name = new_record_id is_struct in
           if Scope.mem_typ name scope then (sl, user_typs, scope)
           else
-            let callback compinfo = [] in
-            let compinfo = Cil.mkCompInfo is_struct name callback [] in
-            let typ = Cil.TComp (compinfo, []) in
-            let scope = Scope.add_type rdecl.name typ scope in
-            (sl, user_typs @ [ Cil.GCompTag (compinfo, loc) ], scope)
+            let globals, scope = trans_global_decl ~new_name:name scope d in
+            (sl, user_typs @ globals, scope)
       | TypedefDecl tdecl ->
           let ttype = trans_type scope tdecl.underlying_type in
           let tinfo = { Cil.tname = tdecl.name; ttype; treferenced = false } in
@@ -1054,27 +1024,10 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
           in
           (sl, user_typs @ [ Cil.GType (tinfo, loc) ], scope)
       | EnumDecl edecl ->
-          let eitems, scope, _ =
-            List.fold_left
-              (fun (eitems, scope, next) (c : C.Ast.enum_constant) ->
-                let value = C.Enum_constant.get_value c |> Cil.integer in
-                let scope =
-                  Scope.add c.desc.constant_name (EnvData.EnvEnum value) scope
-                in
-                (eitems @ [ (c.desc.constant_name, value, loc) ], scope, next))
-              ([], scope, Cil.zero) edecl.constants
+          let globals, scope =
+            trans_global_decl ~new_name:(new_enum_id edecl.name) scope d
           in
-          let einfo =
-            {
-              Cil.ename = new_enum_id edecl.name;
-              eitems;
-              eattr = [];
-              ereferenced = false;
-              ekind = Cil.IInt;
-            }
-          in
-          let scope = Scope.add_type edecl.name (Cil.TEnum (einfo, [])) scope in
-          (sl, user_typs @ [ Cil.GEnumTag (einfo, loc) ], scope)
+          (sl, user_typs @ globals, scope)
       | Field _ | EmptyDecl | AccessSpecifier _ | Namespace _ | UsingDirective _
       | UsingDeclaration _ | Constructor _ | Destructor _ | LinkageSpec _
       | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
@@ -1862,7 +1815,7 @@ and trans_stmt_opt scope fundec = function
   | Some s -> trans_stmt scope fundec s
   | None -> (Chunk.empty, scope)
 
-and trans_global_decl scope (decl : C.Ast.decl) =
+and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
   let loc = trans_location decl in
   let storage = trans_storage decl in
   match decl.desc with
@@ -1919,7 +1872,9 @@ and trans_global_decl scope (decl : C.Ast.decl) =
           [] rdecl.fields
       in
       let name =
-        if rdecl.name = "" then new_record_id is_struct else rdecl.name
+        if new_name = "" then
+          if rdecl.name = "" then new_record_id is_struct else rdecl.name
+        else new_name
       in
       let compinfo = Cil.mkCompInfo is_struct name callback [] in
       compinfo.cdefined <- true;
@@ -1935,7 +1890,9 @@ and trans_global_decl scope (decl : C.Ast.decl) =
   | C.Ast.RecordDecl rdecl ->
       let is_struct = rdecl.keyword = C.Struct in
       let name =
-        if rdecl.name = "" then new_record_id is_struct else rdecl.name
+        if new_name = "" then
+          if rdecl.name = "" then new_record_id is_struct else rdecl.name
+        else new_name
       in
       if Scope.mem_typ name scope then
         let typ = Scope.find_type name scope in
@@ -1963,9 +1920,10 @@ and trans_global_decl scope (decl : C.Ast.decl) =
             (eitems @ [ (c.desc.constant_name, value, loc) ], scope, next))
           ([], scope, Cil.zero) edecl.constants
       in
+      let name = if new_name = "" then edecl.name else new_name in
       let einfo =
         {
-          Cil.ename = edecl.name;
+          Cil.ename = name;
           eitems;
           eattr = [];
           ereferenced = false;
