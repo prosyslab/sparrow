@@ -36,6 +36,8 @@ module Env = struct
     label : (string, string) H.t;
   }
 
+  (* let usertyps = ref [] *)
+
   let create () = { var = H.create 64; typ = H.create 64; label = H.create 64 }
 
   let add_var name vi env =
@@ -158,6 +160,11 @@ let is_init_list (expr : C.Ast.expr) =
 let new_record_id is_struct =
   let kind = if is_struct then "struct" else "union" in
   let new_id = "__anon" ^ kind ^ "_" ^ string_of_int !struct_id_count in
+  struct_id_count := !struct_id_count + 1;
+  new_id
+
+let new_enum_id name =
+  let new_id = "__anonenum_" ^ name ^ "_" ^ string_of_int !struct_id_count in
   struct_id_count := !struct_id_count + 1;
   new_id
 
@@ -360,6 +367,19 @@ and trans_parameter_types scope = function
       in
       (Some formals, params.C.Ast.variadic)
   | None -> (None, false)
+
+let failwith_decl (decl : C.Ast.decl) =
+  match decl.C.Ast.desc with
+  | C.Ast.RecordDecl _ -> failwith "record decl"
+  | _ -> failwith "unknown decl"
+
+let trans_field_decl scope compinfo (field : C.Ast.decl) =
+  let floc = trans_location field in
+  match field.C.Ast.desc with
+  | C.Ast.Field fdecl ->
+      let typ = trans_type ~compinfo:(Some compinfo) scope fdecl.qual_type in
+      (fdecl.name, typ, None, [], floc)
+  | _ -> failwith_decl field
 
 let trans_params scope args fundec =
   match args with
@@ -821,10 +841,17 @@ module Chunk = struct
     cases : Cil.stmt list;
     labels : Cil.stmt ref LabelMap.t;
     gotos : string GotoMap.t;
+    user_typs : Cil.global list;
   }
 
   let empty =
-    { stmts = []; cases = []; labels = LabelMap.empty; gotos = GotoMap.empty }
+    {
+      stmts = [];
+      cases = [];
+      labels = LabelMap.empty;
+      gotos = GotoMap.empty;
+      user_typs = [];
+    }
 
   let append x y =
     {
@@ -832,8 +859,31 @@ module Chunk = struct
       cases = x.cases @ y.cases;
       labels = LabelMap.append x.labels y.labels;
       gotos = GotoMap.append x.gotos y.gotos;
+      user_typs = x.user_typs @ y.user_typs;
     }
 end
+
+class replaceGotoVisitor gotos labels =
+  object
+    inherit Cil.nopCilVisitor
+
+    method! vstmt stmt =
+      match stmt.Cil.skind with
+      | Cil.Goto (placeholder, loc) -> (
+          match Chunk.GotoMap.find placeholder gotos with
+          | label ->
+              let target =
+                try Chunk.LabelMap.find label labels
+                with Not_found ->
+                  failwith
+                    ( CilHelper.s_location loc ^ ": label " ^ label
+                    ^ " not found" )
+              in
+              stmt.Cil.skind <- Cil.Goto (target, loc);
+              Cil.DoChildren
+          | exception Not_found -> Cil.DoChildren )
+      | _ -> Cil.DoChildren
+  end
 
 let append_label chunk label loc in_origin =
   let l = Cil.Label (label, loc, in_origin) in
@@ -915,8 +965,10 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       in
       ({ Chunk.empty with stmts }, scope)
   | C.Ast.Decl dl ->
-      let stmts, scope = trans_var_decl_list scope fundec loc AExp dl in
-      ({ Chunk.empty with stmts }, scope)
+      let stmts, user_typs, scope =
+        trans_var_decl_list scope fundec loc AExp dl
+      in
+      ({ Chunk.empty with stmts; user_typs }, scope)
   | C.Ast.Expr e ->
       (* skip_lhs is true only here: a function is called at the top-most level
        * without a return variable *)
@@ -945,16 +997,94 @@ and trans_compound scope fundec sl =
 
 and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
   List.fold_left
-    (fun (sl, scope) (d : C.Ast.decl) ->
+    (fun (sl, user_typs, scope) (d : C.Ast.decl) ->
       match d.C.Ast.desc with
       | C.Ast.Var desc ->
           let storage = trans_storage d in
           let decl_stmts, scope =
             trans_var_decl ~storage scope fundec loc action desc
           in
-          (sl @ decl_stmts, scope)
-      | _ -> (sl, scope))
-    ([], scope) dl
+          (sl @ decl_stmts, user_typs, scope)
+      | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
+          let is_struct = rdecl.keyword = C.Struct in
+          let globals, scope =
+            List.fold_left
+              (fun (globals, scope) decl ->
+                let gs, scope = trans_global_decl scope decl in
+                (globals @ gs, scope))
+              ([], scope) rdecl.fields
+          in
+          let callback compinfo =
+            List.fold_left
+              (fun fl (decl : C.Ast.decl) ->
+                match decl.C.Ast.desc with
+                | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+                | _ -> fl)
+              [] rdecl.fields
+          in
+          let name = new_record_id is_struct in
+          let compinfo = Cil.mkCompInfo is_struct name callback [] in
+          compinfo.cdefined <- true;
+          if Scope.mem_typ name scope then (
+            let typ = Scope.find_type name scope in
+            let prev_ci = get_compinfo typ in
+            prev_ci.cfields <- compinfo.cfields;
+
+            (sl, user_typs @ globals @ [ Cil.GCompTag (prev_ci, loc) ], scope) )
+          else
+            let typ = Cil.TComp (compinfo, []) in
+            let scope = Scope.add_type rdecl.name typ scope in
+
+            (sl, user_typs @ globals @ [ Cil.GCompTag (compinfo, loc) ], scope)
+      | C.Ast.RecordDecl rdecl ->
+          let is_struct = rdecl.keyword = C.Struct in
+          let name = new_record_id is_struct in
+          if Scope.mem_typ name scope then (sl, user_typs, scope)
+          else
+            let callback compinfo = [] in
+            let compinfo = Cil.mkCompInfo is_struct name callback [] in
+            let typ = Cil.TComp (compinfo, []) in
+            let scope = Scope.add_type rdecl.name typ scope in
+            (sl, user_typs @ [ Cil.GCompTag (compinfo, loc) ], scope)
+      | TypedefDecl tdecl ->
+          let ttype = trans_type scope tdecl.underlying_type in
+          let tinfo = { Cil.tname = tdecl.name; ttype; treferenced = false } in
+          let scope =
+            Scope.add_type tdecl.name (Cil.TNamed (tinfo, [])) scope
+          in
+          (sl, user_typs @ [ Cil.GType (tinfo, loc) ], scope)
+      | EnumDecl edecl ->
+          let eitems, scope, _ =
+            List.fold_left
+              (fun (eitems, scope, next) (c : C.Ast.enum_constant) ->
+                let value = C.Enum_constant.get_value c |> Cil.integer in
+                let scope =
+                  Scope.add c.desc.constant_name (EnvData.EnvEnum value) scope
+                in
+                (eitems @ [ (c.desc.constant_name, value, loc) ], scope, next))
+              ([], scope, Cil.zero) edecl.constants
+          in
+          let einfo =
+            {
+              Cil.ename = new_enum_id edecl.name;
+              eitems;
+              eattr = [];
+              ereferenced = false;
+              ekind = Cil.IInt;
+            }
+          in
+          let scope = Scope.add_type edecl.name (Cil.TEnum (einfo, [])) scope in
+          (sl, user_typs @ [ Cil.GEnumTag (einfo, loc) ], scope)
+      | Field _ | EmptyDecl | AccessSpecifier _ | Namespace _ | UsingDirective _
+      | UsingDeclaration _ | Constructor _ | Destructor _ | LinkageSpec _
+      | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
+      | StaticAssert _ | TypeAlias _ | Decomposition _
+      | UnknownDecl (_, _) ->
+          failwith "not expected"
+      | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
+          failwith "Unsupported C++ features"
+      | Function _ -> failwith "not allowed in basic block")
+    ([], [], scope) dl
 
 and trans_var_decl ?(storage = Cil.NoStorage) (scope : Scope.t) fundec loc
     action (desc : C.Ast.var_decl_desc) =
@@ -1256,7 +1386,7 @@ and mk_init_stmt field_offset scope loc fundec action fi varinfo expr_list =
       (append_instr sl_expr instr, el, scope)
   | _ -> failwith "not expected"
 
-and trans_tcomp_array stmts expr_list expr_remainders o ci field_offset fi
+and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
     fundec action loc tmp_var varinfo flags primitive_arr_remainders scope =
   let stmts', expr_remainders', tmp_var, flags, scope =
     if (expr_list <> [] && List.length expr_remainders <> 0) || flags.skip_while
@@ -1332,7 +1462,7 @@ and trans_tcomp_array stmts expr_list expr_remainders o ci field_offset fi
       flags,
       o + 1 )
 
-and trans_primitive_array stmts expr_list expr_remainders o arr_type arr_len
+and mk_primitive_array_stmt stmts expr_list expr_remainders o arr_type arr_len
     field_offset fi fundec action loc tmp_var varinfo flags
     primitive_arr_remainders scope =
   if expr_list <> [] && List.length expr_remainders <> 0 then
@@ -1352,7 +1482,7 @@ and trans_primitive_array stmts expr_list expr_remainders o arr_type arr_len
       }
     in
 
-    if List.length (List.tl expr_remainders) = 0 then
+    if arr_len > o + 1 && List.length (List.tl expr_remainders) = 0 then
       let tmp_var_lval, tmp_var_expr, tmp_var_stmt, unary_plus_expr, scope =
         mk_tmp_var fundec loc varinfo (o + 1) scope
       in
@@ -1433,11 +1563,11 @@ and mk_array_stmt expr_list field_offset fi loc fundec action varinfo scope
              o ) _ ->
         match Cil.unrollType arr_type with
         | Cil.TComp (ci, _) ->
-            trans_tcomp_array stmts expr_list expr_remainders o ci field_offset
-              fi fundec action loc tmp_var varinfo flags
+            mk_tcomp_array_stmt stmts expr_list expr_remainders o ci
+              field_offset fi fundec action loc tmp_var varinfo flags
               primitive_arr_remainders scope
         | _ ->
-            trans_primitive_array stmts expr_list expr_remainders o arr_type
+            mk_primitive_array_stmt stmts expr_list expr_remainders o arr_type
               arr_len field_offset fi fundec action loc tmp_var varinfo flags
               primitive_arr_remainders scope)
       ([], [], expr_list, scope, None, flags, 0)
@@ -1505,7 +1635,13 @@ and trans_for scope fundec loc init cond_var cond inc body =
     @ inc_stmt.Chunk.stmts
   in
   let cases = init_stmt.cases @ body_stmt.cases @ inc_stmt.cases in
-  { Chunk.stmts; cases; labels = body_stmt.labels; gotos = body_stmt.gotos }
+  {
+    Chunk.stmts;
+    cases;
+    labels = body_stmt.labels;
+    gotos = body_stmt.gotos;
+    user_typs = body_stmt.user_typs;
+  }
 
 and trans_while scope fundec loc condition_variable cond body =
   let scope = Scope.enter scope in
@@ -1531,6 +1667,7 @@ and trans_while scope fundec loc condition_variable cond body =
     cases = body_stmt.cases;
     labels = body_stmt.labels;
     gotos = body_stmt.gotos;
+    user_typs = body_stmt.user_typs;
   }
 
 and trans_do scope fundec loc body cond =
@@ -1558,6 +1695,7 @@ and trans_do scope fundec loc body cond =
     cases = body_stmt.cases;
     labels = body_stmt.labels;
     gotos = body_stmt.gotos;
+    user_typs = body_stmt.user_typs;
   }
 
 and trans_if scope fundec loc init cond_var cond then_branch else_branch =
@@ -1627,6 +1765,7 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
             labels = Chunk.LabelMap.append st.labels sf.labels;
             gotos = Chunk.GotoMap.append st.gotos sf.gotos;
             cases = [];
+            user_typs = init_stmt.user_typs;
           } )
   in
   let scope, if_chunk = compile_cond scope cond_expr then_stmt else_stmt in
@@ -1644,6 +1783,7 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
       (* Chunk.LabelMap.append then_stmt.labels else_stmt.labels*);
     gotos =
       if_chunk.gotos (*Chunk.GotoMap.append then_stmt.gotos else_stmt.gotos*);
+    user_typs = init_stmt.user_typs;
   }
 
 and trans_block scope fundec body =
@@ -1722,7 +1862,151 @@ and trans_stmt_opt scope fundec = function
   | Some s -> trans_stmt scope fundec s
   | None -> (Chunk.empty, scope)
 
-let rec mk_init scope loc fitype expr_list =
+and trans_global_decl scope (decl : C.Ast.decl) =
+  let loc = trans_location decl in
+  let storage = trans_storage decl in
+  match decl.desc with
+  | C.Ast.Function fdecl when fdecl.body = None ->
+      let name = string_of_declaration_name fdecl.name in
+      let typ = trans_function_type scope fdecl.C.Ast.function_type in
+      let svar, scope = find_global_variable scope name typ in
+      svar.vstorage <- storage;
+      svar.vattr <- trans_decl_attribute decl;
+      ([ Cil.GVarDecl (svar, loc) ], scope)
+  | C.Ast.Function fdecl ->
+      let name = string_of_declaration_name fdecl.name in
+      let typ = trans_function_type scope fdecl.C.Ast.function_type in
+      let svar, scope = find_global_variable scope name typ in
+      let fundec = { Cil.dummyFunDec with svar } in
+      let scope = Scope.enter scope in
+      let scope = trans_params scope fdecl.function_type.parameters fundec in
+      fundec.svar.vstorage <- storage;
+      fundec.svar.vattr <- trans_decl_attribute decl;
+      fundec.svar.vinline <-
+        C.Ast.cursor_of_node decl |> C.cursor_is_function_inlined;
+      let fun_body = trans_function_body scope fundec (Option.get fdecl.body) in
+      fundec.sbody <- fst fun_body;
+      let scope = Scope.exit scope in
+      (snd fun_body @ [ Cil.GFun (fundec, loc) ], scope)
+  | C.Ast.Var vdecl when vdecl.var_init = None ->
+      let typ = trans_type scope vdecl.var_type in
+      let vi, scope = find_global_variable scope vdecl.var_name typ in
+      vi.vstorage <- storage;
+      ([ Cil.GVarDecl (vi, loc) ], scope)
+  | C.Ast.Var vdecl ->
+      let typ = trans_type scope vdecl.var_type in
+      let vi, scope = find_global_variable scope vdecl.var_name typ in
+      vi.vstorage <- storage;
+      let e = Option.get vdecl.var_init in
+      let init' = trans_global_init scope loc e in
+      let init = { Cil.init = Some init' } in
+      ([ Cil.GVar (vi, init, loc) ], scope)
+  | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
+      let is_struct = rdecl.keyword = C.Struct in
+      let globals, scope =
+        List.fold_left
+          (fun (globals, scope) decl ->
+            let gs, scope = trans_global_decl scope decl in
+            (globals @ gs, scope))
+          ([], scope) rdecl.fields
+      in
+      let callback compinfo =
+        List.fold_left
+          (fun fl (decl : C.Ast.decl) ->
+            match decl.C.Ast.desc with
+            | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+            | _ -> fl)
+          [] rdecl.fields
+      in
+      let name =
+        if rdecl.name = "" then new_record_id is_struct else rdecl.name
+      in
+      let compinfo = Cil.mkCompInfo is_struct name callback [] in
+      compinfo.cdefined <- true;
+      if Scope.mem_typ name scope then (
+        let typ = Scope.find_type name scope in
+        let prev_ci = get_compinfo typ in
+        prev_ci.cfields <- compinfo.cfields;
+        (globals @ [ Cil.GCompTag (prev_ci, loc) ], scope) )
+      else
+        let typ = Cil.TComp (compinfo, []) in
+        let scope = Scope.add_type rdecl.name typ scope in
+        (globals @ [ Cil.GCompTag (compinfo, loc) ], scope)
+  | C.Ast.RecordDecl rdecl ->
+      let is_struct = rdecl.keyword = C.Struct in
+      let name =
+        if rdecl.name = "" then new_record_id is_struct else rdecl.name
+      in
+      if Scope.mem_typ name scope then
+        let typ = Scope.find_type name scope in
+        let prev_ci = get_compinfo typ in
+        ([ Cil.GCompTagDecl (prev_ci, loc) ], scope)
+      else
+        let callback compinfo = [] in
+        let compinfo = Cil.mkCompInfo is_struct name callback [] in
+        let typ = Cil.TComp (compinfo, []) in
+        let scope = Scope.add_type rdecl.name typ scope in
+        ([ Cil.GCompTagDecl (compinfo, loc) ], scope)
+  | TypedefDecl tdecl ->
+      let ttype = trans_type scope tdecl.underlying_type in
+      let tinfo = { Cil.tname = tdecl.name; ttype; treferenced = false } in
+      let scope = Scope.add_type tdecl.name (Cil.TNamed (tinfo, [])) scope in
+      ([ Cil.GType (tinfo, loc) ], scope)
+  | EnumDecl edecl ->
+      let eitems, scope, _ =
+        List.fold_left
+          (fun (eitems, scope, next) (c : C.Ast.enum_constant) ->
+            let value = C.Enum_constant.get_value c |> Cil.integer in
+            let scope =
+              Scope.add c.desc.constant_name (EnvData.EnvEnum value) scope
+            in
+            (eitems @ [ (c.desc.constant_name, value, loc) ], scope, next))
+          ([], scope, Cil.zero) edecl.constants
+      in
+      let einfo =
+        {
+          Cil.ename = edecl.name;
+          eitems;
+          eattr = [];
+          ereferenced = false;
+          ekind = Cil.IInt;
+        }
+      in
+      let scope = Scope.add_type edecl.name (Cil.TEnum (einfo, [])) scope in
+      ([ Cil.GEnumTag (einfo, loc) ], scope)
+  | Field _ | EmptyDecl | AccessSpecifier _ | Namespace _ | UsingDirective _
+  | UsingDeclaration _ | Constructor _ | Destructor _ | LinkageSpec _
+  | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
+  | StaticAssert _ | TypeAlias _ | Decomposition _
+  | UnknownDecl (_, _) ->
+      ([], scope)
+  | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
+      failwith "Unsupported C++ features"
+
+and trans_function_body scope fundec body =
+  let chunk = trans_block scope fundec body in
+  let vis = new replaceGotoVisitor chunk.Chunk.gotos chunk.Chunk.labels in
+  ( {
+      Cil.battrs = [];
+      bstmts = List.map (Cil.visitCilStmt vis) chunk.Chunk.stmts;
+    },
+    chunk.user_typs )
+
+and trans_decl_attribute decl =
+  let attrs = ref [] in
+  ignore
+    (C.visit_children (C.Ast.cursor_of_node decl) (fun c p ->
+         ( if C.get_cursor_kind c |> C.is_attribute then
+           match C.ext_attr_get_kind c with
+           | C.NoThrow ->
+               attrs := Cil.addAttribute (Cil.Attr ("nothrow", [])) !attrs
+           | C.GNUInline ->
+               attrs := Cil.addAttribute (Cil.Attr ("gnu_inline", [])) !attrs
+           | _ -> () );
+         C.Recurse));
+  !attrs
+
+and mk_init scope loc fitype expr_list =
   (* for uninitaiized *)
   match (Cil.unrollType fitype, expr_list) with
   | Cil.TInt (ikind, _), [] -> (Cil.SingleInit (Cil.kinteger ikind 0), [])
@@ -1886,183 +2170,6 @@ and trans_global_init scope loc (e : C.Ast.expr) =
       let _, expr_opt = trans_expr scope None loc ADrop e in
       let expr = Option.get expr_opt in
       Cil.SingleInit expr
-
-let failwith_decl (decl : C.Ast.decl) =
-  match decl.C.Ast.desc with
-  | C.Ast.RecordDecl _ -> failwith "record decl"
-  | _ -> failwith "unknown decl"
-
-class replaceGotoVisitor gotos labels =
-  object
-    inherit Cil.nopCilVisitor
-
-    method! vstmt stmt =
-      match stmt.Cil.skind with
-      | Cil.Goto (placeholder, loc) -> (
-          match Chunk.GotoMap.find placeholder gotos with
-          | label ->
-              let target =
-                try Chunk.LabelMap.find label labels
-                with Not_found ->
-                  failwith
-                    ( CilHelper.s_location loc ^ ": label " ^ label
-                    ^ " not found" )
-              in
-              stmt.Cil.skind <- Cil.Goto (target, loc);
-              Cil.DoChildren
-          | exception Not_found -> Cil.DoChildren )
-      | _ -> Cil.DoChildren
-  end
-
-let trans_function_body scope fundec body =
-  let chunk = trans_block scope fundec body in
-  let vis = new replaceGotoVisitor chunk.Chunk.gotos chunk.Chunk.labels in
-  {
-    Cil.battrs = [];
-    bstmts = List.map (Cil.visitCilStmt vis) chunk.Chunk.stmts;
-  }
-
-let trans_decl_attribute decl =
-  let attrs = ref [] in
-  ignore
-    (C.visit_children (C.Ast.cursor_of_node decl) (fun c p ->
-         ( if C.get_cursor_kind c |> C.is_attribute then
-           match C.ext_attr_get_kind c with
-           | C.NoThrow ->
-               attrs := Cil.addAttribute (Cil.Attr ("nothrow", [])) !attrs
-           | C.GNUInline ->
-               attrs := Cil.addAttribute (Cil.Attr ("gnu_inline", [])) !attrs
-           | _ -> () );
-         C.Recurse));
-  !attrs
-
-let rec trans_global_decl scope (decl : C.Ast.decl) =
-  let loc = trans_location decl in
-  let storage = trans_storage decl in
-  match decl.desc with
-  | C.Ast.Function fdecl when fdecl.body = None ->
-      let name = string_of_declaration_name fdecl.name in
-      let typ = trans_function_type scope fdecl.C.Ast.function_type in
-      let svar, scope = find_global_variable scope name typ in
-      svar.vstorage <- storage;
-      svar.vattr <- trans_decl_attribute decl;
-      ([ Cil.GVarDecl (svar, loc) ], scope)
-  | C.Ast.Function fdecl ->
-      let name = string_of_declaration_name fdecl.name in
-      let typ = trans_function_type scope fdecl.C.Ast.function_type in
-      let svar, scope = find_global_variable scope name typ in
-      let fundec = { Cil.dummyFunDec with svar } in
-      let scope = Scope.enter scope in
-      let scope = trans_params scope fdecl.function_type.parameters fundec in
-      fundec.svar.vstorage <- storage;
-      fundec.svar.vattr <- trans_decl_attribute decl;
-      fundec.svar.vinline <-
-        C.Ast.cursor_of_node decl |> C.cursor_is_function_inlined;
-      fundec.sbody <- trans_function_body scope fundec (Option.get fdecl.body);
-      let scope = Scope.exit scope in
-      ([ Cil.GFun (fundec, loc) ], scope)
-  | C.Ast.Var vdecl when vdecl.var_init = None ->
-      let typ = trans_type scope vdecl.var_type in
-      let vi, scope = find_global_variable scope vdecl.var_name typ in
-      vi.vstorage <- storage;
-      ([ Cil.GVarDecl (vi, loc) ], scope)
-  | C.Ast.Var vdecl ->
-      let typ = trans_type scope vdecl.var_type in
-      let vi, scope = find_global_variable scope vdecl.var_name typ in
-      vi.vstorage <- storage;
-      let e = Option.get vdecl.var_init in
-      let init' = trans_global_init scope loc e in
-      let init = { Cil.init = Some init' } in
-      ([ Cil.GVar (vi, init, loc) ], scope)
-  | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
-      let is_struct = rdecl.keyword = C.Struct in
-      let globals, scope =
-        List.fold_left
-          (fun (globals, scope) decl ->
-            let gs, scope = trans_global_decl scope decl in
-            (globals @ gs, scope))
-          ([], scope) rdecl.fields
-      in
-      let callback compinfo =
-        List.fold_left
-          (fun fl (decl : C.Ast.decl) ->
-            match decl.C.Ast.desc with
-            | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
-            | _ -> fl)
-          [] rdecl.fields
-      in
-      let name =
-        if rdecl.name = "" then new_record_id is_struct else rdecl.name
-      in
-      let compinfo = Cil.mkCompInfo is_struct name callback [] in
-      compinfo.cdefined <- true;
-      if Scope.mem_typ name scope then (
-        let typ = Scope.find_type name scope in
-        let prev_ci = get_compinfo typ in
-        prev_ci.cfields <- compinfo.cfields;
-        (globals @ [ Cil.GCompTag (prev_ci, loc) ], scope) )
-      else
-        let typ = Cil.TComp (compinfo, []) in
-        let scope = Scope.add_type rdecl.name typ scope in
-        (globals @ [ Cil.GCompTag (compinfo, loc) ], scope)
-  | C.Ast.RecordDecl rdecl ->
-      let is_struct = rdecl.keyword = C.Struct in
-      let name =
-        if rdecl.name = "" then new_record_id is_struct else rdecl.name
-      in
-      if Scope.mem_typ name scope then
-        let typ = Scope.find_type name scope in
-        let prev_ci = get_compinfo typ in
-        ([ Cil.GCompTagDecl (prev_ci, loc) ], scope)
-      else
-        let callback compinfo = [] in
-        let compinfo = Cil.mkCompInfo is_struct name callback [] in
-        let typ = Cil.TComp (compinfo, []) in
-        let scope = Scope.add_type rdecl.name typ scope in
-        ([ Cil.GCompTagDecl (compinfo, loc) ], scope)
-  | TypedefDecl tdecl ->
-      let ttype = trans_type scope tdecl.underlying_type in
-      let tinfo = { Cil.tname = tdecl.name; ttype; treferenced = false } in
-      let scope = Scope.add_type tdecl.name (Cil.TNamed (tinfo, [])) scope in
-      ([ Cil.GType (tinfo, loc) ], scope)
-  | EnumDecl edecl ->
-      let eitems, scope, _ =
-        List.fold_left
-          (fun (eitems, scope, next) (c : C.Ast.enum_constant) ->
-            let value = C.Enum_constant.get_value c |> Cil.integer in
-            let scope =
-              Scope.add c.desc.constant_name (EnvData.EnvEnum value) scope
-            in
-            (eitems @ [ (c.desc.constant_name, value, loc) ], scope, next))
-          ([], scope, Cil.zero) edecl.constants
-      in
-      let einfo =
-        {
-          Cil.ename = edecl.name;
-          eitems;
-          eattr = [];
-          ereferenced = false;
-          ekind = Cil.IInt;
-        }
-      in
-      let scope = Scope.add_type edecl.name (Cil.TEnum (einfo, [])) scope in
-      ([ Cil.GEnumTag (einfo, loc) ], scope)
-  | Field _ | EmptyDecl | AccessSpecifier _ | Namespace _ | UsingDirective _
-  | UsingDeclaration _ | Constructor _ | Destructor _ | LinkageSpec _
-  | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
-  | StaticAssert _ | TypeAlias _ | Decomposition _
-  | UnknownDecl (_, _) ->
-      ([], scope)
-  | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
-      failwith "Unsupported C++ features"
-
-and trans_field_decl scope compinfo (field : C.Ast.decl) =
-  let floc = trans_location field in
-  match field.C.Ast.desc with
-  | C.Ast.Field fdecl ->
-      let typ = trans_type ~compinfo:(Some compinfo) scope fdecl.qual_type in
-      (fdecl.name, typ, None, [], floc)
-  | _ -> failwith_decl field
 
 let initialize_builtins scope =
   H.fold

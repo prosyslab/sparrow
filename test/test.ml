@@ -109,6 +109,10 @@ let test_suites =
           "clang/label2.c";
           "clang/comma0.c";
           "clang/comma1.c";
+          "clang/usertype-in-local0.c";
+          "clang/usertype-in-local1.c";
+          "clang/usertype-in-local2.c";
+          "clang/usertype-in-local3.c";
         ];
     };
   ]
