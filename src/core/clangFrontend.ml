@@ -653,7 +653,7 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
       in
       let stmt = Cil.mkStmt (Cil.Instr [ Cil.Set (lval, rhs, loc) ]) in
       (rhs_sl @ lhs_sl @ [ stmt ], lhs_expr)
-  | C.Comma -> failwith "Unsupported syntax (Comma)"
+  | C.Comma -> (rhs_sl @ lhs_sl, rhs_expr)
   | C.Cmp | C.PtrMemD | C.PtrMemI | C.InvalidBinaryOperator ->
       failwith "unsupported expr"
 
@@ -1133,10 +1133,10 @@ and mk_struct_stmt field_offset scope typ cfields fundec action loc varinfo
           if is_init_list e then
             let field_offset = add_to_field_tail field_offset f in
             let stmts', scope =
-              handle_stmt_init scope typ fundec loc action field_offset varinfo
-                e
+              handle_stmt_init scope f.ftype fundec loc action field_offset
+                varinfo e
             in
-            loop scope union_flag fl el (f :: fis) (stmts' @ stmts)
+            loop scope union_flag fl el (f :: fis) (stmts @ stmts')
           else
             let stmts', expr_remainders, scope =
               mk_init_stmt field_offset scope loc fundec action f varinfo
@@ -1148,7 +1148,7 @@ and mk_struct_stmt field_offset scope typ cfields fundec action loc varinfo
           | true ->
               let field_offset = add_to_field_tail field_offset f in
               let stmts', scope =
-                handle_stmt_init scope typ fundec loc action field_offset
+                handle_stmt_init scope f.ftype fundec loc action field_offset
                   varinfo e
               in
               loop scope true fl el (f :: fis) (stmts @ stmts')

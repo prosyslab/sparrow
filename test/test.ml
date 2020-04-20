@@ -107,6 +107,8 @@ let test_suites =
           "clang/label0.c";
           "clang/label1.c";
           "clang/label2.c";
+          "clang/comma0.c";
+          "clang/comma1.c";
         ];
     };
   ]
