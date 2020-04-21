@@ -1398,22 +1398,16 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
         in
         (stmts', expr_remainders', tmp_var, flags, scope)
   in
-  if List.length expr_remainders' = 0 then
-    ( stmts @ stmts',
-      primitive_arr_remainders,
-      expr_remainders',
-      scope,
-      tmp_var,
-      { flags with terminate_flag = true },
-      o + 1 )
-  else
-    ( stmts @ stmts',
-      primitive_arr_remainders,
-      expr_remainders',
-      scope,
-      tmp_var,
-      flags,
-      o + 1 )
+  let flags =
+    { flags with terminate_flag = List.length expr_remainders' = 0 }
+  in
+  ( stmts @ stmts',
+    primitive_arr_remainders,
+    expr_remainders',
+    scope,
+    tmp_var,
+    flags,
+    o + 1 )
 
 and mk_primitive_array_stmt stmts expr_list expr_remainders o arr_type arr_len
     field_offset fi fundec action loc tmp_var varinfo flags
@@ -1533,35 +1527,26 @@ and mk_array_stmt expr_list field_offset fi loc fundec action varinfo scope
     let last_half_stmts =
       BatList.drop flags.total_initialized_items_len var_stmts
     in
-    let tmp_var_lval, tmp_var_expr, tmp_var_stmt, unary_plus_expr =
-      match Option.get tmp_var with
-      | {
-       tmp_var_lval = lval;
-       tmp_var_expr = expr;
-       tmp_var_stmt = stmt;
-       unary_plus_expr = unary;
-      } ->
-          (lval, expr, stmt, unary)
-    in
+    let tmp_var = Option.get tmp_var in
     let while_stmt =
-      mk_while_stmt arr_len loc tmp_var_expr tmp_var_lval unary_plus_expr
-        last_half_stmts
+      mk_while_stmt arr_len loc tmp_var.tmp_var_expr tmp_var.tmp_var_lval
+        tmp_var.unary_plus_expr last_half_stmts
     in
     let tmp_var_cond_back_patch =
       Cil.Set
-        ( tmp_var_lval,
+        ( tmp_var.tmp_var_lval,
           Cil.CastE (Cil.uintType, Cil.integer flags.tmp_var_cond_update),
           loc )
     in
-    tmp_var_stmt.skind <- Cil.Instr [ tmp_var_cond_back_patch ];
-    (first_half_stmts @ [ tmp_var_stmt ] @ while_stmt, expr_remainders, scope) )
+    tmp_var.tmp_var_stmt.skind <- Cil.Instr [ tmp_var_cond_back_patch ];
+    ( first_half_stmts @ [ tmp_var.tmp_var_stmt ] @ while_stmt,
+      expr_remainders,
+      scope ) )
   else (var_stmts @ primitive_arr_remainders, expr_remainders, scope)
 
 and trans_var_decl_opt scope fundec loc action (vdecl : C.Ast.var_decl option) =
   match vdecl with
-  | Some v ->
-      let sl, scope = trans_var_decl scope fundec loc AExp v.C.Ast.desc in
-      (sl, scope)
+  | Some v -> trans_var_decl scope fundec loc AExp v.C.Ast.desc
   | None -> ([], scope)
 
 and trans_for scope fundec loc init cond_var cond inc body =
@@ -1661,8 +1646,6 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
     | Some s -> trans_block scope fundec s
     | None -> Chunk.empty
   in
-  (* let then_block = { Cil.battrs = []; bstmts = then_stmt.stmts } in
-     let else_block = { Cil.battrs = []; bstmts = else_stmt.stmts } in*)
   let cond_expr = Option.get cond_expr in
   let duplicate chunk =
     if
@@ -1722,20 +1705,13 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
           } )
   in
   let scope, if_chunk = compile_cond scope cond_expr then_stmt else_stmt in
-  let stmts =
-    decl_stmt @ init_stmt.stmts @ cond_sl
-    (*     @ [ Cil.mkStmt (Cil.If (cond_expr, then_block, else_block, loc)) ] *)
-    @ if_chunk.Chunk.stmts
-  in
+  let stmts = decl_stmt @ init_stmt.stmts @ cond_sl @ if_chunk.Chunk.stmts in
   let cases = init_stmt.cases @ then_stmt.cases @ else_stmt.cases in
   {
     Chunk.stmts;
     cases;
-    labels =
-      if_chunk.labels
-      (* Chunk.LabelMap.append then_stmt.labels else_stmt.labels*);
-    gotos =
-      if_chunk.gotos (*Chunk.GotoMap.append then_stmt.gotos else_stmt.gotos*);
+    labels = if_chunk.labels;
+    gotos = if_chunk.gotos;
     user_typs = init_stmt.user_typs;
   }
 
