@@ -396,7 +396,7 @@ let trans_integer_literal decoration il =
   let ikind =
     match decoration with
     | C.Ast.Cursor c -> C.get_cursor_type c |> C.get_type_kind |> trans_int_kind
-    | _ -> failwith "qqq"
+    | _ -> failwith "Invalid cursor for integer literal"
   in
   match il with
   | C.Ast.Int i -> Cil.kinteger ikind i
@@ -407,18 +407,18 @@ let trans_floating_literal decoration il =
     match decoration with
     | C.Ast.Cursor c ->
         C.get_cursor_type c |> C.get_type_kind |> trans_float_kind
-    | _ -> failwith "qqq"
+    | _ -> failwith "Invalid cursor for float literal"
   in
   match il with
   | C.Ast.Float f -> Cil.Const (Cil.CReal (f, fkind, None))
-  | _ -> failwith "no"
+  | _ -> failwith "unknown float literal"
 
 let trans_string_literal sl = Cil.Const (Cil.CStr sl.C.Ast.bytes)
 
 let type_of_decoration decoration =
   match decoration with
   | C.Ast.Cursor c -> C.get_cursor_type c
-  | _ -> failwith "qqq"
+  | _ -> failwith "Invalid cursor for type"
 
 let type_of_expr expr = C.Type.of_node expr
 
