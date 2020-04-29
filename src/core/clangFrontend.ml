@@ -400,7 +400,8 @@ let trans_integer_literal decoration il =
   in
   match il with
   | C.Ast.Int i -> Cil.kinteger ikind i
-  | _ -> failwith "unknown integer literal"
+  | C.Ast.CXInt cxi -> 
+      Cil.kinteger ikind (Clang__.Clang__bindings.ext_int_get_sext_value cxi)
 
 let trans_floating_literal decoration il =
   let fkind =
