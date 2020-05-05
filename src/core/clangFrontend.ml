@@ -2,6 +2,7 @@ open Vocab
 module H = Hashtbl
 module C = Clang
 module F = Format
+module L = Logging
 
 exception UnknownSyntax
 
@@ -400,7 +401,7 @@ let trans_integer_literal decoration il =
   in
   match il with
   | C.Ast.Int i -> Cil.kinteger ikind i
-  | C.Ast.CXInt cxi -> 
+  | C.Ast.CXInt cxi ->
       Cil.kinteger ikind (Clang__.Clang__bindings.ext_int_get_sext_value cxi)
 
 let trans_floating_literal decoration il =
@@ -477,87 +478,81 @@ let rec should_ignore_implicit_cast2 e typ =
 
 let rec trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt
     loc action (expr : C.Ast.expr) =
-  try
-    match expr.C.Ast.desc with
-    | C.Ast.IntegerLiteral il ->
-        ([], Some (trans_integer_literal expr.decoration il))
-    | C.Ast.FloatingLiteral fl ->
-        ([], Some (trans_floating_literal expr.decoration fl))
-    | C.Ast.StringLiteral sl -> ([], Some (trans_string_literal sl))
-    | C.Ast.CharacterLiteral cl ->
-        ([], Some (Cil.Const (Cil.CChr (char_of_int cl.value))))
-    | C.Ast.UnaryOperator uo ->
-        let typ = type_of_expr expr |> trans_type scope in
-        let il, exp =
-          trans_unary_operator scope fundec_opt loc action typ uo.kind
-            uo.operand
-        in
-        (il, Some exp)
-    | C.Ast.BinaryOperator bo ->
-        let typ = type_of_expr expr |> trans_type scope in
-        let il, exp =
-          trans_binary_operator scope fundec_opt loc action typ bo.kind bo.lhs
-            bo.rhs
-        in
-        (il, Some exp)
-    | C.Ast.DeclRef idref -> trans_decl_ref scope allow_undef idref
-    | C.Ast.Call call ->
-        trans_call scope skip_lhs fundec_opt loc action call.callee call.args
-    | C.Ast.Cast cast ->
-        let sl, expr_opt =
-          trans_expr ~allow_undef scope fundec_opt loc action cast.operand
-        in
-        let e = Option.get expr_opt in
-        let typ = trans_type scope cast.qual_type in
-        if should_ignore_implicit_cast1 expr cast.qual_type then (sl, Some e)
-        else if should_ignore_implicit_cast2 e typ then (sl, Some e)
-        else (sl, Some (Cil.CastE (typ, e)))
-    | C.Ast.Member mem ->
-        ( [],
-          Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field)
-        )
-    | C.Ast.ArraySubscript arr ->
-        let sl1, base = trans_expr scope fundec_opt loc action arr.base in
-        let sl2, idx = trans_expr scope fundec_opt loc action arr.index in
-        let base =
-          match Option.get base |> CilHelper.remove_cast with
-          | Cil.Lval lv -> lv
-          | e -> failwith (CilHelper.s_exp e)
-        in
-        let new_lval =
-          match idx with
-          | Some x when Cil.isPointerType (Cil.typeOfLval base) ->
-              ( Cil.Mem
-                  (Cil.BinOp (Cil.PlusPI, Cil.Lval base, x, Cil.typeOfLval base)),
-                Cil.NoOffset )
-          | Some x -> Cil.addOffsetLval (Cil.Index (x, Cil.NoOffset)) base
-          | _ -> failwith "lval"
-        in
-        (sl1 @ sl2, Some (Cil.Lval new_lval))
-    | C.Ast.ConditionalOperator co ->
-        trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
-    | C.Ast.UnaryExpr ue ->
-        trans_unary_expr scope fundec_opt loc ue.kind ue.argument
-    | C.Ast.UnexposedExpr e -> (
-        match e with
-        | DesignatedInitExpr -> failwith "not implemented"
-        | _ -> failwith "not expected" )
-    | C.Ast.InitList el -> failwith "init list"
-    | C.Ast.ImaginaryLiteral _ ->
-        failwith "Unsupported syntax (ImaginaryLiteral)"
-    | C.Ast.BoolLiteral _ -> failwith "Unsupported syntax (BoolLiteral)"
-    | C.Ast.NullPtrLiteral -> failwith "Unsupported syntax (NullPtrLiteral)"
-    | C.Ast.UnknownExpr (C.StmtExpr, C.StmtExpr) ->
-        (* StmtExpr is not supported yet *)
-        raise UnknownSyntax
-    | C.Ast.UnknownExpr (_, _) ->
-        prerr_endline ("warning unknown expr " ^ CilHelper.s_location loc);
-        Clangml_show.pp_expr F.err_formatter expr;
-        raise UnknownSyntax
-    | _ ->
-        Clangml_show.pp_expr F.err_formatter expr;
-        failwith "unknown trans_expr"
-  with UnknownSyntax -> ([], Some Cil.zero)
+  match expr.C.Ast.desc with
+  | C.Ast.IntegerLiteral il ->
+      ([], Some (trans_integer_literal expr.decoration il))
+  | C.Ast.FloatingLiteral fl ->
+      ([], Some (trans_floating_literal expr.decoration fl))
+  | C.Ast.StringLiteral sl -> ([], Some (trans_string_literal sl))
+  | C.Ast.CharacterLiteral cl ->
+      ([], Some (Cil.Const (Cil.CChr (char_of_int cl.value))))
+  | C.Ast.UnaryOperator uo ->
+      let typ = type_of_expr expr |> trans_type scope in
+      let il, exp =
+        trans_unary_operator scope fundec_opt loc action typ uo.kind uo.operand
+      in
+      (il, Some exp)
+  | C.Ast.BinaryOperator bo ->
+      let typ = type_of_expr expr |> trans_type scope in
+      let il, exp =
+        trans_binary_operator scope fundec_opt loc action typ bo.kind bo.lhs
+          bo.rhs
+      in
+      (il, Some exp)
+  | C.Ast.DeclRef idref -> trans_decl_ref scope allow_undef idref
+  | C.Ast.Call call ->
+      trans_call scope skip_lhs fundec_opt loc action call.callee call.args
+  | C.Ast.Cast cast ->
+      let sl, expr_opt =
+        trans_expr ~allow_undef scope fundec_opt loc action cast.operand
+      in
+      let e = Option.get expr_opt in
+      let typ = trans_type scope cast.qual_type in
+      if should_ignore_implicit_cast1 expr cast.qual_type then (sl, Some e)
+      else if should_ignore_implicit_cast2 e typ then (sl, Some e)
+      else (sl, Some (Cil.CastE (typ, e)))
+  | C.Ast.Member mem ->
+      ([], Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field))
+  | C.Ast.ArraySubscript arr ->
+      let sl1, base = trans_expr scope fundec_opt loc action arr.base in
+      let sl2, idx = trans_expr scope fundec_opt loc action arr.index in
+      let base =
+        match Option.get base |> CilHelper.remove_cast with
+        | Cil.Lval lv -> lv
+        | e -> failwith (CilHelper.s_exp e)
+      in
+      let new_lval =
+        match idx with
+        | Some x when Cil.isPointerType (Cil.typeOfLval base) ->
+            ( Cil.Mem
+                (Cil.BinOp (Cil.PlusPI, Cil.Lval base, x, Cil.typeOfLval base)),
+              Cil.NoOffset )
+        | Some x -> Cil.addOffsetLval (Cil.Index (x, Cil.NoOffset)) base
+        | _ -> failwith "lval"
+      in
+      (sl1 @ sl2, Some (Cil.Lval new_lval))
+  | C.Ast.ConditionalOperator co ->
+      trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
+  | C.Ast.UnaryExpr ue ->
+      trans_unary_expr scope fundec_opt loc ue.kind ue.argument
+  | C.Ast.UnexposedExpr e ->
+      L.warn "UnexposedExpr at %s" (CilHelper.s_location loc);
+      ([], Some Cil.zero)
+  | C.Ast.InitList el -> failwith "init list"
+  | C.Ast.ImaginaryLiteral _ -> failwith "Unsupported syntax (ImaginaryLiteral)"
+  | C.Ast.BoolLiteral _ -> failwith "Unsupported syntax (BoolLiteral)"
+  | C.Ast.NullPtrLiteral -> failwith "Unsupported syntax (NullPtrLiteral)"
+  | C.Ast.UnknownExpr (C.StmtExpr, C.StmtExpr) ->
+      (* StmtExpr is not supported yet *)
+      L.warn "StmtExpr at %s" (CilHelper.s_location loc);
+      ([], Some Cil.zero)
+  | C.Ast.UnknownExpr (_, _) ->
+      L.warn "warning unknown expr (%a) at %s" Clangml_show.pp_expr expr
+        (CilHelper.s_location loc);
+      ([], Some Cil.zero)
+  | _ ->
+      Clangml_show.pp_expr F.err_formatter expr;
+      failwith "unknown trans_expr"
 
 and trans_unary_operator scope fundec_opt loc action typ kind expr =
   let sl, var_opt = trans_expr scope fundec_opt loc action expr in
@@ -624,8 +619,20 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
 and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
   let lhs_sl, lhs_opt = trans_expr scope fundec_opt loc AExp lhs in
   let rhs_sl, rhs_opt = trans_expr scope fundec_opt loc AExp rhs in
-  let lhs_expr = match lhs_opt with Some x -> x | None -> failwith "lhs" in
-  let rhs_expr = match rhs_opt with Some x -> x | None -> failwith "rhs" in
+  let lhs_expr =
+    match lhs_opt with
+    | Some x -> x
+    | None ->
+        L.warn "Invalid lhs at %s" (CilHelper.s_location loc);
+        Cil.zero
+  in
+  let rhs_expr =
+    match rhs_opt with
+    | Some x -> x
+    | None ->
+        L.warn "Invalid rhs at %s" (CilHelper.s_location loc);
+        Cil.zero
+  in
   match kind with
   | C.Mul | C.Div | C.Rem | C.Add | C.Sub | C.Shl | C.Shr | C.LT | C.GT | C.LE
   | C.GE | C.EQ | C.NE | C.And | C.Xor | C.Or | C.LAnd | C.LOr ->
