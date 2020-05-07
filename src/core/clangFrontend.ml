@@ -536,7 +536,7 @@ let rec trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt
   | C.Ast.UnaryExpr ue ->
       trans_unary_expr scope fundec_opt loc ue.kind ue.argument
   | C.Ast.UnexposedExpr e ->
-      L.warn "UnexposedExpr at %s" (CilHelper.s_location loc);
+      L.warn "UnexposedExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
   | C.Ast.InitList el -> failwith "init list"
   | C.Ast.ImaginaryLiteral _ -> failwith "Unsupported syntax (ImaginaryLiteral)"
@@ -544,10 +544,10 @@ let rec trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt
   | C.Ast.NullPtrLiteral -> failwith "Unsupported syntax (NullPtrLiteral)"
   | C.Ast.UnknownExpr (C.StmtExpr, C.StmtExpr) ->
       (* StmtExpr is not supported yet *)
-      L.warn "StmtExpr at %s" (CilHelper.s_location loc);
+      L.warn "StmtExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
   | C.Ast.UnknownExpr (_, _) ->
-      L.warn "warning unknown expr (%a) at %s" Clangml_show.pp_expr expr
+      L.warn "warning unknown expr (%a) at %s\n" Clangml_show.pp_expr expr
         (CilHelper.s_location loc);
       ([], Some Cil.zero)
   | _ ->
@@ -623,14 +623,14 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
     match lhs_opt with
     | Some x -> x
     | None ->
-        L.warn "Invalid lhs at %s" (CilHelper.s_location loc);
+        L.warn "Invalid lhs at %s\n" (CilHelper.s_location loc);
         Cil.zero
   in
   let rhs_expr =
     match rhs_opt with
     | Some x -> x
     | None ->
-        L.warn "Invalid rhs at %s" (CilHelper.s_location loc);
+        L.warn "Invalid rhs at %s\n" (CilHelper.s_location loc);
         Cil.zero
   in
   match kind with
