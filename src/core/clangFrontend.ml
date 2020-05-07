@@ -485,7 +485,8 @@ let rec trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt
       ([], Some (trans_floating_literal expr.decoration fl))
   | C.Ast.StringLiteral sl -> ([], Some (trans_string_literal sl))
   | C.Ast.CharacterLiteral cl ->
-      ([], Some (Cil.Const (Cil.CChr (char_of_int cl.value))))
+      if cl.value > 255 then ([], Some (Cil.kinteger Cil.IUInt cl.value))
+      else ([], Some (Cil.Const (Cil.CChr (char_of_int cl.value))))
   | C.Ast.UnaryOperator uo ->
       let typ = type_of_expr expr |> trans_type scope in
       let il, exp =
