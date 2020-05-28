@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+script/apply-format
+
+dirty=$(git ls-files --modified)
+
+if [[ $dirty ]]; then
+  echo "The following files are not formatted"
+  echo $dirty
+  exit 1
+fi

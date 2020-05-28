@@ -19,4 +19,5 @@ install:
   - ./build.sh
   - eval $(opam env)
 script:
+  - script/check-format
   - make test
