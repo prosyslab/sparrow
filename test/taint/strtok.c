@@ -1,4 +1,4 @@
-char *strtok(char*, char*);
+char *strtok(char *, char *);
 
 int main(int argc, char **argv) {
   char *p;

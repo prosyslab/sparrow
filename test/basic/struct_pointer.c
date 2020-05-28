@@ -1,14 +1,13 @@
-void* malloc(int size);
-typedef struct _S
-{
+void *malloc(int size);
+typedef struct _S {
   char arr[16];
   int i;
 } S;
 
-int main(){
+int main() {
   S str;
-  S* p1 = &str;
-  S* p2 = (S*) malloc(sizeof(S));
+  S *p1 = &str;
+  S *p2 = (S *)malloc(sizeof(S));
   p1->i = 100;
   p2->i = 200;
   sparrow_print(str);

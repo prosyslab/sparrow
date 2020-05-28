@@ -6,7 +6,7 @@ void myprintf(char *dst, int len, char *format, ...) {
   vsnprintf(dst, len, format, args);
 }
 
-int main(int argc, char** argv){
+int main(int argc, char **argv) {
   char bug[10];
   myprintf("", 10, argv[1], "", "");
   return 0;

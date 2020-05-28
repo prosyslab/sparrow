@@ -1,12 +1,11 @@
-void* malloc(int size);
-typedef struct _S
-{
+void *malloc(int size);
+typedef struct _S {
   char arr[16];
   int i;
 } S;
 
-int main(){
-  S* str = (S*) malloc (sizeof(S));
+int main() {
+  S *str = (S *)malloc(sizeof(S));
   str->i = 10;
   str->arr[20] = 30;
 

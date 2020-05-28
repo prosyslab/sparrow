@@ -1,6 +1,6 @@
-int fgetc(void*);
+int fgetc(void *);
 
-int main(){
+int main() {
   char buf[10];
   buf[0] = fgetc(0);
   buf[1] = fgetc(0);

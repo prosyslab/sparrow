@@ -1,4 +1,4 @@
-int snprintf(char * s, int n, const char * format, ...);
+int snprintf(char *s, int n, const char *format, ...);
 
 int main(int argc, char **argv) {
   char *p = malloc(10);

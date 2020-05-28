@@ -1,8 +1,8 @@
 int arr[10];
 
-int main(){
-  int* p = arr;
-  *(p+1) = 10;
+int main() {
+  int *p = arr;
+  *(p + 1) = 10;
   sparrow_print(arr);
   sparrow_print(p);
   sparrow_print(*p);
