@@ -30,6 +30,6 @@ depends: [
   "lymp" {>= "0.1.3"}
   "ppx_compare"
   "ppx_deriving"
-  "clangml" {>="4.1.0"}
-  "ocamlformat" {=="0.13.0"}
+  "clangml" {>= "4.1.0"}
+  "ocamlformat" {= "0.13.0"}
 ]
