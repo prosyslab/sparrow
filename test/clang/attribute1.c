@@ -1,4 +1,1 @@
-inline void f() {
-  int x  = 0;
-
-}
+inline void f() { int x = 0; }

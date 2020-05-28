@@ -1,3 +1,1 @@
-void f() {
-  int x = g();
-}
+void f() { int x = g(); }

@@ -14,19 +14,19 @@ __inline extern int tolower(int __c )
   __int32_t tmp ;
 
   {
-#line 9
+#line 8
   if (__c >= -128 && __c < 256) {
     {
-#line 9
+#line 8
     __cil_tmp2 = __ctype_tolower_loc();
-#line 9
+#line 8
     tmp = *(*__cil_tmp2 + __c);
     }
   } else {
-#line 9
+#line 8
     tmp = (__int32_t )__c;
   }
-#line 9
+#line 8
   return ((int )tmp);
 }
 }

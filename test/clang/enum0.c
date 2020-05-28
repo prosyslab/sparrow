@@ -1,4 +1,4 @@
-enum state{a=1, b=2};
+enum state { a = 1, b = 2 };
 enum week { Mon, Tue = 10, Wed };
 
 int main() {

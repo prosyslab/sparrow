@@ -1,11 +1,10 @@
 void f() {
-  int x,y;
+  int x, y;
 
 x:
-  x=1;
+  x = 1;
   goto y;
 y:
-  y=1;
+  y = 1;
   goto x;
 }
-

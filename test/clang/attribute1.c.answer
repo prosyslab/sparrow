@@ -7,7 +7,7 @@ __inline void f(void)
   int x ;
 
   {
-#line 2
+#line 1
   x = 0;
 }
 }

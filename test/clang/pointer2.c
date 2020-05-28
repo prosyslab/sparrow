@@ -1,3 +1,1 @@
-void f(char *p) {
-  p[1] = 10;
-}
+void f(char *p) { p[1] = 10; }

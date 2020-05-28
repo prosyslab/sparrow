@@ -1,11 +1,13 @@
 typedef struct A {
-    int y;
-}A;
+  int y;
+} A;
 typedef struct B {
-    int a;
-    int b;
-    A k[2];
-}B;
+  int a;
+  int b;
+  A k[2];
+} B;
 int main() {
-    B b = {1,};
+  B b = {
+      1,
+  };
 }

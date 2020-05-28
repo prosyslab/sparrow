@@ -1,7 +1,6 @@
 void f() {
   int y;
 y:
-  y=1;
+  y = 1;
   goto y;
 }
-

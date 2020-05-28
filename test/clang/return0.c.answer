@@ -7,11 +7,11 @@ int f(void)
 
 
   {
-#line 2
+#line 1
   return (0);
 }
 }
-#line 5 "clang/return0.c"
+#line 3 "clang/return0.c"
 void g(void) 
 { 
   short x ;
@@ -19,11 +19,11 @@ void g(void)
 
   {
   {
-#line 6
+#line 4
   f();
-#line 7
+#line 5
   __cil_tmp2 = f();
-#line 7
+#line 5
   x = (short )__cil_tmp2;
   }
 }

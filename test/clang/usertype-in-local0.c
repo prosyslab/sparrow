@@ -1,16 +1,14 @@
 int foo() {
-    struct A {
-        int a;
-    };
-    struct A sa = {1};
+  struct A {
+    int a;
+  };
+  struct A sa = {1};
 }
 
 int main() {
-    struct A {
-        int a;
-    };
-    struct A sa = {1};
-    foo();
+  struct A {
+    int a;
+  };
+  struct A sa = {1};
+  foo();
 }
-
-

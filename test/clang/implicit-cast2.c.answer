@@ -9,9 +9,9 @@ void f(void)
 
   {
   {
-#line 2
+#line 1
   __cil_tmp2 = g();
-#line 2
+#line 1
   x = __cil_tmp2;
   }
 }

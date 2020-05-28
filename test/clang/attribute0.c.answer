@@ -9,7 +9,7 @@ void f(void)
   char const   *p ;
 
   {
-#line 4
+#line 3
   p = x;
 }
 }

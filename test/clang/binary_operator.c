@@ -1,6 +1,6 @@
 void foo() {
-    int i = 0;
-    while(1) {
-        i += 10;
-    }
+  int i = 0;
+  while (1) {
+    i += 10;
+  }
 }

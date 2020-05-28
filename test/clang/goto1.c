@@ -1,4 +1,4 @@
-void f(){
+void f() {
   int x, y;
 L : {
   x = 1;

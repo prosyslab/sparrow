@@ -1,6 +1,6 @@
 int main() {
   int c = 1;
-  switch(c){
+  switch (c) {
     int x = 1;
     {
     case 0:

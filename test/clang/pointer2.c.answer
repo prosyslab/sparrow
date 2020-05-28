@@ -7,7 +7,7 @@ void f(char *p )
 
 
   {
-#line 2
+#line 1
   *(p + 1) = (char )10;
 }
 }
