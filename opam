@@ -30,5 +30,5 @@ depends: [
   "lymp" {>= "0.1.3"}
   "ppx_compare"
   "ppx_deriving"
-  "clangml"
+  "clangml" {>="4.1.0"}
 ]

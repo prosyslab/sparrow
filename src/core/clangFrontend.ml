@@ -286,18 +286,31 @@ let name_of_ident_ref idref = string_of_declaration_name idref.C.Ast.name
 let trans_attribute typ =
   if typ.C.Ast.const then [ Cil.Attr ("const", []) ] else []
 
-let rec trans_type ?(compinfo = None) scope typ =
+let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
   match typ.C.Ast.desc with
-  | C.Ast.Pointer pt ->
-      Cil.TPtr (trans_type ~compinfo scope pt, trans_attribute typ)
-  | C.Ast.FunctionType ft -> trans_function_type scope ft
-  | C.Ast.Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
-  | C.Ast.Elaborated et -> trans_type ~compinfo scope et.named_type
-  | C.Ast.Record rt -> Scope.find_type ~compinfo (name_of_ident_ref rt) scope
-  | C.Ast.Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
-  | C.Ast.InvalidType -> failwith "invalid type"
-  | C.Ast.Vector _ -> failwith "vector type"
-  | C.Ast.BuiltinType _ -> trans_builtin_type ~compinfo scope typ
+  | Pointer pt -> Cil.TPtr (trans_type ~compinfo scope pt, trans_attribute typ)
+  | FunctionType ft -> trans_function_type scope ft
+  | Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
+  | Elaborated et -> trans_type ~compinfo scope et.named_type
+  | Record rt -> Scope.find_type ~compinfo (name_of_ident_ref rt) scope
+  | Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
+  | InvalidType -> failwith "invalid type"
+  | Vector _ -> failwith "vector type"
+  | BuiltinType _ -> trans_builtin_type ~compinfo scope typ
+  | ConstantArray ca ->
+      let size = Cil.integer ca.size in
+      let elem_type = trans_type ~compinfo scope ca.element in
+      let attr = trans_attribute typ in
+      Cil.TArray (elem_type, Some size, attr)
+  | IncompleteArray ia_type ->
+      let elem_type = trans_type ~compinfo scope ia_type in
+      let attr = trans_attribute typ in
+      Cil.TArray (elem_type, None, attr)
+  | VariableArray va ->
+      let _, size = trans_expr scope None Cil.locUnknown AExp va.size in
+      let elem_type = trans_type ~compinfo scope va.element in
+      let attr = trans_attribute typ in
+      Cil.TArray (elem_type, Some (Option.get size), attr)
   | x -> trans_builtin_type ~compinfo scope typ
 
 and trans_builtin_type ?(compinfo = None) scope t =
@@ -336,10 +349,7 @@ and trans_builtin_type ?(compinfo = None) scope t =
   | Float128 -> failwith "float 128"
   | Half -> failwith "half"
   | Float16 -> failwith "float 16"
-  | ShortAccum -> failwith "short accum"
-  | Accum -> failwith "accum"
-  | LongAccum | UShortAccum | UAccum | ULongAccum | Complex | BlockPointer
-  | LValueReference | RValueReference | Record ->
+  | Complex | BlockPointer | LValueReference | RValueReference | Record ->
       failwith "7"
   | ObjCInterface | ObjCObjectPointer | Vector -> failwith ""
   | DependentSizedArray -> failwith "dependent"
@@ -367,12 +377,12 @@ and trans_parameter_types scope = function
       (Some formals, params.C.Ast.variadic)
   | None -> (None, false)
 
-let failwith_decl (decl : C.Ast.decl) =
+and failwith_decl (decl : C.Ast.decl) =
   match decl.C.Ast.desc with
   | C.Ast.RecordDecl _ -> failwith "record decl"
   | _ -> failwith "unknown decl"
 
-let trans_field_decl scope compinfo (field : C.Ast.decl) =
+and trans_field_decl scope compinfo (field : C.Ast.decl) =
   let floc = trans_location field in
   match field.C.Ast.desc with
   | C.Ast.Field fdecl ->
@@ -380,7 +390,7 @@ let trans_field_decl scope compinfo (field : C.Ast.decl) =
       (fdecl.name, typ, None, [], floc)
   | _ -> failwith_decl field
 
-let trans_params scope args fundec =
+and trans_params scope args fundec =
   match args with
   | Some l ->
       List.fold_left
@@ -393,7 +403,7 @@ let trans_params scope args fundec =
         scope l.C.Ast.non_variadic
   | None -> scope
 
-let trans_integer_literal decoration il =
+and trans_integer_literal decoration il =
   let ikind =
     match decoration with
     | C.Ast.Cursor c -> C.get_cursor_type c |> C.get_type_kind |> trans_int_kind
@@ -404,7 +414,7 @@ let trans_integer_literal decoration il =
   | C.Ast.CXInt cxi ->
       Cil.kinteger ikind (Clang__.Clang__bindings.ext_int_get_sext_value cxi)
 
-let trans_floating_literal decoration il =
+and trans_floating_literal decoration il =
   let fkind =
     match decoration with
     | C.Ast.Cursor c ->
@@ -415,16 +425,16 @@ let trans_floating_literal decoration il =
   | C.Ast.Float f -> Cil.Const (Cil.CReal (f, fkind, None))
   | _ -> failwith "unknown float literal"
 
-let trans_string_literal sl = Cil.Const (Cil.CStr sl.C.Ast.bytes)
+and trans_string_literal sl = Cil.Const (Cil.CStr sl.C.Ast.bytes)
 
-let type_of_decoration decoration =
+and type_of_decoration decoration =
   match decoration with
   | C.Ast.Cursor c -> C.get_cursor_type c
   | _ -> failwith "Invalid cursor for type"
 
-let type_of_expr expr = C.Type.of_node expr
+and type_of_expr expr = C.Type.of_node expr
 
-let trans_decl_ref scope allow_undef idref =
+and trans_decl_ref scope allow_undef idref =
   let name = name_of_ident_ref idref in
   match Scope.find_var_enum ~allow_undef name scope with
   | EnvVar varinfo ->
@@ -433,7 +443,7 @@ let trans_decl_ref scope allow_undef idref =
   | EnvEnum enum -> ([], Some enum)
   | _ -> failwith "no found"
 
-let should_ignore_implicit_cast1 expr qual_type =
+and should_ignore_implicit_cast1 expr qual_type =
   let expr_kind = C.Ast.cursor_of_node expr |> C.ext_get_cursor_kind in
   let type_kind =
     C.get_pointee_type qual_type.C.Ast.cxtype |> C.ext_type_get_kind
@@ -442,14 +452,14 @@ let should_ignore_implicit_cast1 expr qual_type =
   expr_kind = C.ImplicitCastExpr
   && (type_kind = C.FunctionNoProto || type_kind = C.FunctionProto)
 
-let rec append_instr sl instr =
+and append_instr sl instr =
   match sl with
   | [ ({ Cil.skind = Cil.Instr l } as h) ] ->
       [ { h with skind = Cil.Instr (l @ [ instr ]) } ]
   | [] -> [ Cil.mkStmt (Cil.Instr [ instr ]) ]
   | h :: t -> h :: append_instr t instr
 
-let rec append_stmt_list sl1 sl2 =
+and append_stmt_list sl1 sl2 =
   match (sl1, sl2) with
   | ( [ ({ Cil.skind = Cil.Instr l1 } as h1) ],
       ({ Cil.skind = Cil.Instr l2 } as h2) :: t2 )
@@ -459,7 +469,7 @@ let rec append_stmt_list sl1 sl2 =
   | [], _ -> sl2
   | h1 :: t1, _ -> h1 :: append_stmt_list t1 sl2
 
-let rec should_ignore_implicit_cast2 e typ =
+and should_ignore_implicit_cast2 e typ =
   (* ignore LValueToRValue *)
   match (typ, Cil.typeOf e) with
   | Cil.TVoid _, Cil.TVoid _
@@ -476,8 +486,8 @@ let rec should_ignore_implicit_cast2 e typ =
       Cil.typeSig typ = (Cil.typeOf e |> Cil.typeSig)
   | _, _ -> false
 
-let rec trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt
-    loc action (expr : C.Ast.expr) =
+and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
+    action (expr : C.Ast.expr) =
   match expr.C.Ast.desc with
   | C.Ast.IntegerLiteral il ->
       ([], Some (trans_integer_literal expr.decoration il))
@@ -547,13 +557,8 @@ let rec trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt
       (* StmtExpr is not supported yet *)
       L.warn "StmtExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
-  | C.Ast.UnknownExpr (_, _) ->
-      L.warn "warning unknown expr (%a) at %s\n" Clangml_show.pp_expr expr
-        (CilHelper.s_location loc);
-      ([], Some Cil.zero)
-  | _ ->
-      Clangml_show.pp_expr F.err_formatter expr;
-      failwith "unknown trans_expr"
+  | C.Ast.UnknownExpr (_, _) -> ([], Some Cil.zero)
+  | _ -> failwith "unknown trans_expr"
 
 and trans_unary_operator scope fundec_opt loc action typ kind expr =
   let sl, var_opt = trans_expr scope fundec_opt loc action expr in
@@ -562,7 +567,6 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
     | Some x -> x
     | None ->
         prerr_endline (CilHelper.s_location loc);
-        Clangml_show.pp_expr F.err_formatter expr;
         failwith "var_opt"
   in
   let lval_of_expr var =
@@ -613,9 +617,7 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
   | C.Not -> (sl, Cil.UnOp (Cil.BNot, var, typ))
   | C.LNot -> (sl, Cil.UnOp (Cil.LNot, var, typ))
   | C.Extension -> (sl, var)
-  | _ ->
-      Clangml_show.pp_expr F.err_formatter expr;
-      failwith ("unary_operator at " ^ CilHelper.s_location loc)
+  | _ -> failwith ("unary_operator at " ^ CilHelper.s_location loc)
 
 and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
   let lhs_sl, lhs_opt = trans_expr scope fundec_opt loc AExp lhs in
@@ -1045,7 +1047,8 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
           failwith "not expected"
       | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
           failwith "Unsupported C++ features"
-      | Function _ -> failwith "not allowed in basic block")
+      | Function _ -> failwith "not allowed in basic block"
+      | Concept _ | Export _ -> failwith "new cases: Concept | Export")
     ([], [], scope) dl
 
 and trans_var_decl ?(storage = Cil.NoStorage) (scope : Scope.t) fundec loc
@@ -1925,6 +1928,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       ([], scope)
   | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
       failwith "Unsupported C++ features"
+  | Concept _ | Export _ -> failwith "new cases: Concept | Export"
 
 and trans_function_body scope fundec body =
   let chunk = trans_block scope fundec body in
@@ -1967,15 +1971,10 @@ and mk_init scope loc fitype expr_list =
       let _, expr_opt = trans_expr scope None loc ADrop e in
       let e = Option.get expr_opt in
       (Cil.SingleInit e, el)
-  | Cil.TPtr (typ, attr), e :: el -> (
+  | Cil.TPtr (typ, attr), e :: el ->
       let _, expr_opt = trans_expr scope None loc ADrop e in
       let e = Option.get expr_opt in
-      let actual_typ = Cil.unrollTypeDeep typ in
-      match actual_typ with
-      | Cil.TFun (_, _, _, _) ->
-          (* function pointer *)
-          (Cil.SingleInit (Cil.CastE (Cil.TPtr (actual_typ, attr), e)), el)
-      | _ -> (Cil.SingleInit e, el) )
+      (Cil.SingleInit e, el)
   (* common *)
   | Cil.TComp (ci, _), _ ->
       (* struct in struct *)

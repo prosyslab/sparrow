@@ -21,4 +21,4 @@ true: annot, bin_annot
 <src/*>: include
 true: pkg_apron, pkg_apron.octMPQ, pkg_batteries, pkg_cil, pkg_cil.all-features
 true: pkg_clangml, pkg_lymp, pkg_ocamlgraph, pkg_ppx_compare, pkg_ppx_deriving.std
-true: pkg_threads, pkg_yojson, pkg_clangml.show
+true: pkg_threads, pkg_yojson
