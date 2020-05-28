@@ -24,9 +24,9 @@ __inline extern int tolower(int __c )
     }
   } else {
 #line 8
-    tmp = (__int32_t )__c;
+    tmp = __c;
   }
 #line 8
-  return ((int )tmp);
+  return (tmp);
 }
 }

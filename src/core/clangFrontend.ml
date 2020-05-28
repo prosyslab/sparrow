@@ -443,14 +443,23 @@ and trans_decl_ref scope allow_undef idref =
   | EnvEnum enum -> ([], Some enum)
   | _ -> failwith "no found"
 
-and should_ignore_implicit_cast1 expr qual_type =
-  let expr_kind = C.Ast.cursor_of_node expr |> C.ext_get_cursor_kind in
-  let type_kind =
-    C.get_pointee_type qual_type.C.Ast.cxtype |> C.ext_type_get_kind
-  in
-  (* ignore FunctionToPointerDecay and BuiltinFnToFnPtr *)
-  expr_kind = C.ImplicitCastExpr
-  && (type_kind = C.FunctionNoProto || type_kind = C.FunctionProto)
+and should_ignore_implicit_cast expr qual_type e typ =
+  (* heuristics to selectively make implicit cast explicit because clangml
+   * does not fully expose all the implicit casting information *)
+  if
+    Cil.unrollType typ |> Cil.isPointerType
+    && Cil.typeOf e |> Cil.unrollType |> Cil.isIntegralType
+  then false
+  else
+    let expr_kind = C.Ast.cursor_of_node expr |> C.ext_get_cursor_kind in
+    let type_kind =
+      C.get_pointee_type qual_type.C.Ast.cxtype |> C.ext_type_get_kind
+    in
+    (* ignore FunctionToPointerDecay and BuiltinFnToFnPtr *)
+    expr_kind = C.ImplicitCastExpr
+    && (type_kind = C.FunctionNoProto || type_kind = C.FunctionProto)
+    (* ignore LValueToRValue *)
+    || CilHelper.eq_typ (Cil.typeOf e) typ
 
 and append_instr sl instr =
   match sl with
@@ -468,23 +477,6 @@ and append_stmt_list sl1 sl2 =
       { h1 with skind = Cil.Instr (l1 @ l2) } :: t2
   | [], _ -> sl2
   | h1 :: t1, _ -> h1 :: append_stmt_list t1 sl2
-
-and should_ignore_implicit_cast2 e typ =
-  (* ignore LValueToRValue *)
-  match (typ, Cil.typeOf e) with
-  | Cil.TVoid _, Cil.TVoid _
-  | Cil.TInt (_, _), Cil.TInt (_, _)
-  | Cil.TFloat (_, _), Cil.TFloat (_, _)
-  | Cil.TPtr (_, _), Cil.TPtr (_, _)
-  | Cil.TArray (_, _, _), Cil.TArray (_, _, _)
-  | Cil.TFun (_, _, _, _), Cil.TFun (_, _, _, _)
-  | Cil.TNamed (_, _), Cil.TNamed (_, _)
-  | Cil.TComp (_, _), Cil.TComp (_, _)
-  | Cil.TEnum (_, _), Cil.TEnum (_, _)
-  | Cil.TBuiltin_va_list _, Cil.TBuiltin_va_list _ ->
-      (* enumerate all to preserve typedef because typeSig unrolls TNamed *)
-      Cil.typeSig typ = (Cil.typeOf e |> Cil.typeSig)
-  | _, _ -> false
 
 and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
     action (expr : C.Ast.expr) =
@@ -519,8 +511,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
       in
       let e = Option.get expr_opt in
       let typ = trans_type scope cast.qual_type in
-      if should_ignore_implicit_cast1 expr cast.qual_type then (sl, Some e)
-      else if should_ignore_implicit_cast2 e typ then (sl, Some e)
+      if should_ignore_implicit_cast expr cast.qual_type e typ then (sl, Some e)
       else (sl, Some (Cil.CastE (typ, e)))
   | C.Ast.Member mem ->
       ([], Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field))
@@ -785,7 +776,7 @@ and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
       let var = (Cil.Var vi, Cil.NoOffset) in
       let bstmts =
         match then_expr with
-        | Some e when should_ignore_implicit_cast2 e typ ->
+        | Some e when CilHelper.eq_typ (Cil.typeOf e) typ ->
             append_instr then_sl (Cil.Set (var, e, loc))
         | Some e ->
             append_instr then_sl (Cil.Set (var, Cil.CastE (typ, e), loc))
@@ -793,15 +784,14 @@ and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
       in
       let tb = { Cil.battrs = []; bstmts } in
       let bstmts =
-        if should_ignore_implicit_cast2 else_expr typ then
+        if CilHelper.eq_typ (Cil.typeOf else_expr) typ then
           append_instr else_sl (Cil.Set (var, else_expr, loc))
         else
           append_instr else_sl (Cil.Set (var, Cil.CastE (typ, else_expr), loc))
       in
       let fb = { Cil.battrs = []; bstmts } in
       let return_exp =
-        if should_ignore_implicit_cast2 (Cil.Lval var) Cil.intType then
-          Some (Cil.Lval var)
+        if CilHelper.eq_typ (Cil.typeOf else_expr) typ then Some (Cil.Lval var)
         else Some (Cil.CastE (Cil.intType, Cil.Lval var))
       in
       (cond_sl @ [ Cil.mkStmt (Cil.If (cond_expr, tb, fb, loc)) ], return_exp)

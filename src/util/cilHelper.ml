@@ -178,6 +178,8 @@ let byteSizeOf typ =
       prerr_endline ("warn: Cil.bitsSizeOf (" ^ s_type typ ^ ")");
     raise e
 
+let eq_typ t1 t2 = Cil.typeSig t1 = Cil.typeSig t2
+
 module Lval = struct
   type t = Cil.lval
 

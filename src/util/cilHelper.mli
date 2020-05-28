@@ -55,6 +55,8 @@ val is_unsigned : Cil.typ -> bool
 
 val byteSizeOf : Cil.typ -> int
 
+val eq_typ : Cil.typ -> Cil.typ -> bool
+
 module Lval : sig
   type t = Cil.lval
 
