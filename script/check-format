@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-script/apply-format
+script/apply-format || exit 1
 
-dirty=$(git ls-files --modified)
+dirty=$(git ls-files test --modified | grep -E "*.c$")
 
 if [[ $dirty ]]; then
   echo "The following files are not formatted"
   echo $dirty
-  git checkout -f
+  find test -name "*.c" | git checkout -- > /dev/null
   exit 1
 fi
