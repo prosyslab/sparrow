@@ -31,4 +31,5 @@ depends: [
   "ppx_compare"
   "ppx_deriving"
   "clangml" {>="4.1.0"}
+  "ocamlformat" {=="0.13.0"}
 ]
