@@ -57,6 +57,10 @@ val byteSizeOf : Cil.typ -> int
 
 val eq_typ : Cil.typ -> Cil.typ -> bool
 
+val add_field_offset : Cil.offset -> Cil.fieldinfo -> Cil.offset
+
+val add_index_offset : Cil.offset -> Cil.exp -> Cil.offset
+
 module Lval : sig
   type t = Cil.lval
 

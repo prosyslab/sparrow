@@ -180,6 +180,12 @@ let byteSizeOf typ =
 
 let eq_typ t1 t2 = Cil.typeSig t1 = Cil.typeSig t2
 
+let add_field_offset offset fi =
+  Cil.addOffset (Cil.Field (fi, Cil.NoOffset)) offset
+
+let add_index_offset offset exp =
+  Cil.addOffset (Cil.Index (exp, Cil.NoOffset)) offset
+
 module Lval = struct
   type t = Cil.lval
 
