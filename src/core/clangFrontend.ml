@@ -1829,9 +1829,9 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       let vi, scope = find_global_variable scope vdecl.var_name typ in
       vi.vstorage <- storage;
       let e = Option.get vdecl.var_init in
-      let init' = trans_global_init scope loc e in
-      let init = { Cil.init = Some init' } in
-      ([ Cil.GVar (vi, init, loc) ], scope)
+      let init = Some (trans_global_init scope loc e) in
+      vi.vinit.init <- init;
+      ([ Cil.GVar (vi, { Cil.init }, loc) ], scope)
   | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
       let is_struct = rdecl.keyword = C.Struct in
       let globals, scope =
