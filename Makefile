@@ -1,43 +1,14 @@
-export OCAMLFIND_IGNORE_DUPS_IN=$(shell ocamlc -where)/compiler-libs
-
-# OASIS_START
-# DO NOT EDIT (digest: a3c674b4239234cbbe53afe090018954)
-
-SETUP = ocaml setup.ml
-
-build: setup.data
-	$(SETUP) -build $(BUILDFLAGS)
-
-doc: setup.data build
-	$(SETUP) -doc $(DOCFLAGS)
-
-test: setup.data build
-	$(SETUP) -test $(TESTFLAGS)
+SPARROW=sparrow
+VIS=sparrow-vis
 
 all:
-	$(SETUP) -all $(ALLFLAGS)
+	dune build src/main.exe
+	dune build src/vis.exe
+	@cd bin; ln -sf ../_build/default/src/main.exe $(SPARROW); ln -sf ../_build/default/src/vis.exe $(VIS)
 
-install: setup.data
-	$(SETUP) -install $(INSTALLFLAGS)
-
-uninstall: setup.data
-	$(SETUP) -uninstall $(UNINSTALLFLAGS)
-
-reinstall: setup.data
-	$(SETUP) -reinstall $(REINSTALLFLAGS)
+test: all
+	dune build test/test.exe
+	@cd test; ../_build/default/test/test.exe
 
 clean:
-	$(SETUP) -clean $(CLEANFLAGS)
-
-distclean:
-	$(SETUP) -distclean $(DISTCLEANFLAGS)
-
-setup.data:
-	$(SETUP) -configure $(CONFIGUREFLAGS)
-
-configure:
-	$(SETUP) -configure $(CONFIGUREFLAGS)
-
-.PHONY: build doc test all install uninstall reinstall clean distclean configure
-
-# OASIS_STOP
+	dune clean

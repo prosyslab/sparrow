@@ -13,7 +13,6 @@ open Vocab
 open Global
 open BasicDom
 open AbsSem
-open Dug
 module L = Logging
 
 let total_iterations = ref 0
@@ -211,7 +210,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
     L.info ~level:1 "#iteration in narrowing : %d\n" !total_iterations;
     x
 
-  let print_dug spec (access, global, dug) =
+  let print_dug (global, dug) =
     if !Options.dug then (
       `Assoc
         [
@@ -227,7 +226,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
       L.info "#Nodes in def-use graph : %d\n" (DUGraph.nb_node dug);
       L.info "#Locs on def-use graph : %d\n" (DUGraph.nb_loc dug) )
 
-  let bind_fi_locs global mem_fi dug access inputof =
+  let bind_fi_locs mem_fi dug access inputof =
     DUGraph.fold_node
       (fun n t ->
         let used = Access.Info.useof (Access.find_node n access) in
@@ -263,13 +262,11 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
           Table.add node mem_with_access t)
       nodes inputof
 
-  let initialize spec global dug access =
+  let initialize spec dug access =
     Table.add InterCfg.start_node (Sem.initial spec.Spec.locset) Table.empty
-    |> cond (!Options.pfs < 100)
-         (bind_fi_locs global spec.Spec.premem dug access)
-         id
+    |> cond (!Options.pfs < 100) (bind_fi_locs spec.Spec.premem dug access) id
 
-  let finalize spec global dug access (worklist, global, inputof, outputof) =
+  let finalize spec dug access (worklist, global, inputof, outputof) =
     let inputof =
       if !Options.pfs < 100 then
         bind_unanalyzed_node global spec.Spec.premem dug access inputof
@@ -294,14 +291,14 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
       StepManager.stepf false "Def-use graph construction" SsaDug.make
         (global, access, spec.Spec.locset_fs)
     in
-    print_dug spec (access, global, dug);
+    print_dug (global, dug);
     let worklist =
       StepManager.stepf false "Workorder computation" Worklist.init dug
     in
-    (worklist, global, initialize spec global dug access, Table.empty)
+    (worklist, global, initialize spec dug access, Table.empty)
     |> StepManager.stepf false "Fixpoint iteration with widening"
          (widening spec dug)
-    |> finalize spec global dug access
+    |> finalize spec dug access
     |> StepManager.stepf_opt !Options.narrow false
          "Fixpoint iteration with narrowing" (narrowing spec dug)
     |> fun (_, global, inputof, outputof) -> (global, dug, inputof, outputof)

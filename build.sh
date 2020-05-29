@@ -28,5 +28,4 @@ opam pin add cil https://github.com/KihongHeo/cil.git -n
 opam pin add sparrow . -n
 opam install -j $NCPU sparrow --deps-only
 opam pin remove sparrow
-./configure --enable-tests
 make

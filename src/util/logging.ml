@@ -50,7 +50,7 @@ let dual_formatter fmt1 fmt2 =
     };
   fmt
 
-let init level =
+let init () =
   let log_oc = open_out (!Options.outdir ^ "/log.txt") in
   let report_oc = open_out (!Options.outdir ^ "/report.txt") in
   let log_file_fmt = F.formatter_of_out_channel log_oc in

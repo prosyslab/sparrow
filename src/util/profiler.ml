@@ -58,7 +58,7 @@ let record_arguments name args =
   v := Marshal.to_string args [ Marshal.No_sharing; Marshal.Closures ]
 
 (* (internal procedure) *)
-let max_check name t args =
+let max_check name t _ =
   let v =
     if BatMap.mem name !max_log then BatMap.find name !max_log
     else

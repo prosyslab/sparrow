@@ -120,7 +120,7 @@ let get_locset mem =
 let make_top_mem locset =
   PowLoc.fold (fun l mem -> Mem.add l TaintDom.Val.top mem) locset Mem.bot
 
-let print_datalog_fact spec global dug alarms =
+let print_datalog_fact _ global dug alarms =
   RelSyntax.print analysis global.icfg;
   Provenance.print analysis global.relations;
   RelDUGraph.print analysis global dug alarms;

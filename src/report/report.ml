@@ -11,11 +11,7 @@
 
 open Vocab
 open BasicDom
-open ItvDom
 open Cil
-open IntraCfg
-open Cmd
-open AlarmExp
 module F = Format
 module L = Logging
 

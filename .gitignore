@@ -25,3 +25,6 @@ sparrow-out
 
 # vim swp files
 .*.sw?
+
+# merlin
+.merlin

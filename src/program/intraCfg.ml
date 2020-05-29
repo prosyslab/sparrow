@@ -113,8 +113,8 @@ module Cmd = struct
         "call(" ^ s_exp fexp ^ s_exps params ^ ")"
     | Creturn (Some e, _) -> "return " ^ s_exp e
     | Creturn (None, _) -> "return"
-    | Cif (e, b1, b2, loc) -> "if"
-    | Cassume (e, _, loc) -> "assume(" ^ s_exp e ^ ")"
+    | Cif (_, _, _, _) -> "if"
+    | Cassume (e, _, _) -> "assume(" ^ s_exp e ^ ")"
     | CLoop _ -> "loop"
     | Casm _ -> "asm"
     | Cskip _ -> "skip"
@@ -199,9 +199,9 @@ module GDom = struct
 
   let nb_vertex = G.nb_vertex
 
-  let add_edge g a b = ()
+  let add_edge _ _ _ = ()
 
-  let create : ?size:int -> unit -> t = fun ?size:int () -> empty
+  let create : ?size:int -> unit -> t = fun ?size:_ () -> empty
 end
 
 module Dom = Graph.Dominator.Make_graph (GDom)
@@ -338,8 +338,8 @@ let generate_assumes g =
                 (* true-branch node, false-branch node *)
                 match (tb.bstmts, fb.bstmts) with
                 | [], [] -> (s1, s2)
-                | t :: l, _ -> if t.sid = Node.id s1 then (s1, s2) else (s2, s1)
-                | _, t :: l -> if t.sid = Node.id s2 then (s1, s2) else (s2, s1)
+                | t :: _, _ -> if t.sid = Node.id s1 then (s1, s2) else (s2, s1)
+                | _, t :: _ -> if t.sid = Node.id s2 then (s1, s2) else (s2, s1)
               in
               let tassert = Cmd.Cassume (e, true, loc) in
               let not_e = UnOp (LNot, e, Cil.typeOf e) in
@@ -405,7 +405,7 @@ let flatten_instructions g =
                (* connect edges between instrs *)
                fst
                  (List.fold_left
-                    (fun (g, p) (n, c) -> (add_edge p n g, n))
+                    (fun (g, p) (n, _) -> (add_edge p n g, n))
                     (g, n) pairs))
           |> list_fold (fun p -> add_edge p first) preds
           |> list_fold (fun s -> add_edge last s) succs
@@ -424,13 +424,13 @@ let flatten_instructions g =
       | _ -> g)
     g g
 
-let make_array fd lv typ exp loc entry g =
+let make_array lv typ exp loc entry g =
   let alloc_node = Node.make () in
   let size = Cil.BinOp (Cil.Mult, Cil.SizeOf typ, exp, Cil.intType) in
   let alloc_cmd = Cmd.Calloc (lv, Cmd.Array size, true, loc) in
   (alloc_node, g |> add_cmd alloc_node alloc_cmd |> add_edge entry alloc_node)
 
-let make_struct fd lv comp loc entry g =
+let make_struct lv comp loc entry g =
   let alloc_node = Node.make () in
   let alloc_cmd = Cmd.Calloc (lv, Cmd.Struct comp, true, loc) in
   (alloc_node, g |> add_cmd alloc_node alloc_cmd |> add_edge entry alloc_node)
@@ -491,7 +491,7 @@ let rec make_nested_array fd lv typ exp loc entry initialize g =
           ( Cil.Var (Cil.makeTempVar fd (Cil.TPtr (Cil.TVoid [], []))),
             Cil.NoOffset )
         in
-        let term, g = make_array fd tmp t size loc assume_node g in
+        let term, g = make_array tmp t size loc assume_node g in
         let cast_node = Node.make () in
         let cast_cmd =
           Cmd.Cset (element, Cil.CastE (TPtr (t, []), Cil.Lval tmp), loc)
@@ -503,7 +503,7 @@ let rec make_nested_array fd lv typ exp loc entry initialize g =
   | TComp (comp, _) ->
       let f assume_node element g =
         (* tmp = malloc(size); lv[i] = tmp *)
-        let term, g = make_struct fd element comp loc assume_node g in
+        let term, g = make_struct element comp loc assume_node g in
         generate_allocs_field comp.cfields element fd term g
       in
       make_init_loop fd lv exp loc entry f g
@@ -528,7 +528,7 @@ and generate_allocs_field fl lv fd entry g =
           let tmp =
             (Cil.Var (Cil.makeTempVar fd Cil.voidPtrType), Cil.NoOffset)
           in
-          let term, g = make_array fd tmp typ exp fieldinfo.floc entry g in
+          let term, g = make_array tmp typ exp fieldinfo.floc entry g in
           let cast_node = Node.make () in
           let cast_cmd =
             Cmd.Cset
@@ -543,7 +543,7 @@ and generate_allocs_field fl lv fd entry g =
           generate_allocs_field t lv fd term g
       | TComp (comp, _) ->
           let field = addOffsetLval (Cil.Field (fieldinfo, Cil.NoOffset)) lv in
-          let term, g = make_struct fd field comp fieldinfo.floc entry g in
+          let term, g = make_struct field comp fieldinfo.floc entry g in
           let term, g = generate_allocs_field comp.cfields field fd term g in
           generate_allocs_field t lv fd term g
       | _ -> generate_allocs_field t lv fd entry g )
@@ -562,7 +562,7 @@ let rec generate_allocs fd vl entry g =
           let tmp =
             (Cil.Var (Cil.makeTempVar fd Cil.voidPtrType), Cil.NoOffset)
           in
-          let term, g = make_array fd tmp typ exp varinfo.vdecl entry g in
+          let term, g = make_array tmp typ exp varinfo.vdecl entry g in
           let cast_node = Node.make () in
           let cast_cmd =
             Cmd.Cset
@@ -577,7 +577,7 @@ let rec generate_allocs fd vl entry g =
           generate_allocs fd t term g
       | TComp (comp, _) ->
           let lv = (Cil.Var varinfo, Cil.NoOffset) in
-          let term, g = make_struct fd lv comp varinfo.vdecl entry g in
+          let term, g = make_struct lv comp varinfo.vdecl entry g in
           let term, g = generate_allocs_field comp.cfields lv fd term g in
           generate_allocs fd t term g
       | _ -> generate_allocs fd t entry g )
@@ -685,7 +685,7 @@ let transform_string_allocs fd g =
               let g = add_edge node last_node g in
               replace_node_graph n empty_node last_node g )
       (* do not allocate memory cells for arguments of external lib calls *)
-      | Cmd.Ccall (lv, Cil.Lval (Cil.Var f, Cil.NoOffset), el, loc)
+      | Cmd.Ccall (_, Cil.Lval (Cil.Var f, Cil.NoOffset), _, _)
         when f.vstorage = Cil.Extern && not (List.mem f.vname targets) ->
           g
       | Cmd.Ccall (lv, f, el, loc) -> (
@@ -727,7 +727,7 @@ let transform_allocs fd g =
     | BinOp (Mult, SizeOf typ, e, _) | BinOp (Mult, e, SizeOf typ, _) -> (
         let typ = Cil.unrollTypeDeep typ in
         match (lv, typ) with
-        | (Var v, NoOffset), TComp (_, _) ->
+        | (Var _, NoOffset), TComp (_, _) ->
             (* dynamic struct array alloc *)
             let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
             let g = add_cmd node cmd g in
@@ -739,7 +739,7 @@ let transform_allocs fd g =
     | SizeOf typ | CastE (_, SizeOf typ) -> (
         let typ = Cil.unrollTypeDeep typ in
         match (lv, typ) with
-        | (Var v, NoOffset), TComp (comp, _) ->
+        | (Var _, NoOffset), TComp (comp, _) ->
             (* dynamic struct alloc *)
             let cast_node = Node.make () in
             let cast_cmd =
@@ -755,7 +755,7 @@ let transform_allocs fd g =
             let g = add_cmd node cmd g in
             (node, g) )
     | SizeOfE e -> transform lv (SizeOf (Cil.typeOf e)) loc node g
-    | e ->
+    | _ ->
         let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
         let g = add_cmd node cmd g in
         (node, g)
@@ -838,7 +838,7 @@ let process_gvardecl fd lv loc entry g =
   match Cil.unrollTypeDeep (Cil.typeOfLval lv) with
   | TArray (typ, Some exp, _) ->
       let tmp = (Cil.Var (Cil.makeTempVar fd Cil.voidPtrType), Cil.NoOffset) in
-      let term, g = make_array fd tmp typ exp loc entry g in
+      let term, g = make_array tmp typ exp loc entry g in
       let cast_node = Node.make () in
       let cast_cmd =
         Cmd.Cset (lv, Cil.CastE (Cil.TPtr (typ, []), Cil.Lval tmp), loc)
@@ -851,7 +851,7 @@ let process_gvardecl fd lv loc entry g =
       let cmd = Cmd.Cset (lv, Cil.zero, loc) in
       (node, g |> add_cmd node cmd |> add_edge entry node)
   | TComp (comp, _) ->
-      let term, g = make_struct fd lv comp loc entry g in
+      let term, g = make_struct lv comp loc entry g in
       let term, g = generate_allocs_field comp.cfields lv fd term g in
       (term, g)
   | _ -> (entry, g)
@@ -863,7 +863,7 @@ let rec process_init fd lv i loc entry g =
       let cmd = Cmd.Cset (lv, exp, loc) in
       let g = add_edge entry new_node (add_cmd new_node cmd g) in
       (new_node, g)
-  | CompoundInit (typ, ilist) ->
+  | CompoundInit (_, ilist) ->
       List.fold_left
         (fun (node, g) (offset, init) ->
           let lv = Cil.addOffsetLval offset lv in
@@ -873,10 +873,10 @@ let rec process_init fd lv i loc entry g =
 let process_gvar fd lv i loc entry g =
   match (Cil.typeOfLval lv, i.init) with
   | _, None -> process_gvardecl fd lv loc entry g (* e.g., int global;     *)
-  | _, Some (SingleInit exp as init) ->
+  | _, Some (SingleInit _ as init) ->
       (* e.g., int global = 1; *)
       process_init fd lv init loc entry g
-  | _, Some (CompoundInit (typ, ilist) as init) ->
+  | _, Some (CompoundInit (_, ilist) as init) ->
       (* e.g., int global = { 1, 2 }; *)
       let length = List.length ilist in
       if length > 1000 then
@@ -896,7 +896,7 @@ let get_main_dec globals =
       | _ -> s)
     None globals
 
-let process_fundecl fd fundecl loc node g =
+let process_fundecl fundecl loc node g =
   let new_node = Node.make () in
   let cmd = Cmd.Cfalloc ((Var fundecl.svar, NoOffset), fundecl, loc) in
   let g = add_edge node new_node (add_cmd new_node cmd g) in
@@ -1012,7 +1012,7 @@ let generate_global_proc globals fd =
         | Cil.GVarDecl (var, loc) when not (ignore_file regexps loc) ->
             process_gvardecl fd (Cil.var var) loc node g
         | Cil.GFun (fundec, loc) when not (ignore_file regexps loc) ->
-            process_fundecl fd fundec loc node g
+            process_fundecl fundec loc node g
         | _ -> (node, g))
       (entry, empty fd)
       globals
@@ -1058,7 +1058,7 @@ let merge_vertex g vl =
 let rec collect g n lval node_list exp_list =
   let s = succ n g |> List.hd in
   match (find_cmd n g, find_cmd s g) with
-  | Cmd.Csalloc (_, str, _), Cmd.Cset (l, e, _) -> (
+  | Cmd.Csalloc (_, str, _), Cmd.Cset (l, _, _) -> (
       match Cil.removeOffsetLval l with
       | l, Cil.Index (i, Cil.NoOffset)
         when CilHelper.eq_lval lval l && Cil.isConstant i ->

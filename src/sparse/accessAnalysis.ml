@@ -13,9 +13,6 @@
 open Vocab
 open Global
 open BasicDom
-open AbsSem
-open Access
-open ItvDom
 
 module type S = sig
   module Dom : InstrumentedMem.S

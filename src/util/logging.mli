@@ -1,6 +1,6 @@
 type level = DEBUG | INFO | WARN | ERROR
 
-val init : 'a -> unit
+val init : unit -> unit
 
 val finalize : unit -> unit
 

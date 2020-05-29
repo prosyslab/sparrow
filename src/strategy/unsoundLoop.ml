@@ -11,7 +11,6 @@
 open Cil
 open Vocab
 open Global
-open AbsSem
 open BasicDom
 open ItvDom
 
@@ -237,9 +236,9 @@ let add_cstring global cond_node cfg feat =
       let cmd2 = IntraCfg.find_cmd (List.hd pred2) cfg in
       let cmd3 = IntraCfg.find_cmd (List.hd pred3) cfg in
       match (cmd1, cmd2, cmd3) with
-      | ( IntraCfg.Cmd.Cset ((Var c, NoOffset), e1, _),
+      | ( IntraCfg.Cmd.Cset ((Var _, NoOffset), _, _),
           IntraCfg.Cmd.Cset (lv2, e2, _),
-          IntraCfg.Cmd.Cset (lv3, Lval lv4, _) )
+          IntraCfg.Cmd.Cset (_, Lval lv4, _) )
         when incptr_itself_by_one (lv2, e2) && lv2 = lv4 ->
           PowLoc.join locset (ItvSem.eval_lv pid lv2 global.mem)
       | _ -> locset
@@ -297,9 +296,9 @@ let get_cond_exp cond cfg =
   | IntraCfg.Cmd.Cassume (e, _, _) -> e
   | _ -> raise (Failure ("get_cond_exp : " ^ IntraCfg.Cmd.to_string cmd))
 
-let add_array_content global cond cfg feat =
+let add_array_content _ cond _ feat =
   let exists_deref_lval = function
-    | (Var _, offset) as lval -> (
+    | (Var _, _) as lval -> (
         let _, offset = Cil.removeOffsetLval lval in
         match offset with Index (_, _) -> true | _ -> false )
     | Mem _, NoOffset -> true
@@ -314,7 +313,7 @@ let add_array_content global cond cfg feat =
   in
   if exists_deref cond then { feat with array_content = true } else feat
 
-let add_null cond cfg feat =
+let add_null cond _ feat =
   let rec null_condition = function
     | UnOp (LNot, e, _) -> null_condition e
     | Lval _ -> true
@@ -325,7 +324,7 @@ let add_null cond cfg feat =
   if null_condition (CilHelper.remove_cast cond) then { feat with null = true }
   else feat
 
-let add_constant cond cfg feat =
+let add_constant cond _ feat =
   let rec const_condition = function
     | UnOp (_, e, _) -> const_condition e
     | BinOp (bop, Lval _, (Const _ as c), _)
@@ -372,8 +371,8 @@ let add_close_left_arr_size_offset global cond_node cfg feat =
   List.fold_left
     (fun feat q ->
       match q with
-      | AlarmExp.ArrayExp (arr, i, _)
-      | AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
+      | AlarmExp.ArrayExp (arr, _, _)
+      | AlarmExp.DerefExp (BinOp (_, Lval arr, _, _), _) ->
           let v1 = Mem.lookup (ItvSem.eval_lv pid arr global.mem) global.mem in
           let size = ArrayBlk.sizeof (Val.array_of_val v1) in
           let offset = ArrayBlk.offsetof (Val.array_of_val v1) in
@@ -450,11 +449,11 @@ let add_index conds cfg scc feat =
       (fun i set -> BatSet.mem i lvset && BatSet.cardinal set = 1)
       map
   then { feat with single_index = true }
-  else if BatMap.for_all (fun i set -> BatSet.mem i lvset) map then
+  else if BatMap.for_all (fun i _ -> BatSet.mem i lvset) map then
     { feat with multi_index = true }
   else feat
 
-let add_out_index conds cfg scc feat =
+let add_out_index _ cfg scc feat =
   let qs =
     List.fold_left
       (fun qs node ->
@@ -466,8 +465,8 @@ let add_out_index conds cfg scc feat =
     List.fold_left
       (fun set q ->
         match q with
-        | AlarmExp.ArrayExp (arr, i, _)
-        | AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
+        | AlarmExp.ArrayExp (_, i, _)
+        | AlarmExp.DerefExp (BinOp (_, Lval _, i, _), _) ->
             BatSet.add i set
         | _ -> set)
       BatSet.empty qs
@@ -504,8 +503,8 @@ let add_out_index conds cfg scc feat =
     List.fold_left
       (fun set q ->
         match q with
-        | AlarmExp.ArrayExp (arr, i, _)
-        | AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
+        | AlarmExp.ArrayExp (_, i, _)
+        | AlarmExp.DerefExp (BinOp (_, Lval _, i, _), _) ->
             BatSet.add i set
         | _ -> set)
       BatSet.empty qs
@@ -596,8 +595,8 @@ let add_diff_array_access cfg scc feat =
     List.fold_left
       (fun set q ->
         match q with
-        | AlarmExp.ArrayExp (arr, i, _)
-        | AlarmExp.DerefExp (BinOp (_, Lval arr, i, _), _) ->
+        | AlarmExp.ArrayExp (arr, _, _)
+        | AlarmExp.DerefExp (BinOp (_, Lval arr, _, _), _) ->
             BatSet.add arr set
         | _ -> set)
       BatSet.empty qs
@@ -806,10 +805,10 @@ let extract_feature global =
   normalize trset
 
 class loopRemoveVisitor (loops : string BatSet.t) =
-  object (self)
+  object
     inherit nopCilVisitor
 
-    method vstmt (s : Cil.stmt) =
+    method! vstmt (s : Cil.stmt) =
       match s.skind with
       | Loop (blk, loc, _, _) when BatSet.mem (CilHelper.s_location loc) loops
         ->

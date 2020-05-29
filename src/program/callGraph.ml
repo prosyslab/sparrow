@@ -9,9 +9,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Vocab
 open BasicDom
-open Yojson
 open InterCfg
 
 module G = struct
@@ -26,7 +24,7 @@ module G = struct
     PredHash.replace pred_hash d new_pred;
     add_edge g s d
 
-  let fold_pred f g v a =
+  let fold_pred f _ v a =
     let preds = try PredHash.find pred_hash v with _ -> PowProc.empty in
     PowProc.fold f preds a
 

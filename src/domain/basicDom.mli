@@ -10,7 +10,6 @@
 (***********************************************************************)
 (** Basic abstract domains *)
 
-open AbsDom
 module Node = InterCfg.Node
 
 module PowNode :

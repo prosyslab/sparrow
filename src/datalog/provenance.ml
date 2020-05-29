@@ -16,7 +16,7 @@ let alloc analysis n lv e ploc v relations =
       ploc relations
   else relations
 
-let rec extract prov l set =
+let extract prov l set =
   match G.pred prov l with
   | [] -> set
   | lst -> List.fold_left (fun set p -> Rel.LocPairSet.add (p, l) set) set lst
@@ -49,7 +49,7 @@ let set analysis icfg node e ploc v prov relations =
 let all_locs prov =
   G.fold_vertex (fun v l -> if Loc.equal v Loc.dummy then l else v :: l) prov []
 
-let call analysis icfg node arg_lvars_set prov_list relations =
+let call analysis arg_lvars_set prov_list relations =
   if analysis = Spec.Pre then
     let is_same_length l = List.length l = List.length prov_list in
     let arg_lvars_set = BatSet.filter is_same_length arg_lvars_set in

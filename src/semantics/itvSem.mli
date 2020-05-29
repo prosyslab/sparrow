@@ -29,4 +29,4 @@ val eval :
 val eval_array_alloc :
   ?spec:Spec.t -> BasicDom.Node.t -> Cil.exp -> bool -> Dom.t -> ItvDom.Val.t
 
-val eval_string_alloc : BasicDom.Node.t -> string -> Dom.t -> ItvDom.Val.t
+val eval_string_alloc : BasicDom.Node.t -> string -> ItvDom.Val.t

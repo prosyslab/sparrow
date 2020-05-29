@@ -154,7 +154,7 @@ let collect_interval = function
   | _ -> []
 
 let collect_taint = function
-  | Cmd.Calloc (lv, Array e, _, loc) -> [ AllocSize ("malloc", e, loc) ]
+  | Cmd.Calloc (_, Array e, _, loc) -> [ AllocSize ("malloc", e, loc) ]
   | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) -> c_lib_taint f es loc
   | _ -> []
 

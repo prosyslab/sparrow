@@ -8,7 +8,6 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
-open Arg
 
 type task = All | Capture | Analyze
 

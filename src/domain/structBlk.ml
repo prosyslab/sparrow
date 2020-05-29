@@ -9,8 +9,6 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open AbsDom
-open ProdDom
 open BasicDom
 open Vocab
 

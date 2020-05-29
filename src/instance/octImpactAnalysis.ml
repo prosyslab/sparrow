@@ -9,13 +9,10 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Graph
 open Cil
 open Global
 open BasicDom
 open Vocab
-open IntraCfg
-open InterCfg
 open OctDom
 open OctImpactDom
 open AlarmExp
@@ -32,7 +29,7 @@ module Mem = OctImpactDom.Mem
 let check pid v1 v2opt v2exp ptrmem mem =
   let arr = ItvDom.Val.array_of_val v1 in
   if ArrayBlk.eq arr ArrayBlk.bot || ArrayBlk.cardinal arr > 1 then
-    ItvAnalysis.check_bo v1 v2opt |> List.map (fun (s, a, d) -> (None, a, d))
+    ItvAnalysis.check_bo v1 v2opt |> List.map (fun (_, a, d) -> (None, a, d))
   else
     ArrayBlk.foldi
       (fun a arr lst ->
@@ -74,7 +71,7 @@ let inspect_aexp node aexp ptrmem mem queries =
       check pid v1 (Some v2) (Some e) ptrmem mem
       |> List.map (fun (status, a, desc) ->
              match status with
-             | Some p ->
+             | Some _ ->
                  ( {
                      node;
                      exp = aexp;
@@ -96,13 +93,13 @@ let inspect_aexp node aexp ptrmem mem queries =
                      src = None;
                    },
                    status ))
-  | DerefExp ((Cil.BinOp (op, e1, e2, _) as e), loc)
+  | DerefExp ((Cil.BinOp (op, _, e2, _) as e), loc)
     when op = Cil.PlusPI || op = Cil.IndexPI ->
       let v = ItvSem.eval (InterCfg.Node.get_pid node) e ptrmem in
       check pid v None (Some e2) ptrmem mem
       |> List.map (fun (status, a, desc) ->
              match status with
-             | Some p ->
+             | Some _ ->
                  ( {
                      node;
                      exp = aexp;
@@ -130,7 +127,7 @@ let inspect_aexp node aexp ptrmem mem queries =
       check pid v None None ptrmem mem
       |> List.map (fun (status, a, desc) ->
              match status with
-             | Some p ->
+             | Some _ ->
                  ( {
                      node;
                      exp = aexp;
@@ -161,7 +158,7 @@ let inspect_aexp node aexp ptrmem mem queries =
       check pid v1 (Some v2) None ptrmem mem
       |> List.map (fun (status, a, desc) ->
              match status with
-             | Some p ->
+             | Some _ ->
                  ( {
                      node;
                      exp = aexp;
@@ -192,7 +189,7 @@ let inspect_aexp node aexp ptrmem mem queries =
       check pid v1 (Some np) None ptrmem mem
       |> List.map (fun (status, a, desc) ->
              match status with
-             | Some p ->
+             | Some _ ->
                  ( {
                      node;
                      exp = aexp;
@@ -226,7 +223,7 @@ let inspect_aexp node aexp ptrmem mem queries =
       lst1 @ lst2
       |> List.map (fun (status, a, desc) ->
              match status with
-             | Some p ->
+             | Some _ ->
                  ( {
                      node;
                      exp = aexp;
@@ -300,7 +297,7 @@ let print itv_queries oct_queries =
   |> partition
   |> display_alarms "Impact Pre-analysis Results"
 
-let generate (global, itvinputof, itv_queries, inputof) =
+let generate (global, itvinputof, _, inputof) =
   let nodes = InterCfg.nodesof global.icfg in
   let total = List.length nodes in
   list_fold
@@ -321,7 +318,7 @@ let generate (global, itvinputof, itv_queries, inputof) =
     nodes ([], 0)
   |> fst
 
-let inspect_alarm (global, itvinputof, inputof, outputof) =
+let inspect_alarm (global, itvinputof, inputof, _) =
   let itv_queries = ItvAnalysis.generate (global, itvinputof, Report.BO) in
   let oct_queries, absocts =
     generate (global, itvinputof, itv_queries, inputof) |> List.split

@@ -12,8 +12,6 @@ open Cil
 open Global
 open BasicDom
 open Vocab
-open ItvDom
-open IntraCfg
 open IntraCfg.Cmd
 module Dom = ItvSem.Dom
 module AccessSem = AccessSem.Make (ItvSem)
@@ -235,7 +233,7 @@ let rec simplify_exp e = e |> remove_casts |> remove_coeffs
 
 and remove_casts e =
   match e with
-  | CastE (typ, e1) -> remove_casts e1
+  | CastE (_, e1) -> remove_casts e1
   | BinOp (bop, e1, e2, typ) ->
       BinOp (bop, remove_casts e1, remove_casts e2, typ)
   | UnOp (uop, e1, typ) -> UnOp (uop, remove_casts e1, typ)
@@ -290,7 +288,7 @@ let inc_itself_by_const (lv, e) =
 let inc_itself_by_var (lv, e) =
   match (lv, e) with
   | ( (Var x, NoOffset),
-      BinOp (PlusA, Lval (Var y, NoOffset), Lval (Var z, NoOffset), _) )
+      BinOp (PlusA, Lval (Var y, NoOffset), Lval (Var _, NoOffset), _) )
     when x.vname = y.vname ->
       true
   | _ -> false
@@ -314,7 +312,7 @@ let mul_itself_by_const (lv, e) =
 let mul_itself_by_var (lv, e) =
   match (lv, e) with
   | ( (Var x, NoOffset),
-      BinOp (Mult, Lval (Var y, NoOffset), Lval (Var z, NoOffset), _) )
+      BinOp (Mult, Lval (Var y, NoOffset), Lval (Var _, NoOffset), _) )
     when x.vname = y.vname ->
       true
   | _ -> false
@@ -328,17 +326,17 @@ let dec_itself (lv, e) =
 
 let is_inc (lv, e) =
   match (lv, e) with
-  | (Var x, NoOffset), BinOp (PlusA, _, _, _) -> true
+  | (Var _, NoOffset), BinOp (PlusA, _, _, _) -> true
   | _ -> false
 
 let is_dec (lv, e) =
   match (lv, e) with
-  | (Var x, NoOffset), BinOp (MinusA, _, _, _) -> true
+  | (Var _, NoOffset), BinOp (MinusA, _, _, _) -> true
   | _ -> false
 
 let is_mul (lv, e) =
   match (lv, e) with
-  | (Var x, NoOffset), BinOp (Mult, _, _, _) -> true
+  | (Var _, NoOffset), BinOp (Mult, _, _, _) -> true
   | _ -> false
 
 let is_proc_G loc =
@@ -490,7 +488,7 @@ let extract_assume node pid e mem global feature =
           PowLoc.fold add_prune_by_not (ItvSem.eval_lv pid x mem)
       | _ -> id )
 
-let extract_alloc node pid (lv, e) mem global feature =
+let extract_alloc node pid lv mem global feature =
   let locs_lv = ItvSem.eval_lv pid lv mem in
   let locs_e = Access.Info.useof (AccessSem.accessof global node sem_fun mem) in
   feature
@@ -504,7 +502,7 @@ let extract_call_realloc node pid (lvo, fe, el) mem global feature =
       let locs_e =
         Access.Info.useof
           (list_fold
-             (fun e access ->
+             (fun _ access ->
                AccessSem.accessof global node sem_fun mem
                |> Access.Info.union access)
              el Access.Info.empty)
@@ -517,9 +515,9 @@ let extract_call_realloc node pid (lvo, fe, el) mem global feature =
 let is_undef fname global =
   Global.is_undef fname global && not (fname = "realloc" || fname = "strlen")
 
-let extract_call_ext_fun node pid (lvo, fe, el) mem global feature =
+let extract_call_ext_fun node (lvo, fe) mem global feature =
   match (lvo, fe) with
-  | Some lv, Cil.Lval (Cil.Var f, Cil.NoOffset) when is_undef f.vname global ->
+  | Some _, Cil.Lval (Cil.Var f, Cil.NoOffset) when is_undef f.vname global ->
       PowLoc.fold add_return_from_ext_fun
         (Access.Info.useof (AccessSem.accessof global node sem_fun mem))
         feature
@@ -527,7 +525,7 @@ let extract_call_ext_fun node pid (lvo, fe, el) mem global feature =
 
 let extract_call node pid (lvo, fe, el) mem global feature =
   feature
-  |> extract_call_ext_fun node pid (lvo, fe, el) mem global
+  |> extract_call_ext_fun node (lvo, fe) mem global
   |> extract_call_realloc node pid (lvo, fe, el) mem global
 
 let extract_used_index pid mem cmd feature =
@@ -539,7 +537,7 @@ let extract_used_index pid mem cmd feature =
           (accessof_eval pid
              ( match q with
              | AlarmExp.ArrayExp (_, e, _) -> e
-             | AlarmExp.DerefExp (BinOp (op, _, e2, _), _) -> e2
+             | AlarmExp.DerefExp (BinOp (_, _, e2, _), _) -> e2
              | _ -> Cil.zero (* dummy exp *) )
              mem)
       in
@@ -555,7 +553,7 @@ let extract_used_buf pid mem cmd feature =
           (accessof_eval pid
              ( match q with
              | AlarmExp.ArrayExp (lv, _, _) -> Lval lv
-             | AlarmExp.DerefExp (BinOp (op, e1, _, _), _) -> e1
+             | AlarmExp.DerefExp (BinOp (_, e1, _, _), _) -> e1
              | AlarmExp.DerefExp (e, _) -> e
              | _ -> Cil.zero (* dummy exp *) )
              mem)
@@ -582,8 +580,8 @@ let extract1 icfg mem global node feature =
     |> ( match cmd with
        | Cset (lv, e, _) -> extract_set pid (lv, e) mem global
        | Cassume (e, _, _) -> extract_assume node pid e mem global
-       | Calloc (lv, IntraCfg.Cmd.Array e, _, _) ->
-           extract_alloc node pid (lv, e) mem global
+       | Calloc (lv, IntraCfg.Cmd.Array _, _, _) ->
+           extract_alloc node pid lv mem global
        | Ccall (lvo, fe, el, _) ->
            extract_call node pid (lvo, fe, el) mem global
        | _ -> id )
@@ -601,7 +599,7 @@ let traverse1 global =
 
 (* extract information obtainable after first iteration *)
 (* : passed_to_alloc2, returned_from_alloc2 *)
-let extract2 icfg mem global node feature =
+let extract2 icfg mem node feature =
   let pid = InterCfg.Node.get_pid node in
   match InterCfg.cmdof icfg node with
   | Cset (lv, e, _) -> (
@@ -609,7 +607,7 @@ let extract2 icfg mem global node feature =
       let locs_e = Access.Info.useof (accessof_eval pid e mem) in
       let e = simplify_exp e in
       match (lv, e) with
-      | (Var x, NoOffset), Lval (Var y, NoOffset) ->
+      | (Var _, NoOffset), Lval (Var _, NoOffset) ->
           (* x := y *)
           let l_x = PowLoc.choose locs_lv in
           let l_y = PowLoc.choose locs_e in
@@ -632,7 +630,7 @@ let extract2 icfg mem global node feature =
 
 let traverse2 global feature =
   let nodes = InterCfg.nodesof global.icfg in
-  list_fold (extract2 global.icfg global.mem global) nodes feature
+  list_fold (extract2 global.icfg global.mem) nodes feature
 
 module N = struct
   include Loc
@@ -650,7 +648,7 @@ let build_copy_graph icfg mem =
       match InterCfg.cmdof icfg n with
       | Cset (lv, e, _) -> (
           match (lv, simplify_exp e) with
-          | (Var x, NoOffset), Lval (Var y, NoOffset) ->
+          | (Var _, NoOffset), Lval (Var _, NoOffset) ->
               let pid = InterCfg.Node.get_pid n in
               let lhs = PowLoc.choose (ItvSem.eval_lv pid lv mem) in
               let rhs =

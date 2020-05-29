@@ -1,8 +1,5 @@
-open BasicDom
-open Cil
 open IntraCfg
 open Cmd
-open Vocab
 module F = Format
 module Node = InterCfg.Node
 
@@ -50,7 +47,7 @@ let rec pp_lv fmt lv =
   else
     let id = new_lv_id lv in
     match lv with
-    | Var vi, NoOffset -> F.fprintf fmt.lval "%s\t%s\n" id vi.vname
+    | Cil.Var vi, Cil.NoOffset -> F.fprintf fmt.lval "%s\t%s\n" id vi.vname
     | _, _ -> F.fprintf fmt.lval "%s\tOther\n" id
 
 and pp_exp fmt e =
@@ -95,15 +92,15 @@ let pp_cmd fmt icfg n =
       let lv_id = Hashtbl.find lv_map lv in
       let e_id = Hashtbl.find exp_map e in
       F.fprintf fmt.alloc "%a\t%s\t%s\n" Node.pp n lv_id e_id
-  | Calloc (lv, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
+  | Calloc (_, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
   | Csalloc (_, _, _) -> F.fprintf fmt.cmd "salloc\n"
   | Cfalloc (_, _, _) -> F.fprintf fmt.cmd "falloc\n"
-  | Ccall (_, (Lval (Var f, NoOffset) as e), el, _) when f.vstorage = Cil.Extern
+  | Ccall (_, (Lval (Var f, NoOffset) as e), _, _) when f.vstorage = Cil.Extern
     ->
       pp_exp fmt e;
       let id = Hashtbl.find exp_map e in
       F.fprintf fmt.libcall "%a\t%s\n" Node.pp n id
-  | Ccall (_, e, el, _) ->
+  | Ccall (_, e, _, _) ->
       pp_exp fmt e;
       let id = Hashtbl.find exp_map e in
       F.fprintf fmt.call "%a\t%s\n" Node.pp n id

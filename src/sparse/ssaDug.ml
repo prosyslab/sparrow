@@ -11,7 +11,6 @@
 
 open Vocab
 open Global
-open IntraCfg
 open InterCfg
 open BasicDom
 module L = Logging
@@ -27,10 +26,7 @@ module type S = sig
 
   type loc
 
-  val make :
-    ?skip_nodes:BasicDom.Node.t BatSet.t ->
-    Global.t * Access.t * PowLoc.t ->
-    DUGraph.t
+  val make : Global.t * Access.t * PowLoc.t -> DUGraph.t
 
   val to_json_intra : DUGraph.t -> Access.t -> Yojson.Safe.t
 
@@ -55,10 +51,6 @@ module Make (DUGraph : Dug.S) = struct
   (** Def-use graph construction *)
 
   type phi_points = PowLoc.t NodeMap.t
-
-  type access_map = PowLoc.t IntraNodeMap.t
-
-  type access_map_inv = IntraNodeSet.t LocMap.t
 
   let get_ordinary_defs access node =
     Access.Info.defof (Access.find_node node access)
@@ -151,7 +143,7 @@ module Make (DUGraph : Dug.S) = struct
     PowLoc.union ordinary_defs (PowLoc.union defs_at_entry defs_at_return)
 
   (* locations considered as being defined in the given node *)
-  let rec rhsof (global, access) node locset =
+  let rhsof (global, access) node locset =
     let pid, cfgnode = (Node.get_pid node, Node.get_cfgnode node) in
     let ordinary_uses = get_ordinary_uses access node in
     (* exit uses defs(f) *)
@@ -214,7 +206,7 @@ module Make (DUGraph : Dug.S) = struct
     in
     (collect lhsof, collect rhsof)
 
-  let prepare_defnodes (global, access) cfg defs_of =
+  let prepare_defnodes cfg defs_of =
     try
       list_fold
         (fun node ->
@@ -228,7 +220,7 @@ module Make (DUGraph : Dug.S) = struct
         (IntraCfg.nodesof cfg) LocMap.empty
     with _ -> failwith "Dug.prepare_defnodes"
 
-  let get_phi_points cfg access (defs_of, uses_of, defnodes_of) : phi_points =
+  let get_phi_points cfg defnodes_of : phi_points =
     let pid = IntraCfg.get_pid cfg in
     let variables =
       LocMap.fold (fun k _ -> PowLoc.add k) defnodes_of PowLoc.empty
@@ -301,12 +293,10 @@ module Make (DUGraph : Dug.S) = struct
     let node2defs, node2uses = prepare_defs_uses (global, access, locset) cfg in
     Profiler.finish_event "DugGen.cfg2dug prepare_du";
     Profiler.start_event "DugGen.cfg2dug prepare_def";
-    let loc2defnodes = prepare_defnodes (global, access) cfg node2defs in
+    let loc2defnodes = prepare_defnodes cfg node2defs in
     Profiler.finish_event "DugGen.cfg2dug prepare_def";
     Profiler.start_event "DugGen.cfg2dug get_phi";
-    let phi_points =
-      get_phi_points cfg access (node2defs, node2uses, loc2defnodes)
-    in
+    let phi_points = get_phi_points cfg loc2defnodes in
     Profiler.finish_event "DugGen.cfg2dug get_phi";
     let defs_of node = IntraNodeMap.find node node2defs in
     let uses_of node = IntraNodeMap.find node node2uses in
@@ -371,7 +361,7 @@ module Make (DUGraph : Dug.S) = struct
     let r =
       snd
         (InterCfg.fold_cfgs
-           (fun pid cfg (k, dug) ->
+           (fun _ cfg (k, dug) ->
              prerr_progressbar k n_pids;
              (k + 1, cfg2dug (global, access, locset) cfg dug))
            global.icfg (1, dug))
@@ -404,7 +394,7 @@ module Make (DUGraph : Dug.S) = struct
       calls (1, dug)
     |> snd
 
-  let draw_singledefs (global, access, locset) nodes dug =
+  let draw_singledefs (access, locset) nodes dug =
     let nodes = PowNode.of_list nodes in
     let single_defs = PowLoc.inter locset (Access.find_single_defs access) in
     PowLoc.fold
@@ -421,7 +411,7 @@ module Make (DUGraph : Dug.S) = struct
           use_points dug)
       single_defs dug
 
-  let make ?(skip_nodes = BatSet.empty) (global, access, locset) =
+  let make (global, access, locset) =
     let nodes = InterCfg.nodesof global.icfg in
     let access = Access.restrict_access access locset in
     DUGraph.create ~size:(List.length nodes) ~access ()

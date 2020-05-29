@@ -30,7 +30,7 @@ let opt c f x = if c then f x else x
 
 let rec case cases default x =
   match cases with
-  | (cond, f) :: t when cond -> f x
+  | (cond, f) :: _ when cond -> f x
   | (_, _) :: t -> case t default x
   | [] -> default x
 

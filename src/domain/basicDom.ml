@@ -11,7 +11,6 @@
 (** Abstract Domain *)
 
 open Vocab
-open InterCfg
 module Node = InterCfg.Node
 module PowNode = PowDom.MakeCPO (Node)
 module Proc = InterCfg.Proc

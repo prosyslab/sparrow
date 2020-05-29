@@ -11,7 +11,6 @@
 (** Product domain  *)
 
 open AbsDom
-open Vocab
 
 module Make (A : CPO) (B : CPO) = struct
   type t = A.t * B.t [@@deriving compare]

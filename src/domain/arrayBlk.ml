@@ -10,8 +10,6 @@
 (***********************************************************************)
 (* Abstract Array Block *)
 
-open AbsDom
-open ProdDom
 open BasicDom
 open Vocab
 open StructBlk

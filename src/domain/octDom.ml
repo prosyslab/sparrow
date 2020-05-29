@@ -10,9 +10,7 @@
 (***********************************************************************)
 (** Octagon domain *)
 
-open Cil
 open BasicDom
-open Global
 open Vocab
 open Apron
 
@@ -127,8 +125,6 @@ module PackConf = struct
       packconf
 end
 
-type packconf = PackConf.t
-
 module Octagon = struct
   type t = V of oct | Bot
 
@@ -146,8 +142,6 @@ module Octagon = struct
       Environment.make (Array.of_list (List.map Apron.Var.of_string l)) [||]
     in
     V (Abstract1.top man env)
-
-  let is_bot x = function Bot -> true | _ -> false
 
   let le x y =
     match (x, y) with
@@ -247,9 +241,6 @@ module Octagon = struct
   let itv_of_expr : Texpr1.expr -> t -> Itv.t =
    fun exp oct -> interval_to_itv (bound_texpr oct exp)
 
-  (* TODO *)
-  let to_json x = Yojson.Safe.(`String "")
-
   let set lv texpr oct =
     match oct with
     | V o ->
@@ -265,7 +256,7 @@ module Octagon = struct
     | V o -> V (Abstract1.forget_array man o [| OctLoc.to_var lv |] false)
     | Bot -> bot
 
-  let prune lv texpr typ oct =
+  let prune _ texpr typ oct =
     match oct with
     | V o ->
         let env = Abstract1.env o in
@@ -291,7 +282,7 @@ module Octagon = struct
     | V x, V y -> V (Abstract1.widening man x y)
 
   (* TODO *)
-  let narrow x y = y
+  let narrow _ y = y
 end
 
 module Mem = struct

@@ -9,8 +9,6 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Graph
-open Cil
 open Global
 open Vocab
 module L = Logging
@@ -108,7 +106,7 @@ let initialize () =
   let usageMsg = "Usage: sparrow [options] source-files" in
   Arg.parse_dynamic Options.options Frontend.parse_arg usageMsg;
   FileManager.mk_outdir ();
-  L.init (if !Options.debug then L.DEBUG else L.INFO);
+  L.init ();
   L.info "%s\n" (String.concat " " !Frontend.files);
   Profiler.start_logger ();
   Cil.initCIL ()

@@ -8,14 +8,10 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
-open Graph
 open Cil
 open Global
-open AbsDom
-open Vocab
 open BasicDom
 open ItvDom
-open ItvSem
 
 module AccessSem = struct
   include AccessSem.Make (ItvSem)
@@ -165,7 +161,7 @@ let add_size exps feat = { feat with size = float_of_int (List.length exps) }
 let add_return lvo feat =
   match lvo with Some _ -> { feat with return = true } | _ -> feat
 
-let add_return_int pid lvo cfg feat =
+let add_return_int lvo feat =
   match lvo with
   | Some x ->
       { feat with return_int = Cil.isIntegralType (Cil.typeOf (Cil.Lval x)) }
@@ -249,7 +245,7 @@ let add_finite global node exps feat =
   then { feat with finite = 1.0 }
   else feat
 
-let add_cstring global cond_node cfg exps feat =
+let add_cstring global cond_node exps feat =
   let pid = Node.get_pid cond_node in
   let is_cstring e =
     let use = Access.Info.useof (AccessSem.accessof_eval pid e global.mem) in
@@ -294,12 +290,12 @@ let add_cstring global cond_node cfg exps feat =
   then { feat with cstring = 1.0 }
   else feat
 
-let add_inside_loop global node exps pid scc_list feat =
+let add_inside_loop node scc_list feat =
   if List.exists (fun x -> List.mem (InterCfg.Node.get_cfgnode node) x) scc_list
   then { feat with inside_loop = true }
   else feat
 
-let add_use_ret_in_loop global node exps pid scc_list feat =
+let add_use_ret_in_loop global node pid scc_list feat =
   let def =
     PowLoc.filter
       (fun x -> not (Loc.is_ext_allocsite x))
@@ -327,7 +323,7 @@ let add_update_param_in_loop global node exps pid scc_list feat =
       (fun loop ->
         let use =
           List.fold_left
-            (fun use e ->
+            (fun _ e ->
               Access.Info.useof (AccessSem.accessof_eval pid e global.mem))
             PowLoc.bot exps
         in
@@ -344,7 +340,7 @@ let add_update_param_in_loop global node exps pid scc_list feat =
   in
   { feat with update_param_in_loop = b }
 
-let add_update_param_itself global node exps pid scc_list feat =
+let add_update_param_itself global node feat =
   let access = AccessSem.accessof global node sem_fun global.mem in
   let def =
     PowLoc.filter
@@ -367,7 +363,7 @@ let add_out_of_fun global node cfg feat =
     IntraCfg.fold_node
       (fun intra_node locset ->
         match IntraCfg.find_cmd intra_node cfg with
-        | IntraCfg.Cmd.Creturn (Some e, _) ->
+        | IntraCfg.Cmd.Creturn (Some _, _) ->
             let node = InterCfg.Node.make (IntraCfg.get_pid cfg) intra_node in
             let use =
               Access.Info.useof
@@ -423,18 +419,18 @@ let lib_feature global cfg trset =
           let node = InterCfg.Node.make pid intra_node in
           let feat =
             empty_feature |> add_constant exps |> add_return lvo
-            |> add_return_int pid lvo cfg |> add_size exps
+            |> add_return_int lvo |> add_size exps
             |> add_extern global node exps
             |> add_gvar global node
-            |> add_inside_loop global node exps pid scc_list
+            |> add_inside_loop node scc_list
             |> add_update_param_in_loop global node exps pid scc_list
-            |> add_use_ret_in_loop global node exps pid scc_list
-            |> add_update_param_itself global node exps pid scc_list
+            |> add_use_ret_in_loop global node pid scc_list
+            |> add_update_param_itself global node
             |> add_out_of_fun global node cfg
             |> add_finite global node exps
             |> add_from f
             |> add_points_to global node exps
-            |> add_cstring global node cfg exps
+            |> add_cstring global node exps
           in
           BatMap.add libid feat trset
       | _ -> trset)

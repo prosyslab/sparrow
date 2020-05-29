@@ -20,10 +20,7 @@ module type S = sig
 
   type loc
 
-  val make :
-    ?skip_nodes:BasicDom.Node.t BatSet.t ->
-    Global.t * Access.t * PowLoc.t ->
-    DUGraph.t
+  val make : Global.t * Access.t * PowLoc.t -> DUGraph.t
 
   val to_json_intra : DUGraph.t -> Access.t -> Yojson.Safe.t
 

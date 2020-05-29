@@ -10,7 +10,6 @@
 (***********************************************************************)
 (** Map domain *)
 
-open AbsDom
 open Vocab
 
 module type CPO = sig
@@ -114,9 +113,9 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
             else if c < 0 then
               if B.le v1 B.bot then loop (BatEnum.get enum1) e2 else false
             else loop e1 (BatEnum.get enum2)
-        | Some (k1, v1), None ->
+        | Some (_, v1), None ->
             if B.le v1 B.bot then loop (BatEnum.get enum1) e2 else false
-        | None, Some (k2, v2) -> true
+        | None, Some (_, _) -> true
         | None, None -> true
       in
       loop (BatEnum.get enum1) (BatEnum.get enum2)
@@ -138,9 +137,9 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
               if B.eq v1 B.bot then loop (BatEnum.get enum1) e2 else false
             else if B.eq v2 B.bot then loop e1 (BatEnum.get enum2)
             else false
-        | Some (k1, v1), None ->
+        | Some (_, v1), None ->
             if B.eq v1 B.bot then loop (BatEnum.get enum1) e2 else false
-        | None, Some (k2, v2) ->
+        | None, Some (_, v2) ->
             if B.eq v2 B.bot then loop e1 (BatEnum.get enum2) else false
         | None, None -> true
       in
@@ -156,7 +155,7 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
     else if le x y then y
     else if le y x then x
     else
-      let join' k opt_v1 opt_v2 =
+      let join' _ opt_v1 opt_v2 =
         match (opt_v1, opt_v2) with
         | None, None -> None
         | None, Some v | Some v, None -> if B.eq v B.bot then None else Some v
@@ -172,7 +171,7 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
     else if le x y then x
     else if le y x then y
     else
-      let meet' k opt_v1 opt_v2 =
+      let meet' _ opt_v1 opt_v2 =
         match (opt_v1, opt_v2) with
         | None, _ | _, None -> None
         | Some v1, Some v2 ->
@@ -185,7 +184,7 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
    fun x y ->
     if x == y then x
     else
-      let widen' k opt_v1 opt_v2 =
+      let widen' _ opt_v1 opt_v2 =
         match (opt_v1, opt_v2) with
         | None, None -> None
         | None, Some v | Some v, None -> if B.eq v B.bot then None else Some v
@@ -199,7 +198,7 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
    fun x y ->
     if x == y then x
     else
-      let narrow' k opt_v1 opt_v2 =
+      let narrow' _ opt_v1 opt_v2 =
         match (opt_v1, opt_v2) with
         | _, None | None, _ -> None
         | Some v1, Some v2 ->

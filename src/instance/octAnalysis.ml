@@ -9,14 +9,11 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Graph
 open Cil
 open Global
 open BasicDom
 open Vocab
 open ArrayBlk
-open IntraCfg
-open InterCfg
 open OctDom
 open AlarmExp
 open Report

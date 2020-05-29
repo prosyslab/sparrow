@@ -9,10 +9,6 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open AbsSem
-open BasicDom
-open ItvDom
-
 module type S = sig
   include AbsSem.S
 
@@ -32,7 +28,7 @@ module Make (Sem : AbsSem.S) = struct
   include Sem
   module Access = Sem.Dom.Access
 
-  let accessof ?(locset = Dom.PowA.empty) global node f mem =
+  let accessof ?locset:(_ = Dom.PowA.empty) global node f mem =
     Dom.init_access ();
     let _ = f node (mem, global) in
     Dom.return_access ()

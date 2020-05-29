@@ -101,7 +101,7 @@ end
 module Set = struct
   include Set.Make (Relation)
 
-  let pp fmt set = iter (fun r -> F.fprintf fmt "%a\n" Relation.pp r)
+  let pp fmt _ = iter (fun r -> F.fprintf fmt "%a\n" Relation.pp r)
 end
 
 include Relation

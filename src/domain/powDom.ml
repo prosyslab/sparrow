@@ -171,8 +171,6 @@ module MakeLAT (A : SET) = struct
 
   type elt = A.t
 
-  exception Error
-
   let to_string = function Top -> "top" | V x -> PowCPO.to_string x
 
   let le x y =

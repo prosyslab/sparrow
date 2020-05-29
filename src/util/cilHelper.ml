@@ -17,7 +17,7 @@ module F = Format
  * to_string functions *
  * ******************* *)
 
-let tostring s = Escape.escape_string (Pretty.sprint 0 s)
+let tostring s = Escape.escape_string (Pretty.sprint ~width:0 s)
 
 let rec s_exps es = string_of_list ~first:"(" ~last:")" ~sep:", " s_exp es
 

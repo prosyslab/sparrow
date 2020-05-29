@@ -9,7 +9,7 @@ let rec ptr_of_exp op exp =
   | (BinOp (op0, CastE (_, e1), e2, t) | BinOp (op0, e1, CastE (_, e2), t))
     when op = op0 ->
       ptr_of_exp op (BinOp (op0, e1, e2, t))
-  | BinOp (op0, Lval (Var v, NoOffset), zero, t) when op = op0 && isZero zero ->
+  | BinOp (op0, Lval (Var v, NoOffset), zero, _) when op = op0 && isZero zero ->
       Some v.vname
   | Lval (Var v, NoOffset) when op = Ne -> Some v.vname
   | UnOp (LNot, Lval (Var v, NoOffset), _) when op = Eq -> Some v.vname
@@ -38,10 +38,10 @@ let check_null op stmt exp =
   match ptr_of_exp op exp with Some p -> is_alloc_ptr stmt p | None -> false
 
 class allocVisitor () =
-  object (self)
+  object
     inherit nopCilVisitor
 
-    method vstmt (s : stmt) =
+    method! vstmt (s : stmt) =
       match s.skind with
       | If (e, _, fb, _) when check_null Eq s e ->
           if List.length fb.bstmts = 1 then
@@ -57,14 +57,14 @@ class allocVisitor () =
 let rec split_dead stmts dead =
   match stmts with
   | h :: t when h.labels = [] -> split_dead t (h :: dead)
-  | h :: t when h.labels <> [] -> (List.rev dead, stmts)
+  | h :: _ when h.labels <> [] -> (List.rev dead, stmts)
   | _ -> (List.rev dead, stmts)
 
 let rec split stmts (live, dead) =
   match stmts with
   | h :: t -> (
       match h.skind with
-      | Return (_, loc) ->
+      | Return (_, _) ->
           let dead', live' = split_dead t [] in
           (List.rev (h :: live) @ live', dead')
       | _ -> split t (h :: live, dead) )
@@ -76,10 +76,10 @@ let rec split stmts (live, dead) =
  * => p = malloc(s); return p;
  * *)
 class returnVisitor () =
-  object (self)
+  object
     inherit nopCilVisitor
 
-    method vblock (b : block) =
+    method! vblock (b : block) =
       let live, dead = split b.bstmts ([], []) in
       match dead with
       | [] -> DoChildren

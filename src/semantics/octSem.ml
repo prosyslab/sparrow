@@ -12,10 +12,7 @@
 open Cil
 open Vocab
 open AbsSem
-open ItvDom
 open Global
-open IntraCfg
-open InterCfg
 open BasicDom
 open OctDom
 open BatTuple
@@ -31,7 +28,7 @@ module ItvAccessSem = AccessSem.Make (ItvSem)
 let can_strong_update mode global oct_list =
   match (mode, oct_list) with
   | Weak, _ -> false
-  | Strong, [ (octlv, pack, oct) ] -> (
+  | Strong, [ (octlv, _, _) ] -> (
       match octlv with
       | OctLoc.Loc lv ->
           Loc.is_gvar lv
@@ -67,7 +64,7 @@ let octloc_to_texpr l = Texpr1.Var (Apron.Var.of_string (OctLoc.to_string l))
 let const_to_texpr = function
   | Cil.CInt64 (i, _, _) -> Texpr1.Cst (Coeff.s_of_int (Int64.to_int i))
   | Cil.CStr s -> invalid_arg ("octSem.ml: const_to_texpr string " ^ s)
-  | Cil.CWStr s -> invalid_arg "octSem.ml: const_to_texpr wide string"
+  | Cil.CWStr _ -> invalid_arg "octSem.ml: const_to_texpr wide string"
   | Cil.CChr c -> Texpr1.Cst (Coeff.s_of_int (int_of_char c))
   | Cil.CReal (f, _, _) -> Texpr1.Cst (Coeff.s_of_int (int_of_float (ceil f)))
   (* BatEnum is not evaluated correctly in our analysis. *)
@@ -190,7 +187,7 @@ let nat_texpr =
   Texpr1.Cst
     (Coeff.Interval (Interval.of_scalar (Scalar.of_int 0) (Scalar.of_infty 1)))
 
-let strlen_texpr_set pid packconf pack exp ptrmem mem =
+let strlen_texpr_set pid packconf _ exp ptrmem mem =
   let set =
     ItvSem.eval pid exp ptrmem |> ItvDom.Val.allocsites_of_val
     |> PowOctLoc.of_sizes
@@ -238,7 +235,7 @@ let set mode global ptrmem packconf pid lv_set e mem =
     |> fun l -> update mode global l mem
   else mem
 
-let forget mode global packconf pid lv_set mem =
+let forget mode global packconf _ lv_set mem =
   PowOctLoc.fold
     (fun lv l ->
       let pack = PackConf.get_pack packconf lv in
@@ -248,7 +245,7 @@ let forget mode global packconf pid lv_set mem =
     lv_set []
   |> fun l -> update mode global l mem
 
-let alloc mode global ptrmem packconf pid lv ptrs e mem =
+let alloc mode global ptrmem packconf pid _ ptrs e mem =
   set mode global ptrmem packconf pid ptrs e mem
 
 let rec prune mode global ptrmem packconf pid exp mem =
@@ -296,7 +293,7 @@ let sparrow_print ptrmem packconf pid exps mem loc =
                ^ Octagon.to_string oct ))
   | _ -> ()
 
-let model_strlen mode packconf node pid lvo exps ptrmem (mem, global) =
+let model_strlen mode packconf _ pid lvo exps ptrmem (mem, global) =
   match (lvo, exps) with
   | Some lv, str :: _ ->
       let lv_set = ItvSem.eval_lv pid lv ptrmem |> PowOctLoc.of_locs in
@@ -391,7 +388,7 @@ let strdup_texpr pid packconf pack exp ptrmem mem =
 
 let model_strdup mode packconf node pid lvo exps ptrmem (mem, global) =
   match (lvo, exps) with
-  | Some lv, str :: _ ->
+  | Some _, str :: _ ->
       let lv = Allocsite.allocsite_of_node node |> OctLoc.of_size in
       let pack = PackConf.get_pack packconf lv in
       let old_oct = lookup pack mem in
@@ -402,16 +399,16 @@ let model_strdup mode packconf node pid lvo exps ptrmem (mem, global) =
       |> fun l -> update mode global l mem
   | _, _ -> mem
 
-let model_input mode packconf pid lvo ptrmem (mem, global) =
+let model_input mode packconf pid lvo _ (mem, global) =
   match lvo with
-  | Some lv ->
+  | Some _ ->
       let size =
         Allocsite.allocsite_of_ext None |> OctLoc.of_size |> PowOctLoc.singleton
       in
       forget mode global packconf pid size mem
   | _ -> mem
 
-let model_unknown mode packconf node pid lvo f exps ptrmem (mem, global) =
+let model_unknown mode packconf _ pid lvo f _ ptrmem (mem, global) =
   match lvo with
   | None -> mem
   | Some lv when Cil.isArithmeticType (Cil.unrollTypeDeep (Cil.typeOfLval lv))
@@ -419,7 +416,7 @@ let model_unknown mode packconf node pid lvo f exps ptrmem (mem, global) =
       let lv = ItvSem.eval_lv pid lv ptrmem in
       let oct_lv = PowOctLoc.of_locs lv in
       forget mode global packconf pid oct_lv mem
-  | Some lv ->
+  | Some _ ->
       let size =
         Allocsite.allocsite_of_ext (Some f.vname)
         |> OctLoc.of_size |> PowOctLoc.singleton
@@ -464,7 +461,7 @@ let binding mode global ptrmem packconf pid paramset args mem =
         mem params args)
     paramset mem
 
-let rec run_cmd mode packconf node cmd ptrmem (mem, global) =
+let run_cmd mode packconf node cmd ptrmem (mem, global) =
   let pid = Node.get_pid node in
   match cmd with
   | IntraCfg.Cmd.Cset (l, e, _) ->
@@ -493,7 +490,7 @@ let rec run_cmd mode packconf node cmd ptrmem (mem, global) =
   | IntraCfg.Cmd.Csalloc (l, s, _) ->
       let lv = ItvSem.eval_lv pid l ptrmem |> PowOctLoc.of_locs in
       let ptrs =
-        ItvSem.eval_string_alloc node s ptrmem
+        ItvSem.eval_string_alloc node s
         |> ItvDom.Val.allocsites_of_val |> PowOctLoc.of_sizes
       in
       let e = Cil.integer (String.length s + 1) in
@@ -505,7 +502,7 @@ let rec run_cmd mode packconf node cmd ptrmem (mem, global) =
       (* undefined library functions *)
       handle_undefined_functions mode packconf node pid (lvo, f, arg_exps)
         ptrmem (mem, global) loc
-  | IntraCfg.Cmd.Ccall (lvo, f, arg_exps, _) ->
+  | IntraCfg.Cmd.Ccall (_, f, arg_exps, _) ->
       let fs = ItvDom.Val.pow_proc_of_val (ItvSem.eval pid f ptrmem) in
       if PowProc.eq fs PowProc.bot then mem
       else

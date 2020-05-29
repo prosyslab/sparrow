@@ -10,9 +10,7 @@
 (***********************************************************************)
 
 open Vocab
-open Dug
 open BasicDom
-open AbsDom
 
 module type S = sig
   module DUGraph : Dug.S
@@ -246,7 +244,7 @@ module Make (DUGraph : Dug.S) = struct
        - the n node has a loophead order, and
        - an inneredge to the n node is updated
     *)
-    let rec change_order n o is_inneredge =
+    let change_order n o is_inneredge =
       let is_loophead = snd o in
       if is_inneredge && is_loophead then
         try (BatMap.find n wl.order.Workorder.headorder, is_loophead)
@@ -274,7 +272,7 @@ module Make (DUGraph : Dug.S) = struct
 
   let pick ws =
     try
-      let ((_, n) as e), set = S.pop_min ws.set in
+      let (_, n), set = S.pop_min ws.set in
       let ws = { ws with set } in
       Some (n, ws)
     with Not_found -> None

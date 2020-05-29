@@ -1,12 +1,8 @@
 open Vocab
 open Cil
-open IntraCfg
 open AbsSem
 open BasicDom
-open ItvDom
 open Global
-open ArrayBlk
-open BatTuple
 open TaintDom
 open ApiSem
 module Dom = TaintDom.Mem
@@ -87,7 +83,7 @@ let sparrow_print pid exps itvmem mem loc =
 (* argc, argv *)
 let sparrow_arg mode node exps loc itvmem (mem, global) =
   match exps with
-  | Cil.Lval argc :: Cil.Lval argv :: _ ->
+  | Cil.Lval argc :: Cil.Lval _ :: _ ->
       let argv_a = Allocsite.allocsite_of_ext (Some "argv") in
       let arg_a = Allocsite.allocsite_of_ext (Some "arg") in
       let pid = Node.get_pid node in
@@ -103,9 +99,9 @@ let sparrow_arg mode node exps loc itvmem (mem, global) =
   | _ -> mem
 
 (* optind, optarg *)
-let sparrow_opt mode node exps loc itvmem (mem, global) =
+let sparrow_opt mode node exps loc (mem, global) =
   match exps with
-  | Cil.Lval optind :: Cil.Lval optarg :: _ ->
+  | Cil.Lval _ :: Cil.Lval _ :: _ ->
       let arg_a = Allocsite.allocsite_of_ext (Some "arg") in
       update mode global
         (PowLoc.singleton (Loc.of_allocsite arg_a))
@@ -127,7 +123,7 @@ let rec collect_src_vals arg_exps arg_typs pid itvmem mem =
   | [], _ | _, [] -> []
   | _, [ Src (Variable, src_typ) ] ->
       List.map (eval_src src_typ pid itvmem mem) arg_exps
-  | _, Src (Variable, src_typ) :: _ ->
+  | _, Src (Variable, _) :: _ ->
       failwith "itvSem.ml : API encoding error (Varg not at the last position)"
   | arg_e :: arg_exps_left, Src (Fixed, src_typ) :: arg_typs_left ->
       let src_v = eval_src src_typ pid itvmem mem arg_e in
@@ -352,21 +348,22 @@ let bind_arg_lvars_set mode global arg_ids_set vs mem =
   let mode = if BatSet.cardinal arg_ids_set > 1 then AbsSem.Weak else mode in
   BatSet.fold (bind_arg_ids mode global vs) arg_ids_set mem
 
-let run_cmd mode node cmd itvmem (mem, global) =
+let run_cmd mode node itvmem (mem, global) =
   let pid = Node.get_pid node in
   match InterCfg.cmdof global.icfg node with
-  | IntraCfg.Cmd.Cset (l, e, loc) ->
+  | IntraCfg.Cmd.Cset (l, e, _) ->
       let lv = ItvSem.eval_lv pid l itvmem in
       update mode global lv (eval pid e itvmem mem) mem
-  | IntraCfg.Cmd.Cexternal (l, _) -> mem
-  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, is_static, loc) ->
+  | IntraCfg.Cmd.Cexternal (_, _) -> mem
+  | IntraCfg.Cmd.Calloc (_, IntraCfg.Cmd.Array e, _, _) ->
       let _ = eval pid e itvmem mem in
       (* for inspection *)
       mem
-  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Struct s, is_static, loc) -> mem
-  | IntraCfg.Cmd.Csalloc (l, s, loc) -> mem
-  | IntraCfg.Cmd.Cfalloc (l, fd, _) -> mem
-  | IntraCfg.Cmd.Cassume (e, _, _) -> mem
+  | IntraCfg.Cmd.Calloc (_, IntraCfg.Cmd.Struct _, _, _) -> mem
+  | IntraCfg.Cmd.Csalloc (_, _, _)
+  | IntraCfg.Cmd.Cfalloc (_, _, _)
+  | IntraCfg.Cmd.Cassume (_, _, _) ->
+      mem
   | IntraCfg.Cmd.Ccall (lvo, Cil.Lval (Cil.Var f, Cil.NoOffset), arg_exps, loc)
     when Global.is_undef f.vname global ->
       (* undefined library functions *)
@@ -374,7 +371,7 @@ let run_cmd mode node cmd itvmem (mem, global) =
       (* for inspection *)
       handle_undefined_functions mode node (lvo, f, arg_exps) itvmem
         (mem, global) loc
-  | IntraCfg.Cmd.Ccall (lvo, f, arg_exps, _) ->
+  | IntraCfg.Cmd.Ccall (_, f, arg_exps, _) ->
       (* user functions *)
       let fs = ItvDom.Val.pow_proc_of_val (ItvSem.eval pid f itvmem) in
       if PowProc.eq fs PowProc.bot then mem
@@ -416,9 +413,7 @@ let run_cmd mode node cmd itvmem (mem, global) =
 
 let run mode spec node (mem, global) =
   let itvmem = ItvDom.Table.find node spec.Spec.ptrinfo in
-  let mem =
-    run_cmd mode node (InterCfg.cmdof global.icfg node) itvmem (mem, global)
-  in
+  let mem = run_cmd mode node itvmem (mem, global) in
   (mem, global)
 
 let initial _ = Dom.bot

@@ -471,13 +471,13 @@ let prune op x y =
   else
     let pruned =
       match (op, x, y) with
-      | Cil.Lt, V (a, b), V (c, d) ->
+      | Cil.Lt, V (a, b), V (_, d) ->
           V (a, Integer.min b (Integer.minus d (Int 1)))
-      | Cil.Gt, V (a, b), V (c, d) ->
+      | Cil.Gt, V (a, b), V (c, _) ->
           V (Integer.max a (Integer.plus c (Int 1)), b)
-      | Cil.Le, V (a, b), V (c, d) -> V (a, Integer.min b d)
-      | Cil.Ge, V (a, b), V (c, d) -> V (Integer.max a c, b)
-      | Cil.Eq, V (a, b), V (c, d) -> meet x y
+      | Cil.Le, V (a, b), V (_, d) -> V (a, Integer.min b d)
+      | Cil.Ge, V (a, b), V (c, _) -> V (Integer.max a c, b)
+      | Cil.Eq, V (_, _), V (_, _) -> meet x y
       | Cil.Ne, V (a, b), V (c, d) when Integer.eq b c && Integer.eq c d ->
           V (a, Integer.minus b (Int 1))
       | Cil.Ne, V (a, b), V (c, d) when Integer.eq a c && Integer.eq c d ->

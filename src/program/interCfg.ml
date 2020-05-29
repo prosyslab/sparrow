@@ -39,9 +39,9 @@ module Node = struct
 
   let make pid node = (pid, node)
 
-  let get_pid (pid, node) = pid
+  let get_pid = fst
 
-  let get_cfgnode (pid, node) = node
+  let get_cfgnode = snd
 
   let hash = Hashtbl.hash
 
@@ -164,9 +164,9 @@ let argsof g pid = IntraCfg.get_formals (cfgof g pid)
 
 let callnodesof g = List.filter (fun node -> is_callnode node g) (nodesof g)
 
-let entryof g pid = Node.make pid IntraCfg.Node.entry
+let entryof _ pid = Node.make pid IntraCfg.Node.entry
 
-let exitof g pid = Node.make pid IntraCfg.Node.exit
+let exitof _ pid = Node.make pid IntraCfg.Node.exit
 
 let unreachable_node_pid pid icfg =
   IntraNodeSet.fold
@@ -185,8 +185,7 @@ let remove_node (pid, intra_node) g =
   let intra_cfg = IntraCfg.remove_node intra_node intra_cfg in
   { g with cfgs = BatMap.add pid intra_cfg g.cfgs }
 
-let print chan g =
-  BatMap.iter (fun pid cfg -> IntraCfg.print_dot chan cfg) g.cfgs
+let print chan g = BatMap.iter (fun _ cfg -> IntraCfg.print_dot chan cfg) g.cfgs
 
 let to_json g =
   `Assoc

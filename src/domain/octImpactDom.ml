@@ -10,11 +10,7 @@
 (***********************************************************************)
 (* Octagon Impact Domain *)
 
-open Cil
-open BasicDom
-open AbsDom
 open OctDom
-open AbsSem
 open Vocab
 
 module AbsOct = struct
@@ -86,17 +82,6 @@ module AbsOct = struct
         let path_checker = Check.create g in
         Check.check_path path_checker size idx
 
-  let get_pack idx size = function
-    | Bot -> None
-    | V (o, c, _) -> (
-        try
-          let e, _ = D.shortest_path o size idx in
-          Some
-            (List.fold_left
-               (fun s e -> s |> Pack.add (G.E.src e) |> Pack.add (G.E.dst e))
-               Pack.bot e)
-        with _ -> None )
-
   (* x := c *)
   let set_const x = function
     | Bot -> bot
@@ -141,9 +126,7 @@ module AbsOct = struct
           V (g, c, d) (* |> closure *)
         else V (g, c, d)
 
-  let weak_assume x y = id
-
-  let equal = ( = )
+  let weak_assume _ _ = id
 
   let le x y =
     match (x, y) with
@@ -153,13 +136,13 @@ module AbsOct = struct
         PowOctLoc.le d1 d2
         && ( try
                G.fold_edges
-                 (fun s d b ->
+                 (fun s d _ ->
                    if G.mem_edge x s d then true else raise Not_found)
                  y true
              with Not_found -> false )
         && PowOctLoc.le c2 c1
 
-  let extend (o1, d1) (o2, d2) =
+  let extend (o1, d1) (o2, _) =
     G.fold_edges
       (fun s d o1 ->
         if PowOctLoc.mem s d1 && PowOctLoc.mem d d1 then o1
@@ -200,8 +183,6 @@ module AbsOct = struct
   let widen = join
 
   let narrow = meet
-
-  let is_empty x = x = bot
 
   let to_string = function
     | Bot -> "bot"

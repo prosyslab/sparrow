@@ -9,13 +9,10 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Graph
 open Cil
 open Global
 open BasicDom
 open Vocab
-open Frontend
-open IntraCfg
 open ItvDom
 open ArrayBlk
 open AlarmExp
@@ -209,7 +206,7 @@ let inspect_aexp_dz node aexp mem queries =
       let v = ItvSem.eval (InterCfg.Node.get_pid node) e mem in
       let lst = check_dz v in
       List.map
-        (fun (status, a, desc) ->
+        (fun (status, _, desc) ->
           { node; exp = aexp; loc; allocsite = None; status; desc; src = None })
         lst
   | _ -> [] )
@@ -256,7 +253,7 @@ and is_temp_integer v =
   && Cil.isIntegralType v.vtype
 
 let unsound_aexp = function
-  | ArrayExp (lv, e, _) -> unsound_exp e
+  | ArrayExp (_, e, _) -> unsound_exp e
   | DerefExp (e, _) -> unsound_exp e
   | _ -> false
 
@@ -276,7 +273,7 @@ let formal_param global q =
   | ArrayExp (_, e, _) | DerefExp (e, _) -> find_exp e
   | _ -> false
 
-let unsound_filter global ql =
+let unsound_filter _ ql =
   let filtered =
     List.filter
       (fun q ->
@@ -385,7 +382,7 @@ let connect_from_start g =
     g []
   |> List.fold_left (fun g n -> DUGraph.add_edge InterCfg.start_node n g) g
 
-let print_datalog_fact spec global dug alarms =
+let print_datalog_fact _ global dug alarms =
   let dug = connect_from_start dug in
   let alarms =
     List.rev_map

@@ -14,7 +14,6 @@ open Vocab
 open Global
 open AbsSem
 open BasicDom
-open IntraCfg
 open InterCfg
 open OctDom
 open OctImpactDom
@@ -84,7 +83,7 @@ and forget mode global pid lv_set mem =
   (lv_set |> fun l -> PowOctLoc.fold AbsOct.forget l o) |> fun o ->
   update mode global pid o mem
 
-let alloc mode global ptrmem pid lv_set ptrs e mem =
+let alloc mode global ptrmem pid _ ptrs e mem =
   set mode global ptrmem pid ptrs e mem
 
 let rec prune mode global ptrmem pid exp mem =
@@ -124,7 +123,7 @@ let rec prune mode global ptrmem pid exp mem =
         mem
   | _ -> mem
 
-let model_realloc mode global node pid lvo exps ptrmem (mem, global) =
+let model_realloc mode _ node pid lvo exps ptrmem (mem, global) =
   match (lvo, exps) with
   | Some l, _ :: size :: _ ->
       let lv = ItvSem.eval_lv pid l ptrmem |> PowOctLoc.of_locs in
@@ -135,7 +134,7 @@ let model_realloc mode global node pid lvo exps ptrmem (mem, global) =
       alloc mode global ptrmem pid lv ptrs size mem
   | _ -> mem
 
-let model_calloc mode global node pid lvo exps ptrmem (mem, global) =
+let model_calloc mode _ node pid lvo exps ptrmem (mem, global) =
   match (lvo, exps) with
   | Some l, size :: _ ->
       let lv = ItvSem.eval_lv pid l ptrmem |> PowOctLoc.of_locs in
@@ -146,9 +145,9 @@ let model_calloc mode global node pid lvo exps ptrmem (mem, global) =
       alloc mode global ptrmem pid lv ptrs size mem
   | _ -> mem
 
-let model_input mode pid lvo ptrmem (mem, global) =
+let model_input mode pid lvo _ (mem, global) =
   match lvo with
-  | Some lv ->
+  | Some _ ->
       let size =
         Allocsite.allocsite_of_ext None |> OctLoc.of_size |> PowOctLoc.singleton
       in
@@ -157,7 +156,7 @@ let model_input mode pid lvo ptrmem (mem, global) =
 
 let model_strdup mode pid node lvo exps ptrmem (mem, global) =
   match (lvo, exps) with
-  | Some lv, str :: _ ->
+  | Some _, str :: _ ->
       let o = lookup mem in
       let lv_set =
         Allocsite.allocsite_of_node node
@@ -177,7 +176,7 @@ let model_strdup mode pid node lvo exps ptrmem (mem, global) =
       update mode global pid o mem
   | _, _ -> mem
 
-let sparrow_print pid exps mem loc =
+let sparrow_print _ _ mem loc =
   lookup mem |> AbsOct.to_string
   |> (fun x -> "sparrow_print (" ^ CilHelper.s_location loc ^ ") : \n" ^ x)
   |> prerr_endline
@@ -271,7 +270,7 @@ let binding mode global ptrmem pid paramset args mem =
         mem params args)
     paramset mem
 
-let rec run_cmd mode node cmd ptrmem (mem, global) =
+let run_cmd mode node cmd ptrmem (mem, global) =
   let pid = Node.get_pid node in
   (*  prerr_endline (IntraCfg.Cmd.to_string cmd);*)
   match cmd with
@@ -301,7 +300,7 @@ let rec run_cmd mode node cmd ptrmem (mem, global) =
   | IntraCfg.Cmd.Csalloc (l, s, _) ->
       let lv = ItvSem.eval_lv pid l ptrmem |> PowOctLoc.of_locs in
       let ptrs =
-        ItvSem.eval_string_alloc node s ptrmem
+        ItvSem.eval_string_alloc node s
         |> ItvDom.Val.allocsites_of_val |> PowOctLoc.of_sizes
       in
       let e = Cil.integer (String.length s + 1) in
@@ -314,7 +313,7 @@ let rec run_cmd mode node cmd ptrmem (mem, global) =
       (* for inspection *)
       handle_undefined_functions mode node pid (lvo, f, arg_exps) ptrmem
         (mem, global) loc
-  | IntraCfg.Cmd.Ccall (lvo, f, arg_exps, _) ->
+  | IntraCfg.Cmd.Ccall (_, f, arg_exps, _) ->
       let fs = ItvDom.Val.pow_proc_of_val (ItvSem.eval pid f ptrmem) in
       if PowProc.eq fs PowProc.bot then mem
       else

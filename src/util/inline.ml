@@ -46,7 +46,6 @@
  
  *)
 
-open Pretty
 open Cil
 open Feature
 module E = Errormsg
@@ -75,7 +74,7 @@ class copyBodyVisitor (host : fundec) (* The host of the
    * labels *)
     (retlab : stmt) (* The label for the 
                      * return *) =
-  object (self)
+  object
     inherit nopCilVisitor
 
     (* Keep here a maping from statements to their copies, indexed by their 
@@ -88,7 +87,7 @@ class copyBodyVisitor (host : fundec) (* The host of the
     val argid = ref 0
 
     (* This is the entry point *)
-    method vfunc (f : fundec) : fundec visitAction =
+    method! vfunc (f : fundec) : fundec visitAction =
       let patchfunction (f' : fundec) =
         let findStmt (i : int) =
           try IH.find stmtmap i
@@ -116,20 +115,20 @@ class copyBodyVisitor (host : fundec) (* The host of the
       ChangeDoChildrenPost (f, patchfunction)
 
     (* We must replace references to local variables *)
-    method vvrbl (v : varinfo) =
+    method! vvrbl (v : varinfo) =
       if v.vglob then SkipChildren
       else
         let v' = replVar v in
         if v == v' then SkipChildren else ChangeTo v'
 
-    method vinst (i : instr) =
+    method! vinst (i : instr) =
       match i with
       | Call (_, Lval (Var vi, _), _, _) when vi.vid == inlining.vid ->
           raise Recursion
       | _ -> DoChildren
 
     (* Replace statements. *)
-    method vstmt (s : stmt) : stmt visitAction =
+    method! vstmt (s : stmt) : stmt visitAction =
       (* There is a possibility that we did not have the statements IDed 
        * propertly. So, we change the ID even on the replaced copy so that we 
        * can index on them ! *)
@@ -186,10 +185,10 @@ class copyBodyVisitor (host : fundec) (* The host of the
       ChangeDoChildrenPost (s', postProc)
 
     (* Copy blocks since they are mutable *)
-    method vblock (b : block) =
+    method! vblock (b : block) =
       ChangeDoChildrenPost ({ b with bstmts = b.bstmts }, fun x -> x)
 
-    method vglob _ = E.s (bug "copyFunction should not be used on globals")
+    method! vglob _ = E.s (bug "copyFunction should not be used on globals")
   end
 
 (** Replace a statement with the result of inlining *)
@@ -281,7 +280,7 @@ let replaceStatement (host : fundec) (* The host *)
 
                 (* Make the return statement *)
                 let (ret : stmt), (retvar : varinfo option) =
-                  let rt, _, isva, _ = splitFunctionType repl.svar.vtype in
+                  let rt, _, _, _ = splitFunctionType repl.svar.vtype in
                   match rt with
                   | TVoid _ -> (mkStmt (Instr []), None)
                   | _ -> (
@@ -351,7 +350,7 @@ let doFunction (host : fundec) (* The function into which to inline *)
        (object
           inherit nopCilVisitor
 
-          method vstmt (s : stmt) =
+          method! vstmt (s : stmt) =
             List.iter
               (fun l ->
                 match l with
@@ -377,7 +376,7 @@ let doFunction (host : fundec) (* The function into which to inline *)
       (object
          inherit nopCilVisitor
 
-         method vstmt (s : stmt) =
+         method! vstmt (s : stmt) =
            ChangeDoChildrenPost
              (s, replaceStatement host inlineWhat replLabel anyInlining)
       end)
@@ -392,7 +391,7 @@ let doFile (inlineWhat : varinfo -> fundec option)
      * comments for [doFunction] *) (fl : file) =
   iterGlobals fl (fun g ->
       match g with
-      | GFun (fd, l) ->
+      | GFun (fd, _) ->
           (* Keep doing inlining until there is no more. We will catch 
            * recursion eventually when we want to inline a function into itself*)
           let anyInlining = ref true in
@@ -412,7 +411,7 @@ let doit (fl : file) =
     (object
        inherit nopCilVisitor
 
-       method vfunc (fd : fundec) =
+       method! vfunc (fd : fundec) =
          if List.mem fd.svar.vname !toinline then
            H.add inlineTable fd.svar.vname fd;
          SkipChildren

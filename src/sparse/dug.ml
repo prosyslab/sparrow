@@ -9,12 +9,6 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Vocab
-open Global
-open IntraCfg
-open InterCfg
-open BasicDom
-
 module type S = sig
   type t
 
@@ -91,8 +85,6 @@ module Make (Access : Access.S) = struct
   module PowLoc = Access.PowLoc
   module Loc = Access.Loc
   module Access = Access
-
-  type loc = Loc.t
 
   type locset = PowLoc.t
 

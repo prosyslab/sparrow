@@ -12,13 +12,10 @@
 
 open Vocab
 open Cil
-open IntraCfg
 open AbsSem
 open BasicDom
 open ItvDom
 open Global
-open ArrayBlk
-open BatTuple
 module Dom = ItvDom.Mem
 module Access = Dom.Access
 module Spec = Spec.Make (Dom)
@@ -88,8 +85,8 @@ let eval_const = function
   | Cil.CInt64 (i64, _, _) ->
       let itv = try Itv.of_int (Cil.i64_to_int i64) with _ -> Itv.top in
       Val.of_itv itv
-  | Cil.CStr s -> Val.of_itv Itv.top
-  | Cil.CWStr s -> Val.of_itv Itv.top
+  | Cil.CStr _ -> Val.of_itv Itv.top
+  | Cil.CWStr _ -> Val.of_itv Itv.top
   | Cil.CChr c -> Val.of_itv (Itv.of_int (int_of_char c))
   (* Float numbers are modified to itvs.  If you want to make a
      precise and sound analysis for float numbers, you have to
@@ -249,7 +246,7 @@ let eval_array_alloc ?(spec = Spec.empty) node e is_static mem =
 
 let eval_struct_alloc lv comp = StructBlk.make lv comp |> Val.of_struct
 
-let eval_string_alloc node s mem =
+let eval_string_alloc node s =
   let allocsite = Allocsite.allocsite_of_string node in
   let o = Itv.of_int 0 in
   let sz = Itv.of_int (String.length s + 1) in
@@ -266,7 +263,7 @@ let eval_string _ = Val.of_itv Itv.nat
 
 let rec prune_simple mode spec global pid cond mem =
   match cond with
-  | BinOp (op, Lval x, e, t)
+  | BinOp (op, Lval x, e, _)
     when op = Lt || op = Gt || op = Le || op = Ge || op = Eq || op = Ne ->
       let x_lv = eval_lv ~spec pid x mem in
       if PowLoc.cardinal x_lv = 1 then
@@ -543,7 +540,7 @@ let sparrow_opt mode spec pid exps (mem, global) =
         global )
   | _ -> (mem, global)
 
-let model_unknown mode spec node pid lvo f exps (mem, global) =
+let model_unknown mode spec pid lvo f (mem, global) =
   match lvo with
   | None -> (mem, global)
   | Some lv when Cil.isArithmeticType (Cil.unrollTypeDeep (Cil.typeOfLval lv))
@@ -673,7 +670,7 @@ let sparrow_array_init mode spec node pid exps (mem, global) =
           Val.bot (List.tl exps)
       in
       (update mode spec global lv v mem, global)
-  | arr, Cil.Const (Cil.CStr s) ->
+  | arr, Cil.Const (Cil.CStr _) ->
       let lv =
         eval ~spec pid arr mem |> Val.array_of_val |> ArrayBlk.pow_loc_of_array
       in
@@ -681,8 +678,7 @@ let sparrow_array_init mode spec node pid exps (mem, global) =
         List.fold_left
           (fun v e ->
             match e with
-            | Cil.Const (Cil.CStr s) ->
-                Val.join (eval_string_alloc node s mem) v
+            | Cil.Const (Cil.CStr s) -> Val.join (eval_string_alloc node s) v
             | _ -> v)
           Val.bot (List.tl exps)
       in
@@ -716,7 +712,7 @@ let rec collect_src_vals arg_exps arg_typs pid mem =
   | [], _ | _, [] -> []
   | _, [ ApiSem.Src (ApiSem.Variable, src_typ) ] ->
       List.map (eval_src src_typ pid mem) arg_exps
-  | _, ApiSem.Src (ApiSem.Variable, src_typ) :: _ ->
+  | _, ApiSem.Src (ApiSem.Variable, _) :: _ ->
       failwith "itvSem.ml : API encoding error (Varg not at the last position)"
   | arg_e :: arg_exps_left, ApiSem.Src (ApiSem.Fixed, src_typ) :: arg_typs_left
     ->
@@ -930,11 +926,11 @@ let scaffolded_functions mode spec node pid (lvo, f, exps) (mem, global) =
     | "memset" -> model_memset mode spec pid (lvo, exps) (mem, global)
     | s when List.mem s mem_alloc_libs ->
         model_alloc_one mode spec pid lvo f (mem, global)
-    | s when ApiSem.ApiMap.mem f.vname ApiSem.api_map ->
+    | _ when ApiSem.ApiMap.mem f.vname ApiSem.api_map ->
         let api_type = ApiSem.ApiMap.find f.vname ApiSem.api_map in
         (handle_api mode spec node (lvo, exps) (mem, global) api_type, global)
-    | _ -> model_unknown mode spec node pid lvo f exps (mem, global)
-  else model_unknown mode spec node pid lvo f exps (mem, global)
+    | _ -> model_unknown mode spec pid lvo f (mem, global)
+  else model_unknown mode spec pid lvo f (mem, global)
 
 let handle_undefined_functions mode spec node pid (lvo, f, exps) (mem, global)
     loc =
@@ -982,7 +978,7 @@ let bind_arg_lvars_set mode spec global arg_ids_set vs mem =
 let run mode spec node (mem, global) =
   let pid = Node.get_pid node in
   match InterCfg.cmdof global.icfg node with
-  | IntraCfg.Cmd.Cset (l, e, loc) ->
+  | IntraCfg.Cmd.Cset (l, e, _) ->
       start_provenance ();
       let ploc = eval_lv ~spec pid l mem in
       let v = eval ~spec pid e mem in
@@ -1010,7 +1006,7 @@ let run mode spec node (mem, global) =
           in
           let mem = update mode spec global ext_loc ext_v mem in
           (mem, global) )
-  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, is_static, loc) ->
+  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, is_static, _) ->
       let ploc = eval_lv ~spec pid l mem in
       let v = eval_array_alloc ~spec node e is_static mem in
       let mem = update mode spec global ploc v mem in
@@ -1018,10 +1014,10 @@ let run mode spec node (mem, global) =
         Provenance.alloc spec.analysis node l e ploc v global.relations
       in
       (mem, { global with relations })
-  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Struct s, is_static, loc) ->
+  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Struct s, _, _) ->
       let lv = eval_lv ~spec pid l mem in
       (update mode spec global lv (eval_struct_alloc lv s) mem, global)
-  | IntraCfg.Cmd.Csalloc (l, s, loc) ->
+  | IntraCfg.Cmd.Csalloc (l, s, _) ->
       if !Options.unsound_const_string then (mem, global)
       else
         let str_loc =
@@ -1030,7 +1026,7 @@ let run mode spec node (mem, global) =
         in
         mem
         |> update mode spec global (eval_lv ~spec pid l mem)
-             (eval_string_alloc node s mem)
+             (eval_string_alloc node s)
         |> update mode spec global str_loc (eval_string s)
         |> fun mem -> (mem, global)
   | IntraCfg.Cmd.Cfalloc (l, fd, _) ->
@@ -1087,8 +1083,7 @@ let run mode spec node (mem, global) =
           bind_arg_lvars_set mode spec global arg_lvars_set arg_vals mem
         in
         let relations =
-          Provenance.call spec.analysis global.icfg node arg_lvars_set prov_list
-            global.relations
+          Provenance.call spec.analysis arg_lvars_set prov_list global.relations
         in
         (mem, { global with dump; relations })
   | IntraCfg.Cmd.Creturn (None, _) -> (mem, global)

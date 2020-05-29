@@ -1,5 +1,4 @@
 open BasicDom
-open Vocab
 module F = Format
 module L = Logging
 module Analysis = SparseAnalysis.Make (ItvSem)
@@ -61,12 +60,12 @@ module ReachingDef = BatSet.Make (struct
   type t = Node.t * G.Loc.t [@@deriving compare]
 end)
 
-let reachability2 global alarms g =
+let reachability2 alarms g =
   let access = G.access g in
   let rec fix works results g =
     if ReachingDef.is_empty works then results
     else
-      let ((node, use) as w), works = ReachingDef.pop works in
+      let (node, use), works = ReachingDef.pop works in
       G.fold_pred
         (fun p (works, results) ->
           let locs_on_edge = G.get_abslocs p node g in
@@ -108,13 +107,13 @@ let reachability2 global alarms g =
       if PowNode.mem n reachable_from_node then g else G.remove_node n g)
     g g
 
-let optimize global alarms g =
+let optimize alarms g =
   L.info "%d nodes and %d edges before optimization\n" (G.nb_node g)
     (G.nb_edge g);
   let g = optimize_reachability alarms g in
   L.info "%d nodes and %d edges after reachability\n" (G.nb_node g)
     (G.nb_edge g);
-  let g = reachability2 global alarms g in
+  let g = reachability2 alarms g in
   L.info "%d nodes and %d edges after reachability2\n" (G.nb_node g)
     (G.nb_edge g);
   (*   let g = optimize_inter_edge global g in *)
@@ -123,7 +122,7 @@ let optimize global alarms g =
 let print analysis global dug alarms =
   let dug = G.copy dug in
   let alarms = Report.get alarms Report.UnProven in
-  let dug = optimize global alarms dug in
+  let dug = optimize alarms dug in
   let true_branch, false_branch =
     InterCfg.fold_cfgs
       (fun pid cfg (true_branch, false_branch) ->

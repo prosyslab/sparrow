@@ -76,19 +76,19 @@ module Scope = struct
   let exit = List.tl
 
   let add name varinfo = function
-    | h :: t as l ->
+    | h :: _ as l ->
         ignore (Env.add_var name varinfo h);
         l
     | [] -> failwith "empty scope"
 
   let add_type name typ = function
-    | h :: t as l ->
+    | h :: _ as l ->
         ignore (Env.add_typ name typ h);
         l
     | [] -> failwith "empty scope"
 
   let add_label name = function
-    | h :: t as l ->
+    | h :: _ as l ->
         ignore (Env.add_label name h);
         l
     | [] -> failwith "empty scope"
@@ -138,7 +138,6 @@ module Scope = struct
     | _ -> failwith ("type of " ^ name ^ " not found")
 
   let pp fmt scope =
-    let fmt = F.std_formatter in
     List.iter
       (fun env ->
         F.fprintf fmt "=====\n";
@@ -154,7 +153,7 @@ let empty_block = { Cil.battrs = []; bstmts = [] }
 let struct_id_count = ref 0
 
 let is_init_list (expr : C.Ast.expr) =
-  match expr.C.Ast.desc with C.Ast.InitList el -> true | _ -> false
+  match expr.C.Ast.desc with C.Ast.InitList _ -> true | _ -> false
 
 let new_record_id is_struct =
   let kind = if is_struct then "struct" else "union" in
@@ -311,7 +310,7 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
       let elem_type = trans_type ~compinfo scope va.element in
       let attr = trans_attribute typ in
       Cil.TArray (elem_type, Some (Option.get size), attr)
-  | x -> trans_builtin_type ~compinfo scope typ
+  | _ -> trans_builtin_type ~compinfo scope typ
 
 and trans_builtin_type ?(compinfo = None) scope t =
   let k = C.get_type_kind t.C.Ast.cxtype in
@@ -355,7 +354,7 @@ and trans_builtin_type ?(compinfo = None) scope t =
   | DependentSizedArray -> failwith "dependent"
   | MemberPointer -> failwith "6"
   | Auto | Elaborated | Pipe -> failwith "5"
-  | x ->
+  | _ ->
       F.fprintf F.err_formatter "%s" (C.get_type_spelling t.cxtype);
       F.fprintf F.err_formatter "\n";
       F.pp_print_flush F.err_formatter ();
@@ -463,15 +462,15 @@ and should_ignore_implicit_cast expr qual_type e typ =
 
 and append_instr sl instr =
   match sl with
-  | [ ({ Cil.skind = Cil.Instr l } as h) ] ->
+  | [ ({ Cil.skind = Cil.Instr l; _ } as h) ] ->
       [ { h with skind = Cil.Instr (l @ [ instr ]) } ]
   | [] -> [ Cil.mkStmt (Cil.Instr [ instr ]) ]
   | h :: t -> h :: append_instr t instr
 
 and append_stmt_list sl1 sl2 =
   match (sl1, sl2) with
-  | ( [ ({ Cil.skind = Cil.Instr l1 } as h1) ],
-      ({ Cil.skind = Cil.Instr l2 } as h2) :: t2 )
+  | ( [ ({ Cil.skind = Cil.Instr l1; _ } as h1) ],
+      ({ Cil.skind = Cil.Instr l2; _ } as h2) :: t2 )
   (* merging statements with labels may break goto targets *)
     when h1.labels = [] && h2.labels = [] ->
       { h1 with skind = Cil.Instr (l1 @ l2) } :: t2
@@ -498,13 +497,12 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
   | C.Ast.BinaryOperator bo ->
       let typ = type_of_expr expr |> trans_type scope in
       let il, exp =
-        trans_binary_operator scope fundec_opt loc action typ bo.kind bo.lhs
-          bo.rhs
+        trans_binary_operator scope fundec_opt loc typ bo.kind bo.lhs bo.rhs
       in
       (il, Some exp)
   | C.Ast.DeclRef idref -> trans_decl_ref scope allow_undef idref
   | C.Ast.Call call ->
-      trans_call scope skip_lhs fundec_opt loc action call.callee call.args
+      trans_call scope skip_lhs fundec_opt loc call.callee call.args
   | C.Ast.Cast cast ->
       let sl, expr_opt =
         trans_expr ~allow_undef scope fundec_opt loc action cast.operand
@@ -537,10 +535,10 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
       trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
   | C.Ast.UnaryExpr ue ->
       trans_unary_expr scope fundec_opt loc ue.kind ue.argument
-  | C.Ast.UnexposedExpr e ->
+  | C.Ast.UnexposedExpr _ ->
       L.warn "UnexposedExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
-  | C.Ast.InitList el -> failwith "init list"
+  | C.Ast.InitList _ -> failwith "init list"
   | C.Ast.ImaginaryLiteral _ -> failwith "Unsupported syntax (ImaginaryLiteral)"
   | C.Ast.BoolLiteral _ -> failwith "Unsupported syntax (BoolLiteral)"
   | C.Ast.NullPtrLiteral -> failwith "Unsupported syntax (NullPtrLiteral)"
@@ -610,7 +608,7 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
   | C.Extension -> (sl, var)
   | _ -> failwith ("unary_operator at " ^ CilHelper.s_location loc)
 
-and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
+and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
   let lhs_sl, lhs_opt = trans_expr scope fundec_opt loc AExp lhs in
   let rhs_sl, rhs_opt = trans_expr scope fundec_opt loc AExp rhs in
   let lhs_expr =
@@ -640,8 +638,9 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
       in
       match (rhs_expr, rhs_sl) with
       | ( Cil.Lval _,
-          [ ({ Cil.skind = Cil.Instr [ Cil.Call (Some y, f, el, loc) ] } as s) ]
-        ) ->
+          [
+            ({ Cil.skind = Cil.Instr [ Cil.Call (Some _, f, el, loc) ]; _ } as s);
+          ] ) ->
           let stmt =
             { s with skind = Cil.Instr [ Cil.Call (Some lval, f, el, loc) ] }
           in
@@ -677,7 +676,7 @@ and trans_binary_operator scope fundec_opt loc action typ kind lhs rhs =
   | C.Cmp | C.PtrMemD | C.PtrMemI | C.InvalidBinaryOperator ->
       failwith "unsupported expr"
 
-and trans_call scope skip_lhs fundec_opt loc action callee args =
+and trans_call scope skip_lhs fundec_opt loc callee args =
   let fundec = Option.get fundec_opt in
   let callee_insts, callee_opt =
     trans_expr ~allow_undef:true scope fundec_opt loc AExp callee
@@ -772,7 +771,7 @@ and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
         | Some e -> Cil.typeOf e
         | None -> Cil.typeOf else_expr
       in
-      let vi, scope = create_local_variable scope fundec "tmp" typ in
+      let vi, _ = create_local_variable scope fundec "tmp" typ in
       let var = (Cil.Var vi, Cil.NoOffset) in
       let bstmts =
         match then_expr with
@@ -821,7 +820,7 @@ module Chunk = struct
   module LabelMap = struct
     include Map.Make (String)
 
-    let append xm ym = union (fun k x y -> failwith "duplicated labels") xm ym
+    let append xm ym = union (fun _ _ _ -> failwith "duplicated labels") xm ym
   end
 
   module GotoMap = struct
@@ -832,7 +831,7 @@ module Chunk = struct
     end)
 
     let append xm ym =
-      union (fun k x y -> failwith "duplicated goto targets") xm ym
+      union (fun _ _ _ -> failwith "duplicated goto targets") xm ym
   end
 
   type t = {
@@ -887,7 +886,7 @@ class replaceGotoVisitor gotos labels =
 let append_label chunk label loc in_origin =
   let l = Cil.Label (label, loc, in_origin) in
   match chunk.Chunk.stmts with
-  | h :: t ->
+  | h :: _ ->
       h.labels <- h.labels @ [ l ];
       { chunk with labels = Chunk.LabelMap.add label (ref h) chunk.labels }
   | [] ->
@@ -930,15 +929,14 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       ( trans_switch scope fundec loc desc.init desc.condition_variable
           desc.cond desc.body,
         scope )
-  | C.Ast.Case desc ->
-      (trans_case scope fundec loc desc.lhs desc.rhs desc.body, scope)
+  | C.Ast.Case desc -> (trans_case scope fundec loc desc.lhs desc.body, scope)
   | C.Ast.Default stmt -> (trans_default scope fundec loc stmt, scope)
   | C.Ast.While desc ->
       ( trans_while scope fundec loc desc.condition_variable desc.cond desc.body,
         scope )
   | C.Ast.Do desc -> (trans_do scope fundec loc desc.body desc.cond, scope)
   | C.Ast.Label desc -> trans_label scope fundec loc desc.label desc.body
-  | C.Ast.Goto label -> (trans_goto scope fundec loc label, scope)
+  | C.Ast.Goto label -> (trans_goto loc label, scope)
   | C.Ast.IndirectGoto _ ->
       failwith ("Unsupported syntax (IndirectGoto): " ^ CilHelper.s_location loc)
   | C.Ast.Continue ->
@@ -1054,15 +1052,15 @@ and trans_var_decl ?(storage = Cil.NoStorage) (scope : Scope.t) fundec loc
 and handle_stmt_init scope typ fundec loc action field_offset varinfo
     (e : C.Ast.expr) =
   match (e.C.Ast.desc, Cil.unrollType typ) with
-  | C.Ast.InitList el, Cil.TArray (arr_typ, arr_exp, attr) ->
-      let stmts, expr_list, scope =
+  | C.Ast.InitList el, Cil.TArray (_, arr_exp, _) ->
+      let stmts, _, scope =
         mk_arr_stmt scope fundec loc action varinfo arr_exp field_offset el
       in
       (stmts, scope)
   | C.Ast.InitList el, Cil.TComp (ci, _) ->
-      let stmts, expr_list, scope =
-        mk_struct_stmt field_offset scope typ ci.cfields fundec action loc
-          varinfo el
+      let stmts, _, scope =
+        mk_struct_stmt field_offset scope ci.cfields fundec action loc varinfo
+          el
       in
       (stmts, scope)
   | _ ->
@@ -1098,7 +1096,7 @@ and mk_while_stmt arr_len loc tmp_var_expr tmp_var_lval unary_plus_expr
            None ));
   ]
 
-and mk_tmp_var fundec loc varinfo expr_list_len scope =
+and mk_tmp_var fundec loc expr_list_len scope =
   let vi, scope = create_local_variable scope fundec "tmp" Cil.uintType in
   let tmp_var_lval = (Cil.Var vi, Cil.NoOffset) in
   let tmp_var_instr =
@@ -1198,7 +1196,7 @@ and mk_arr_stmt scope fundec loc action varinfo arr_exp field_offset el =
     let sl, _ = arr_init empty_list in
     (sl, [], scope)
 
-and mk_struct_stmt field_offset scope typ cfields fundec action loc varinfo
+and mk_struct_stmt field_offset scope cfields fundec action loc varinfo
     expr_list =
   let rec loop scope union_flag cfields expr_list fis stmts =
     match (cfields, expr_list) with
@@ -1252,9 +1250,9 @@ and mk_struct_stmt field_offset scope typ cfields fundec action loc varinfo
           let instr = Cil.Set (var, expr, loc) in
           let stmt = Cil.mkStmt (Cil.Instr [ instr ]) in
           loop scope true fl [] (f :: fis) (stmts @ [ stmt ])
-    | [], _ -> (fis, stmts, expr_list, scope)
+    | [], _ -> (stmts, expr_list, scope)
   in
-  let fis, stmts, expr_list, scope = loop scope false cfields expr_list [] [] in
+  let stmts, expr_list, scope = loop scope false cfields expr_list [] [] in
   (stmts, expr_list, scope)
 
 and mk_init_stmt field_offset scope loc fundec action fi varinfo expr_list =
@@ -1283,14 +1281,14 @@ and mk_init_stmt field_offset scope loc fundec action fi varinfo expr_list =
       let instr = Cil.Set (var, Cil.integer 0, loc) in
       (append_instr [] instr, [], scope)
   (* for initaiized *)
-  | Cil.TInt (ikind, _), e :: el ->
+  | Cil.TInt (_, _), e :: el ->
       let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
       let expr = get_opt "var_decl" expr_opt in
       let field_offset = CilHelper.add_field_offset field_offset fi in
       let var = (Cil.Var varinfo, field_offset) in
       let instr = Cil.Set (var, expr, loc) in
       (append_instr sl_expr instr, el, scope)
-  | Cil.TFloat (fkind, _), e :: el ->
+  | Cil.TFloat (_, _), e :: el ->
       let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
       let expr = get_opt "var_decl" expr_opt in
       let field_offset = CilHelper.add_field_offset field_offset fi in
@@ -1317,12 +1315,12 @@ and mk_init_stmt field_offset scope loc fundec action fi varinfo expr_list =
   | Cil.TComp (ci, _), _ ->
       (* struct in struct *)
       let field_offset = CilHelper.add_field_offset field_offset fi in
-      mk_struct_stmt field_offset scope fi.Cil.ftype ci.cfields fundec action
-        loc varinfo expr_list
+      mk_struct_stmt field_offset scope ci.cfields fundec action loc varinfo
+        expr_list
   | Cil.TArray (arr_type, arr_exp, _), _ ->
       mk_array_stmt expr_list field_offset fi loc fundec action varinfo scope
         arr_type arr_exp
-  | Cil.TEnum (einfo, _), e :: el ->
+  | Cil.TEnum (_, _), e :: el ->
       let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
       let expr = get_opt "var_decl" expr_opt in
       let field_offset = CilHelper.add_field_offset field_offset fi in
@@ -1341,8 +1339,8 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
         CilHelper.add_index_offset field_offset (Cil.integer o)
       in
       let stmts', expr_remainders', scope =
-        mk_struct_stmt field_offset scope fi.Cil.ftype ci.Cil.cfields fundec
-          action loc varinfo expr_remainders
+        mk_struct_stmt field_offset scope ci.Cil.cfields fundec action loc
+          varinfo expr_remainders
       in
       let flags =
         if expr_list <> [] && List.length expr_remainders <> 0 then
@@ -1361,7 +1359,7 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
       in
       if not flags.skip_while then
         let tmp_var_lval, tmp_var_expr, tmp_var_stmt, unary_plus_expr, scope =
-          mk_tmp_var fundec loc varinfo (List.length expr_list) scope
+          mk_tmp_var fundec loc (List.length expr_list) scope
         in
         let tmp_var =
           Some { tmp_var_lval; tmp_var_expr; tmp_var_stmt; unary_plus_expr }
@@ -1374,8 +1372,8 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
           { flags with tmp_var_cond_update = flags.tmp_var_cond_update + 1 }
         in
         let stmts', expr_remainders', scope =
-          mk_struct_stmt field_offset scope fi.Cil.ftype ci.cfields fundec
-            action loc varinfo expr_remainders
+          mk_struct_stmt field_offset scope ci.cfields fundec action loc varinfo
+            expr_remainders
         in
         let flags =
           {
@@ -1391,8 +1389,8 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
           CilHelper.add_index_offset field_offset (Cil.integer o)
         in
         let stmts', expr_remainders', scope =
-          mk_struct_stmt field_offset scope fi.Cil.ftype ci.cfields fundec
-            action loc varinfo expr_remainders
+          mk_struct_stmt field_offset scope ci.cfields fundec action loc varinfo
+            expr_remainders
         in
         (stmts', expr_remainders', tmp_var, flags, scope)
   in
@@ -1429,7 +1427,7 @@ and mk_primitive_array_stmt stmts expr_list expr_remainders o arr_type arr_len
 
     if arr_len > o + 1 && List.length (List.tl expr_remainders) = 0 then
       let tmp_var_lval, tmp_var_expr, tmp_var_stmt, unary_plus_expr, scope =
-        mk_tmp_var fundec loc varinfo (o + 1) scope
+        mk_tmp_var fundec loc (o + 1) scope
       in
       let field_offset = CilHelper.add_field_offset origin_field_offset fi in
       let field_offset = CilHelper.add_index_offset field_offset tmp_var_expr in
@@ -1499,7 +1497,7 @@ and mk_array_stmt expr_list field_offset fi loc fundec action varinfo scope
         scope,
         tmp_var,
         flags,
-        last_idx ) =
+        _ ) =
     List.fold_left
       (fun ( stmts,
              primitive_arr_remainders,
@@ -1544,7 +1542,7 @@ and mk_array_stmt expr_list field_offset fi loc fundec action varinfo scope
       scope ) )
   else (var_stmts @ primitive_arr_remainders, expr_remainders, scope)
 
-and trans_var_decl_opt scope fundec loc action (vdecl : C.Ast.var_decl option) =
+and trans_var_decl_opt scope fundec loc (vdecl : C.Ast.var_decl option) =
   match vdecl with
   | Some v -> trans_var_decl scope fundec loc AExp v.C.Ast.desc
   | None -> ([], scope)
@@ -1552,7 +1550,7 @@ and trans_var_decl_opt scope fundec loc action (vdecl : C.Ast.var_decl option) =
 and trans_for scope fundec loc init cond_var cond inc body =
   let scope = Scope.enter scope in
   let init_stmt, scope = trans_stmt_opt scope fundec init in
-  let decl_stmt, scope = trans_var_decl_opt scope fundec loc AExp cond_var in
+  let decl_stmt, scope = trans_var_decl_opt scope fundec loc cond_var in
   let cond_expr =
     match cond with
     | Some e ->
@@ -1584,7 +1582,7 @@ and trans_for scope fundec loc init cond_var cond inc body =
 and trans_while scope fundec loc condition_variable cond body =
   let scope = Scope.enter scope in
   let decl_stmt, scope =
-    trans_var_decl_opt scope fundec loc AExp condition_variable
+    trans_var_decl_opt scope fundec loc condition_variable
   in
   let cond_expr =
     trans_expr scope (Some fundec) loc AExp cond |> snd |> get_opt "while_cond"
@@ -1638,7 +1636,7 @@ and trans_do scope fundec loc body cond =
 
 and trans_if scope fundec loc init cond_var cond then_branch else_branch =
   let init_stmt = trans_stmt_opt scope fundec init |> fst in
-  let decl_stmt, scope = trans_var_decl_opt scope fundec loc AExp cond_var in
+  let decl_stmt, scope = trans_var_decl_opt scope fundec loc cond_var in
   let cond_sl, cond_expr = trans_expr scope (Some fundec) loc AExp cond in
   let then_stmt = trans_block scope fundec then_branch in
   let else_stmt =
@@ -1674,9 +1672,7 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
           try (scope, sf, duplicate sf)
           with Failure _ ->
             let lab, scope = create_label scope "_L" in
-            ( scope,
-              trans_goto scope fundec loc lab,
-              append_label sf lab loc false )
+            (scope, trans_goto loc lab, append_label sf lab loc false)
         in
         let scope, st' = compile_cond scope ce2 st sf1 in
         compile_cond scope ce1 st' sf2
@@ -1685,9 +1681,7 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
           try (scope, st, duplicate st)
           with Failure _ ->
             let lab, scope = create_label scope "_L" in
-            ( scope,
-              trans_goto scope fundec loc lab,
-              append_label st lab loc false )
+            (scope, trans_goto loc lab, append_label st lab loc false)
         in
         let scope, sf' = compile_cond scope ce2 st1 sf in
         compile_cond scope ce1 st2 sf'
@@ -1704,7 +1698,7 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
             user_typs = init_stmt.user_typs;
           } )
   in
-  let scope, if_chunk = compile_cond scope cond_expr then_stmt else_stmt in
+  let _, if_chunk = compile_cond scope cond_expr then_stmt else_stmt in
   let stmts = decl_stmt @ init_stmt.stmts @ cond_sl @ if_chunk.Chunk.stmts in
   let cases = init_stmt.cases @ then_stmt.cases @ else_stmt.cases in
   {
@@ -1721,8 +1715,8 @@ and trans_block scope fundec body =
   | _ -> trans_stmt scope fundec body |> fst
 
 and trans_switch scope fundec loc init cond_var cond body =
-  let init, cope = trans_stmt_opt scope fundec init in
-  let decl_sl, scope = trans_var_decl_opt scope fundec loc AExp cond_var in
+  let init, _ = trans_stmt_opt scope fundec init in
+  let decl_sl, scope = trans_var_decl_opt scope fundec loc cond_var in
   let cond_sl, cond_expr_opt = trans_expr scope (Some fundec) loc AExp cond in
   let cond_expr = Option.get cond_expr_opt in
   let body_stmt = trans_stmt scope fundec body |> fst in
@@ -1740,12 +1734,12 @@ and trans_switch scope fundec loc init cond_var cond body =
   in
   { Chunk.empty with stmts }
 
-and trans_case scope fundec loc lhs rhs body =
+and trans_case scope fundec loc lhs body =
   let lhs_expr = trans_expr scope (Some fundec) loc ADrop lhs |> snd in
   let chunk = trans_stmt scope fundec body |> fst in
   let label = Cil.Case (Option.get lhs_expr, loc) in
   match chunk.Chunk.stmts with
-  | h :: t ->
+  | h :: _ ->
       h.labels <- h.labels @ [ label ];
       { chunk with cases = h :: chunk.cases }
   | [] -> chunk
@@ -1754,7 +1748,7 @@ and trans_default scope fundec loc stmt =
   let chunk = trans_stmt scope fundec stmt |> fst in
   let label = Cil.Default loc in
   match chunk.Chunk.stmts with
-  | h :: t ->
+  | h :: _ ->
       h.labels <- label :: h.labels;
       { chunk with cases = chunk.cases @ [ h ] }
   | [] -> chunk
@@ -1768,7 +1762,7 @@ and trans_label scope fundec loc label body =
   let chunk = trans_stmt scope fundec body |> fst in
   (append_label chunk label loc true, scope)
 
-and trans_goto scope fundec loc label =
+and trans_goto loc label =
   let dummy_instr =
     Cil.Asm
       ( [],
@@ -1875,7 +1869,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
         let prev_ci = get_compinfo typ in
         ([ Cil.GCompTagDecl (prev_ci, loc) ], scope)
       else
-        let callback compinfo = [] in
+        let callback _ = [] in
         let compinfo = Cil.mkCompInfo is_struct name callback [] in
         let typ = Cil.TComp (compinfo, []) in
         let scope = Scope.add_type rdecl.name typ scope in
@@ -1930,7 +1924,7 @@ and trans_function_body scope fundec body =
 and trans_decl_attribute decl =
   let attrs = ref [] in
   ignore
-    (C.visit_children (C.Ast.cursor_of_node decl) (fun c p ->
+    (C.visit_children (C.Ast.cursor_of_node decl) (fun c _ ->
          ( if C.get_cursor_kind c |> C.is_attribute then
            match C.ext_attr_get_kind c with
            | C.NoThrow ->
@@ -1949,17 +1943,17 @@ and mk_init scope loc fitype expr_list =
       (Cil.SingleInit (Cil.Const (Cil.CReal (0., fkind, None))), [])
   | Cil.TPtr (typ, _), [] ->
       (Cil.SingleInit (Cil.CastE (TPtr (typ, []), Cil.integer 0)), [])
-  | Cil.TEnum (einfo, _), [] -> (Cil.SingleInit (Cil.integer 0), [])
+  | Cil.TEnum (_, _), [] -> (Cil.SingleInit (Cil.integer 0), [])
   (* for initaiized *)
-  | Cil.TInt (ikind, _), e :: el ->
+  | Cil.TInt (_, _), e :: el ->
       let _, expr_opt = trans_expr scope None loc ADrop e in
       let e = Option.get expr_opt in
       (Cil.SingleInit e, el)
-  | Cil.TFloat (fkind, _), e :: el ->
+  | Cil.TFloat (_, _), e :: el ->
       let _, expr_opt = trans_expr scope None loc ADrop e in
       let e = Option.get expr_opt in
       (Cil.SingleInit e, el)
-  | Cil.TPtr (typ, attr), e :: el ->
+  | Cil.TPtr (_, _), e :: el ->
       let _, expr_opt = trans_expr scope None loc ADrop e in
       let e = Option.get expr_opt in
       (Cil.SingleInit e, el)
@@ -2015,7 +2009,7 @@ and mk_init scope loc fitype expr_list =
         (Cil.CompoundInit (fitype, List.rev inits), expr_remainders)
       in
       final_init
-  | Cil.TEnum (einfo, _), e :: el ->
+  | Cil.TEnum (_, _), e :: el ->
       let _, expr_opt = trans_expr scope None loc ADrop e in
       let e = Option.get expr_opt in
       (Cil.SingleInit e, el)
@@ -2067,7 +2061,7 @@ and mk_struct_init scope loc typ cfields expr_list =
 and trans_global_init scope loc (e : C.Ast.expr) =
   let typ = type_of_expr e |> trans_type scope in
   match (e.C.Ast.desc, Cil.unrollType typ) with
-  | C.Ast.InitList el, Cil.TArray (arr_typ, arr_exp, attr) ->
+  | C.Ast.InitList el, Cil.TArray (_, arr_exp, _) ->
       let len_exp = Option.get arr_exp in
       let arr_len =
         match len_exp with
