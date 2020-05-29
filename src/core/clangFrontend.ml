@@ -285,10 +285,90 @@ let name_of_ident_ref idref = string_of_declaration_name idref.C.Ast.name
 let trans_attribute typ =
   if typ.C.Ast.const then [ Cil.Attr ("const", []) ] else []
 
+let failwith_decl (decl : C.Ast.decl) =
+  match decl.C.Ast.desc with
+  | C.Ast.RecordDecl _ -> failwith "record decl"
+  | _ -> failwith "unknown decl"
+
+let trans_integer_literal decoration il =
+  let ikind =
+    match decoration with
+    | C.Ast.Cursor c -> C.get_cursor_type c |> C.get_type_kind |> trans_int_kind
+    | _ -> failwith "Invalid cursor for integer literal"
+  in
+  match il with
+  | C.Ast.Int i -> Cil.kinteger ikind i
+  | C.Ast.CXInt cxi ->
+      Cil.kinteger ikind (Clang__.Clang__bindings.ext_int_get_sext_value cxi)
+
+let trans_floating_literal decoration il =
+  let fkind =
+    match decoration with
+    | C.Ast.Cursor c ->
+        C.get_cursor_type c |> C.get_type_kind |> trans_float_kind
+    | _ -> failwith "Invalid cursor for float literal"
+  in
+  match il with
+  | C.Ast.Float f -> Cil.Const (Cil.CReal (f, fkind, None))
+  | _ -> failwith "unknown float literal"
+
+let trans_string_literal sl = Cil.Const (Cil.CStr sl.C.Ast.bytes)
+
+let type_of_decoration decoration =
+  match decoration with
+  | C.Ast.Cursor c -> C.get_cursor_type c
+  | _ -> failwith "Invalid cursor for type"
+
+let type_of_expr expr = C.Type.of_node expr
+
+let trans_decl_ref scope allow_undef idref =
+  let name = name_of_ident_ref idref in
+  match Scope.find_var_enum ~allow_undef name scope with
+  | EnvVar varinfo ->
+      let exp = Cil.Lval (Cil.Var varinfo, NoOffset) in
+      ([], Some exp)
+  | EnvEnum enum -> ([], Some enum)
+  | _ -> failwith "no found"
+
+let should_ignore_implicit_cast expr qual_type e typ =
+  (* heuristics to selectively make implicit cast explicit because clangml
+   * does not fully expose all the implicit casting information *)
+  if
+    Cil.unrollType typ |> Cil.isPointerType
+    && Cil.typeOf e |> Cil.unrollType |> Cil.isIntegralType
+  then false
+  else
+    let expr_kind = C.Ast.cursor_of_node expr |> C.ext_get_cursor_kind in
+    let type_kind =
+      C.get_pointee_type qual_type.C.Ast.cxtype |> C.ext_type_get_kind
+    in
+    (* ignore FunctionToPointerDecay and BuiltinFnToFnPtr *)
+    expr_kind = C.ImplicitCastExpr
+    && (type_kind = C.FunctionNoProto || type_kind = C.FunctionProto)
+    (* ignore LValueToRValue *)
+    || CilHelper.eq_typ (Cil.typeOf e) typ
+
+let rec append_instr sl instr =
+  match sl with
+  | [ ({ Cil.skind = Cil.Instr l; _ } as h) ] ->
+      [ { h with skind = Cil.Instr (l @ [ instr ]) } ]
+  | [] -> [ Cil.mkStmt (Cil.Instr [ instr ]) ]
+  | h :: t -> h :: append_instr t instr
+
+let rec append_stmt_list sl1 sl2 =
+  match (sl1, sl2) with
+  | ( [ ({ Cil.skind = Cil.Instr l1; _ } as h1) ],
+      ({ Cil.skind = Cil.Instr l2; _ } as h2) :: t2 )
+  (* merging statements with labels may break goto targets *)
+    when h1.labels = [] && h2.labels = [] ->
+      { h1 with skind = Cil.Instr (l1 @ l2) } :: t2
+  | [], _ -> sl2
+  | h1 :: t1, _ -> h1 :: append_stmt_list t1 sl2
+
 let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
   match typ.C.Ast.desc with
   | Pointer pt -> Cil.TPtr (trans_type ~compinfo scope pt, trans_attribute typ)
-  | FunctionType ft -> trans_function_type scope ft
+  | FunctionType ft -> trans_function_type scope None ft |> fst
   | Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
   | Elaborated et -> trans_type ~compinfo scope et.named_type
   | Record rt -> Scope.find_type ~compinfo (name_of_ident_ref rt) scope
@@ -360,26 +440,34 @@ and trans_builtin_type ?(compinfo = None) scope t =
       F.pp_print_flush F.err_formatter ();
       failwith "trans_builtin_type"
 
-and trans_function_type scope typ =
+and trans_function_type scope fundec_opt typ =
   let return_typ = trans_type scope typ.C.Ast.result in
-  let param_types, var_arg = trans_parameter_types scope typ.C.Ast.parameters in
-  Cil.TFun (return_typ, param_types, var_arg, [])
+  let param_types, var_arg, scope =
+    trans_parameter_types scope fundec_opt typ.C.Ast.parameters
+  in
+  (Cil.TFun (return_typ, param_types, var_arg, []), scope)
 
-and trans_parameter_types scope = function
+and trans_parameter_types scope fundec_opt = function
   | Some params ->
-      let formals =
-        List.map
-          (fun (param : C.Ast.parameter) ->
-            (param.desc.name, trans_type scope param.desc.qual_type, []))
-          params.C.Ast.non_variadic
+      let scope, formals =
+        List.fold_left
+          (fun p (param : C.Ast.parameter) ->
+            let scope, formals = p in
+            let param_name = param.desc.name in
+            let param_typ = trans_type scope param.desc.qual_type in
+            let result = (param_name, param_typ, []) in
+            let make_var =
+              match fundec_opt with
+              | Some fundec -> fun n t -> Cil.makeFormalVar fundec n t
+              | None -> fun n t -> Cil.makeVarinfo false n t
+            in
+            let vi = make_var param_name param_typ in
+            let scope = Scope.add param.desc.name (EnvData.EnvVar vi) scope in
+            (scope, formals @ [ result ]))
+          (scope, []) params.C.Ast.non_variadic
       in
-      (Some formals, params.C.Ast.variadic)
-  | None -> (None, false)
-
-and failwith_decl (decl : C.Ast.decl) =
-  match decl.C.Ast.desc with
-  | C.Ast.RecordDecl _ -> failwith "record decl"
-  | _ -> failwith "unknown decl"
+      (Some formals, params.C.Ast.variadic, scope)
+  | None -> (None, false, scope)
 
 and trans_field_decl scope compinfo (field : C.Ast.decl) =
   let floc = trans_location field in
@@ -401,81 +489,6 @@ and trans_params scope args fundec =
           Scope.add param.desc.name (EnvData.EnvVar vi) scope)
         scope l.C.Ast.non_variadic
   | None -> scope
-
-and trans_integer_literal decoration il =
-  let ikind =
-    match decoration with
-    | C.Ast.Cursor c -> C.get_cursor_type c |> C.get_type_kind |> trans_int_kind
-    | _ -> failwith "Invalid cursor for integer literal"
-  in
-  match il with
-  | C.Ast.Int i -> Cil.kinteger ikind i
-  | C.Ast.CXInt cxi ->
-      Cil.kinteger ikind (Clang__.Clang__bindings.ext_int_get_sext_value cxi)
-
-and trans_floating_literal decoration il =
-  let fkind =
-    match decoration with
-    | C.Ast.Cursor c ->
-        C.get_cursor_type c |> C.get_type_kind |> trans_float_kind
-    | _ -> failwith "Invalid cursor for float literal"
-  in
-  match il with
-  | C.Ast.Float f -> Cil.Const (Cil.CReal (f, fkind, None))
-  | _ -> failwith "unknown float literal"
-
-and trans_string_literal sl = Cil.Const (Cil.CStr sl.C.Ast.bytes)
-
-and type_of_decoration decoration =
-  match decoration with
-  | C.Ast.Cursor c -> C.get_cursor_type c
-  | _ -> failwith "Invalid cursor for type"
-
-and type_of_expr expr = C.Type.of_node expr
-
-and trans_decl_ref scope allow_undef idref =
-  let name = name_of_ident_ref idref in
-  match Scope.find_var_enum ~allow_undef name scope with
-  | EnvVar varinfo ->
-      let exp = Cil.Lval (Cil.Var varinfo, NoOffset) in
-      ([], Some exp)
-  | EnvEnum enum -> ([], Some enum)
-  | _ -> failwith "no found"
-
-and should_ignore_implicit_cast expr qual_type e typ =
-  (* heuristics to selectively make implicit cast explicit because clangml
-   * does not fully expose all the implicit casting information *)
-  if
-    Cil.unrollType typ |> Cil.isPointerType
-    && Cil.typeOf e |> Cil.unrollType |> Cil.isIntegralType
-  then false
-  else
-    let expr_kind = C.Ast.cursor_of_node expr |> C.ext_get_cursor_kind in
-    let type_kind =
-      C.get_pointee_type qual_type.C.Ast.cxtype |> C.ext_type_get_kind
-    in
-    (* ignore FunctionToPointerDecay and BuiltinFnToFnPtr *)
-    expr_kind = C.ImplicitCastExpr
-    && (type_kind = C.FunctionNoProto || type_kind = C.FunctionProto)
-    (* ignore LValueToRValue *)
-    || CilHelper.eq_typ (Cil.typeOf e) typ
-
-and append_instr sl instr =
-  match sl with
-  | [ ({ Cil.skind = Cil.Instr l; _ } as h) ] ->
-      [ { h with skind = Cil.Instr (l @ [ instr ]) } ]
-  | [] -> [ Cil.mkStmt (Cil.Instr [ instr ]) ]
-  | h :: t -> h :: append_instr t instr
-
-and append_stmt_list sl1 sl2 =
-  match (sl1, sl2) with
-  | ( [ ({ Cil.skind = Cil.Instr l1; _ } as h1) ],
-      ({ Cil.skind = Cil.Instr l2; _ } as h2) :: t2 )
-  (* merging statements with labels may break goto targets *)
-    when h1.labels = [] && h2.labels = [] ->
-      { h1 with skind = Cil.Instr (l1 @ l2) } :: t2
-  | [], _ -> sl2
-  | h1 :: t1, _ -> h1 :: append_stmt_list t1 sl2
 
 and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
     action (expr : C.Ast.expr) =
@@ -1791,18 +1804,24 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
   match decl.desc with
   | C.Ast.Function fdecl when fdecl.body = None ->
       let name = string_of_declaration_name fdecl.name in
-      let typ = trans_function_type scope fdecl.C.Ast.function_type in
+      let typ, scope =
+        trans_function_type scope None fdecl.C.Ast.function_type
+      in
       let svar, scope = find_global_variable scope name typ in
       svar.vstorage <- storage;
       svar.vattr <- trans_decl_attribute decl;
       ([ Cil.GVarDecl (svar, loc) ], scope)
   | C.Ast.Function fdecl ->
       let name = string_of_declaration_name fdecl.name in
-      let typ = trans_function_type scope fdecl.C.Ast.function_type in
+      let fundec = Cil.emptyFunction name in
+      let typ = Cil.TFun (Cil.voidType, None, false, []) in
       let svar, scope = find_global_variable scope name typ in
-      let fundec = { Cil.dummyFunDec with svar } in
       let scope = Scope.enter scope in
-      let scope = trans_params scope fdecl.function_type.parameters fundec in
+      let typ, scope =
+        trans_function_type scope (Some fundec) fdecl.C.Ast.function_type
+      in
+      fundec.svar <- svar;
+      fundec.svar.vtype <- typ;
       fundec.svar.vstorage <- storage;
       fundec.svar.vattr <- trans_decl_attribute decl;
       fundec.svar.vinline <-
