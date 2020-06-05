@@ -526,24 +526,31 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
       else (sl, Some (Cil.CastE (typ, e)))
   | C.Ast.Member mem ->
       ([], Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field))
-  | C.Ast.ArraySubscript arr ->
+  | C.Ast.ArraySubscript arr -> (
       let sl1, base = trans_expr scope fundec_opt loc action arr.base in
       let sl2, idx = trans_expr scope fundec_opt loc action arr.index in
-      let base =
-        match Option.get base |> CilHelper.remove_cast with
-        | Cil.Lval lv -> lv
-        | e -> failwith (CilHelper.s_exp e)
-      in
-      let new_lval =
-        match idx with
-        | Some x when Cil.isPointerType (Cil.typeOfLval base) ->
-            ( Cil.Mem
-                (Cil.BinOp (Cil.PlusPI, Cil.Lval base, x, Cil.typeOfLval base)),
-              Cil.NoOffset )
-        | Some x -> Cil.addOffsetLval (Cil.Index (x, Cil.NoOffset)) base
-        | _ -> failwith "lval"
-      in
-      (sl1 @ sl2, Some (Cil.Lval new_lval))
+      match Option.get base |> CilHelper.remove_cast with
+      | Cil.Lval base ->
+          let new_lval =
+            match idx with
+            | Some x when Cil.isPointerType (Cil.typeOfLval base) ->
+                ( Cil.Mem
+                    (Cil.BinOp
+                       (Cil.PlusPI, Cil.Lval base, x, Cil.typeOfLval base)),
+                  Cil.NoOffset )
+            | Some x -> Cil.addOffsetLval (Cil.Index (x, Cil.NoOffset)) base
+            | _ -> failwith "lval"
+          in
+          (sl1 @ sl2, Some (Cil.Lval new_lval))
+      | e ->
+          let new_lval =
+            match idx with
+            | Some x ->
+                ( Cil.Mem (Cil.BinOp (Cil.PlusPI, e, x, Cil.typeOf e)),
+                  Cil.NoOffset )
+            | _ -> failwith "lval"
+          in
+          (sl1 @ sl2, Some (Cil.Lval new_lval)) )
   | C.Ast.ConditionalOperator co ->
       trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
   | C.Ast.UnaryExpr ue ->

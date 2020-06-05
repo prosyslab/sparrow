@@ -118,7 +118,8 @@ let test_suites =
           "clang/static0.c";
           "clang/variable-array0.c";
           "clang/variable-array1.c";
-          "clang/duplicated-label0.c"
+          "clang/duplicated-label0.c";
+          "clang/array-subscript0.c";
         ];
     };
   ]
