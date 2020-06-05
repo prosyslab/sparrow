@@ -178,7 +178,14 @@ let byteSizeOf typ =
       prerr_endline ("warn: Cil.bitsSizeOf (" ^ s_type typ ^ ")");
     raise e
 
-let eq_typ t1 t2 = Cil.typeSig t1 = Cil.typeSig t2
+let eq_typ t1 t2 =
+  try Cil.typeSig t1 = Cil.typeSig t2
+  with _ ->
+    (* Cil.typeSig may raise an exception if it is a variable array type.
+     * See https://github.com/KihongHeo/cil/blob/6dde2a7922489437f46e6bd994b639351b55bb00/src/cil.ml#L5998
+     * Conservatively return false.
+     *)
+    false
 
 let add_field_offset offset fi =
   Cil.addOffset (Cil.Field (fi, Cil.NoOffset)) offset
