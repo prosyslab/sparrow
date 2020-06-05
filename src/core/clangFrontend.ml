@@ -30,14 +30,10 @@ module EnvData = struct
     | EnvTyp t -> CilHelper.s_type t
 end
 
-module Env = struct
-  type t = {
-    var : (string, EnvData.t) H.t;
-    typ : (string, Cil.typ) H.t;
-    label : (string, string) H.t;
-  }
+module BlockEnv = struct
+  type t = { var : (string, EnvData.t) H.t; typ : (string, Cil.typ) H.t }
 
-  let create () = { var = H.create 64; typ = H.create 64; label = H.create 64 }
+  let create () = { var = H.create 64; typ = H.create 64 }
 
   let add_var name vi env =
     H.add env.var name vi;
@@ -47,91 +43,95 @@ module Env = struct
     H.add env.typ name typ;
     env
 
-  let add_label name env =
-    H.add env.label name name;
-    env
-
   let mem_var name env = H.mem env.var name
 
   let mem_typ name env = H.mem env.typ name
 
-  let mem_label name env = H.mem env.label name
-
   let find_var name env = H.find env.var name
 
   let find_typ name env = H.find env.typ name
+end
+
+module LabelEnv = struct
+  type t = { label : (string, string) H.t }
+
+  let create () = { label = H.create 64 }
+
+  let add_label name env =
+    H.add env.label name name;
+    env
+
+  let mem_label name env = H.mem env.label name
 
   let find_label name env = H.find env.label name
 end
 
 module Scope = struct
-  type t = Env.t list
+  type t = BlockEnv.t list * LabelEnv.t list (* (BlockScope * FunScope) List *)
 
-  let empty = []
+  let empty = ([], [])
 
-  let create () = [ Env.create () ]
+  let create () = ([ BlockEnv.create () ], [ LabelEnv.create () ])
 
-  let enter scope = Env.create () :: scope
+  let enter_block scope =
+    match scope with bs, fs -> (BlockEnv.create () :: bs, fs)
 
-  let exit = List.tl
+  let enter_function scope =
+    match scope with
+    | bs, fs -> (BlockEnv.create () :: bs, LabelEnv.create () :: fs)
+
+  (* exit_block is never needed, since scope is immutable *)
+  let exit_function scope = match scope with bs, fs -> (List.tl bs, List.tl fs)
 
   let add name varinfo = function
-    | h :: _ as l ->
-        ignore (Env.add_var name varinfo h);
+    | (h :: _, _) as l ->
+        ignore (BlockEnv.add_var name varinfo h);
         l
-    | [] -> failwith "empty scope"
+    | [], _ -> failwith "empty block scope"
 
   let add_type name typ = function
-    | h :: _ as l ->
-        ignore (Env.add_typ name typ h);
+    | (h :: _, _) as l ->
+        ignore (BlockEnv.add_typ name typ h);
         l
-    | [] -> failwith "empty scope"
+    | [], _ -> failwith "empty block scope"
 
   let add_label name = function
-    | h :: _ as l ->
-        ignore (Env.add_label name h);
+    | (_, h :: _) as l ->
+        ignore (LabelEnv.add_label name h);
         l
-    | [] -> failwith "empty scope"
+    | _, [] -> failwith "empty function scope"
 
   let rec mem_var name = function
-    | h :: t -> if Env.mem_var name h then true else mem_var name t
-    | [] -> false
+    | h :: t, fs ->
+        if BlockEnv.mem_var name h then true else mem_var name (t, fs)
+    | [], _ -> false
 
   let rec mem_typ name = function
-    | h :: t -> if Env.mem_typ name h then true else mem_typ name t
-    | [] -> false
+    | h :: t, fs ->
+        if BlockEnv.mem_typ name h then true else mem_typ name (t, fs)
+    | [], _ -> false
 
   let rec mem_label name = function
-    | h :: t -> if Env.mem_label name h then true else mem_label name t
-    | [] -> false
-
-  let rec find ?(allow_undef = false) ?(compinfo = None) name = function
-    | h :: t ->
-        if H.mem h name then H.find h name
-        else find ~allow_undef ~compinfo name t
-    | [] when allow_undef ->
-        let ftype = Cil.TFun (Cil.intType, None, false, []) in
-        EnvData.EnvVar (Cil.makeGlobalVar name ftype)
-    | [] when compinfo <> None ->
-        EnvData.EnvTyp (Cil.TComp (Option.get compinfo, []))
-    | [] -> failwith (name ^ " not found")
+    | bs, h :: t ->
+        if LabelEnv.mem_label name h then true else mem_label name (bs, t)
+    | _, [] -> false
 
   let rec find_var_enum ?(allow_undef = false) name = function
-    | h :: t ->
-        if Env.mem_var name h then Env.find_var name h
-        else find_var_enum ~allow_undef name t
-    | [] when allow_undef ->
+    | h :: t, fs ->
+        if BlockEnv.mem_var name h then BlockEnv.find_var name h
+        else find_var_enum ~allow_undef name (t, fs)
+    | [], _ when allow_undef ->
         let ftype = Cil.TFun (Cil.intType, None, false, []) in
         EnvData.EnvVar (Cil.makeGlobalVar name ftype)
     | _ -> failwith ("variable " ^ name ^ " not found")
 
   let rec find_type ?(compinfo = None) name = function
-    | h :: t ->
-        if Env.mem_typ name h then Env.find_typ name h
-        else find_type ~compinfo name t
-    | [] when name = "__builtin_va_list" || name = "__va_list_tag" ->
+    | h :: t, fs ->
+        if BlockEnv.mem_typ name h then BlockEnv.find_typ name h
+        else find_type ~compinfo name (t, fs)
+    | [], _ when name = "__builtin_va_list" || name = "__va_list_tag" ->
         Cil.TBuiltin_va_list []
-    | [] when compinfo <> None ->
+    | [], _ when compinfo <> None ->
         let compinfo = Option.get compinfo in
         if compinfo.Cil.cname = name then Cil.TComp (compinfo, [])
         else failwith ("type of " ^ name ^ " not found")
@@ -922,51 +922,50 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   let loc = trans_location stmt in
   if !Options.debug then prerr_endline (CilHelper.s_location loc);
   match stmt.C.Ast.desc with
-  | C.Ast.Null ->
+  | Null ->
       ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr []) ] }, scope)
-  | C.Ast.Compound sl ->
+  | Compound sl ->
       (* CIL does not need to have local blocks because all variables have unique names *)
       let chunk = trans_compound scope fundec sl in
       (chunk, scope)
-  | C.Ast.For fdesc ->
+  | For fdesc ->
       ( trans_for scope fundec loc fdesc.init fdesc.condition_variable
           fdesc.cond fdesc.inc fdesc.body,
         scope )
-  | C.Ast.ForRange _ ->
-      failwith ("Unsupported syntax : " ^ CilHelper.s_location loc)
-  | C.Ast.If desc ->
+  | ForRange _ -> failwith ("Unsupported syntax : " ^ CilHelper.s_location loc)
+  | If desc ->
       ( trans_if scope fundec loc desc.init desc.condition_variable desc.cond
           desc.then_branch desc.else_branch,
         scope )
-  | C.Ast.Switch desc ->
+  | Switch desc ->
       ( trans_switch scope fundec loc desc.init desc.condition_variable
           desc.cond desc.body,
         scope )
-  | C.Ast.Case desc -> (trans_case scope fundec loc desc.lhs desc.body, scope)
-  | C.Ast.Default stmt -> (trans_default scope fundec loc stmt, scope)
-  | C.Ast.While desc ->
+  | Case desc -> (trans_case scope fundec loc desc.lhs desc.body, scope)
+  | Default stmt -> (trans_default scope fundec loc stmt, scope)
+  | While desc ->
       ( trans_while scope fundec loc desc.condition_variable desc.cond desc.body,
         scope )
-  | C.Ast.Do desc -> (trans_do scope fundec loc desc.body desc.cond, scope)
-  | C.Ast.Label desc -> trans_label scope fundec loc desc.label desc.body
-  | C.Ast.Goto label -> (trans_goto loc label, scope)
-  | C.Ast.IndirectGoto _ ->
+  | Do desc -> (trans_do scope fundec loc desc.body desc.cond, scope)
+  | Label desc -> trans_label scope fundec loc desc.label desc.body
+  | Goto label -> (trans_goto loc label, scope)
+  | IndirectGoto _ ->
       failwith ("Unsupported syntax (IndirectGoto): " ^ CilHelper.s_location loc)
-  | C.Ast.Continue ->
+  | Continue ->
       ( { Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Continue loc) ] },
         scope )
-  | C.Ast.Break ->
+  | Break ->
       ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Break loc) ] }, scope)
-  | C.Ast.Asm desc ->
+  | Asm desc ->
       let instr =
         Cil.Asm ([], [ desc.asm_string ], [], [], [], Cil.locUnknown)
       in
       ( { Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr [ instr ]) ] },
         scope )
-  | C.Ast.Return None ->
+  | Return None ->
       let stmts = [ Cil.mkStmt (Cil.Return (None, loc)) ] in
       ({ Chunk.empty with stmts }, scope)
-  | C.Ast.Return (Some e) ->
+  | Return (Some e) ->
       let sl, expr_opt = trans_expr scope (Some fundec) loc AExp e in
       let expr = get_opt "return" expr_opt in
       let stmts =
@@ -974,34 +973,34 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
         else sl @ [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
       in
       ({ Chunk.empty with stmts }, scope)
-  | C.Ast.Decl dl ->
+  | Decl dl ->
       let stmts, user_typs, scope =
         trans_var_decl_list scope fundec loc AExp dl
       in
       ({ Chunk.empty with stmts; user_typs }, scope)
-  | C.Ast.Expr e ->
+  | Expr e ->
       (* skip_lhs is true only here: a function is called at the top-most level
        * without a return variable *)
       let stmts, _ =
         trans_expr ~skip_lhs:true scope (Some fundec) loc ADrop e
       in
       ({ Chunk.empty with stmts }, scope)
-  | C.Ast.Try _ ->
-      failwith ("Unsupported syntax (Try): " ^ CilHelper.s_location loc)
-  | C.Ast.AttributedStmt _ ->
+  | Try _ -> failwith ("Unsupported syntax (Try): " ^ CilHelper.s_location loc)
+  | AttributedStmt _ ->
       failwith
         ("Unsupported syntax (AttributedStmt)): " ^ CilHelper.s_location loc)
-  | C.Ast.UnknownStmt (_, _) ->
+  | UnknownStmt (_, _) ->
       (*       C.Ast.pp_stmt F.err_formatter stmt ; *)
       let stmts = [ Cil.dummyStmt ] in
       ({ Chunk.empty with stmts }, scope)
 
 and trans_compound scope fundec sl =
-  let scope = Scope.enter scope in
+  let scope = Scope.enter_block scope in
   List.fold_left
     (fun (l, scope) s ->
       let chunk, scope = trans_stmt scope fundec s in
-      (Chunk.append l chunk, scope))
+      let ans = (Chunk.append l chunk, scope) in
+      ans)
     (Chunk.empty, scope) sl
   |> fst
 
@@ -1561,7 +1560,7 @@ and trans_var_decl_opt scope fundec loc (vdecl : C.Ast.var_decl option) =
   | None -> ([], scope)
 
 and trans_for scope fundec loc init cond_var cond inc body =
-  let scope = Scope.enter scope in
+  let scope = Scope.enter_block scope in
   let init_stmt, scope = trans_stmt_opt scope fundec init in
   let decl_stmt, scope = trans_var_decl_opt scope fundec loc cond_var in
   let cond_expr =
@@ -1593,7 +1592,6 @@ and trans_for scope fundec loc init cond_var cond inc body =
   }
 
 and trans_while scope fundec loc condition_variable cond body =
-  let scope = Scope.enter scope in
   let decl_stmt, scope =
     trans_var_decl_opt scope fundec loc condition_variable
   in
@@ -1620,7 +1618,6 @@ and trans_while scope fundec loc condition_variable cond body =
   }
 
 and trans_do scope fundec loc body cond =
-  let scope = Scope.enter scope in
   let cond_expr =
     trans_expr scope (Some fundec) loc AExp cond |> snd |> get_opt "do_cond"
   in
@@ -1654,7 +1651,9 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
   let then_stmt = trans_block scope fundec then_branch in
   let else_stmt =
     match else_branch with
-    | Some s -> trans_block scope fundec s
+    | Some s ->
+        let ans = trans_block scope fundec s in
+        ans
     | None -> Chunk.empty
   in
   let cond_expr = Option.get cond_expr in
@@ -1724,7 +1723,9 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
 
 and trans_block scope fundec body =
   match body.C.Ast.desc with
-  | C.Ast.Compound l -> trans_compound scope fundec l
+  | C.Ast.Compound l ->
+      let ans = trans_compound scope fundec l in
+      ans
   | _ -> trans_stmt scope fundec body |> fst
 
 and trans_switch scope fundec loc init cond_var cond body =
@@ -1816,7 +1817,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       let fundec = Cil.emptyFunction name in
       let typ = Cil.TFun (Cil.voidType, None, false, []) in
       let svar, scope = find_global_variable scope name typ in
-      let scope = Scope.enter scope in
+      let scope = Scope.enter_function scope in
       let typ, scope =
         trans_function_type scope (Some fundec) fdecl.C.Ast.function_type
       in
@@ -1828,7 +1829,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
         C.Ast.cursor_of_node decl |> C.cursor_is_function_inlined;
       let fun_body = trans_function_body scope fundec (Option.get fdecl.body) in
       fundec.sbody <- fst fun_body;
-      let scope = Scope.exit scope in
+      let scope = Scope.exit_function scope in
       (snd fun_body @ [ Cil.GFun (fundec, loc) ], scope)
   | C.Ast.Var vdecl when vdecl.var_init = None ->
       let typ = trans_type scope vdecl.var_type in

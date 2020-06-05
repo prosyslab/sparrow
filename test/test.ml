@@ -116,8 +116,9 @@ let test_suites =
           "clang/long0.c";
           "clang/unicode0.c";
           "clang/static0.c";
-          "clang/variable_array0.c";
-          "clang/variable_array1.c";
+          "clang/variable-array0.c";
+          "clang/variable-array1.c";
+          "clang/duplicated-label0.c"
         ];
     };
   ]
