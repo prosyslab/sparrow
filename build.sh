@@ -24,7 +24,7 @@ fi
 eval $(SHELL=bash opam config env --switch=$SPARROW_OPAM_SWITCH)
 opam install depext
 opam depext apron clangml
-opam pin add cil https://github.com/KihongHeo/cil.git -n
+opam pin add cil https://github.com/prosyslab/cil.git -n
 opam pin add sparrow . -n
 opam install -j $NCPU sparrow --deps-only
 opam pin remove sparrow
