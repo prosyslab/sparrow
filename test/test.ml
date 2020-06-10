@@ -124,6 +124,7 @@ let test_suites =
           "clang/duplicated-label0.c";
           "clang/array-subscript0.c";
           "clang/array-init0.c";
+          "clang/incomplete-array0.c";
         ];
     };
   ]

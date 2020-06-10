@@ -620,7 +620,13 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       let instr = Cil.Set (lval_of_expr var, exp, loc) in
       (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], var)
   | C.AddrOf -> (sl, Cil.AddrOf (lval_of_expr var))
-  | C.Deref -> (sl, Cil.Lval (Cil.Mem var, Cil.NoOffset))
+  | C.Deref ->
+      if Cil.typeOf var |> Cil.isArrayType then
+        let base = lval_of_expr var in
+        ( sl,
+          Cil.Lval (Cil.addOffsetLval (Cil.Index (Cil.zero, Cil.NoOffset)) base)
+        )
+      else (sl, Cil.Lval (Cil.Mem var, Cil.NoOffset))
   | C.Plus -> (sl, Cil.Lval (lval_of_expr var))
   | C.Minus -> (sl, Cil.UnOp (Cil.Neg, var, typ))
   | C.Not -> (sl, Cil.UnOp (Cil.BNot, var, typ))
@@ -1083,7 +1089,8 @@ and trans_var_decl ?(storage = Cil.NoStorage) (scope : Scope.t) fundec loc
 and handle_stmt_init scope typ fundec loc action field_offset varinfo
     (e : C.Ast.expr) =
   match (e.C.Ast.desc, Cil.unrollType typ) with
-  | C.Ast.InitList _, Cil.TArray (_, None, _) -> ([], scope)
+  | C.Ast.InitList _, Cil.TArray (_, None, _) | C.Ast.InitList _, Cil.TPtr _ ->
+      ([], scope)
   | C.Ast.InitList el, Cil.TArray (_, Some arr_exp, _) ->
       let stmts, _, scope =
         mk_arr_stmt scope fundec loc action varinfo arr_exp field_offset el
