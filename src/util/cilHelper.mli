@@ -61,6 +61,8 @@ val add_field_offset : Cil.offset -> Cil.fieldinfo -> Cil.offset
 
 val add_index_offset : Cil.offset -> Cil.exp -> Cil.offset
 
+val is_constant_n : int -> Cil.exp -> bool
+
 module Lval : sig
   type t = Cil.lval
 

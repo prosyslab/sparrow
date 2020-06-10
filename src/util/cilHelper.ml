@@ -168,6 +168,9 @@ let is_unsigned = function
       || i = Cil.IULongLong
   | _ -> false
 
+let is_constant_n n e =
+  match Cil.isInteger e with Some i -> Int64.to_int i = n | None -> false
+
 (* NOTE : Cil.bitsSizeOf often fails: just return top for the moment
  * Adhoc solution: To avoid this failure, translate original C sources
  * into "CIL" (using -il option) and analyze the CIL program. *)

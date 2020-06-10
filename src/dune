@@ -4,8 +4,8 @@
  (name main)
  (modules_without_implementation absDom absSem)
  (modules :standard \ vis)
- (libraries apron apron.octMPQ batteries cil cil.all-features clangml lymp
-   ocamlgraph str yojson)
+ (libraries apron apron.octMPQ batteries cil cil.all-features clangml
+   clangml.printer lymp ocamlgraph str yojson)
  (preprocess
   (pps ppx_compare ppx_deriving.std)))
 

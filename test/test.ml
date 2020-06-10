@@ -69,6 +69,7 @@ let test_suites =
           "clang/binop0.c";
           "clang/ternop0.c";
           "clang/ternop1.c";
+          "clang/ternop2.c";
           "clang/enum0.c";
           "clang/enum1.c";
           "clang/pointer0.c";

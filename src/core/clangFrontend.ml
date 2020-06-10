@@ -778,18 +778,20 @@ and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
   in
   let else_sl, else_expr = trans_expr scope fundec_opt loc ADrop else_branch in
   let cond_expr = Option.get cond_expr in
-  let else_expr = Option.get else_expr in
   match fundec_opt with
   | None ->
       if Cil.constFold false cond_expr |> Cil.isZero then
-        ([], Some (Cil.constFold false else_expr))
+        match else_expr with
+        | Some else_expr -> ([], Some (Cil.constFold false else_expr))
+        | None -> ([], None)
       else if then_expr = None then ([], None)
       else ([], Some (Option.get then_expr |> Cil.constFold false))
   | Some fundec ->
       let typ =
-        match then_expr with
-        | Some e -> Cil.typeOf e
-        | None -> Cil.typeOf else_expr
+        match (then_expr, else_expr) with
+        | Some e, _ -> Cil.typeOf e
+        | None, Some else_expr -> Cil.typeOf else_expr
+        | _, _ -> Cil.intType
       in
       let vi, _ = create_local_variable scope fundec "tmp" typ in
       let var = (Cil.Var vi, Cil.NoOffset) in
@@ -803,17 +805,28 @@ and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
       in
       let tb = { Cil.battrs = []; bstmts } in
       let bstmts =
-        if CilHelper.eq_typ (Cil.typeOf else_expr) typ then
-          append_instr else_sl (Cil.Set (var, else_expr, loc))
-        else
-          append_instr else_sl (Cil.Set (var, Cil.CastE (typ, else_expr), loc))
+        match else_expr with
+        | Some else_expr ->
+            if CilHelper.eq_typ (Cil.typeOf else_expr) typ then
+              append_instr else_sl (Cil.Set (var, else_expr, loc))
+            else
+              append_instr else_sl
+                (Cil.Set (var, Cil.CastE (typ, else_expr), loc))
+        | None -> else_sl
       in
       let fb = { Cil.battrs = []; bstmts } in
       let return_exp =
-        if CilHelper.eq_typ (Cil.typeOf else_expr) typ then Some (Cil.Lval var)
-        else Some (Cil.CastE (Cil.intType, Cil.Lval var))
+        match else_expr with
+        | Some else_expr when CilHelper.eq_typ (Cil.typeOf else_expr) typ ->
+            Some (Cil.Lval var)
+        | _ -> Some (Cil.CastE (Cil.intType, Cil.Lval var))
       in
-      (cond_sl @ [ Cil.mkStmt (Cil.If (cond_expr, tb, fb, loc)) ], return_exp)
+      if Cil.constFold false cond_expr |> Cil.isZero then
+        (cond_sl @ fb.bstmts, return_exp)
+      else if Cil.constFold false cond_expr |> CilHelper.is_constant_n 1 then
+        (cond_sl @ tb.bstmts, return_exp)
+      else
+        (cond_sl @ [ Cil.mkStmt (Cil.If (cond_expr, tb, fb, loc)) ], return_exp)
 
 and trans_unary_expr scope fundec_opt loc kind argument =
   match (kind, argument) with
@@ -1051,7 +1064,8 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
       | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
       | StaticAssert _ | TypeAlias _ | Decomposition _
       | UnknownDecl (_, _) ->
-          failwith "not expected"
+          L.warn "Unknown var decl %s\n" (CilHelper.s_location loc);
+          (sl, [], scope)
       | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
           failwith "Unsupported C++ features"
       | Function _ -> failwith "not allowed in basic block"
