@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+for outfile in $(find test/ -name "*.c.out"); do
+  echo "Promote $outfile"
+  mv $outfile ${outfile%out}answer
+done

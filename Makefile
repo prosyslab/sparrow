@@ -10,5 +10,8 @@ test: all
 	dune build test/test.exe
 	@cd test; ../_build/default/test/test.exe
 
+promote:
+	@script/promote
+
 clean:
 	dune clean
