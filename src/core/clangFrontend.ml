@@ -1071,7 +1071,8 @@ and trans_var_decl ?(storage = Cil.NoStorage) (scope : Scope.t) fundec loc
 and handle_stmt_init scope typ fundec loc action field_offset varinfo
     (e : C.Ast.expr) =
   match (e.C.Ast.desc, Cil.unrollType typ) with
-  | C.Ast.InitList el, Cil.TArray (_, arr_exp, _) ->
+  | C.Ast.InitList _, Cil.TArray (_, None, _) -> ([], scope)
+  | C.Ast.InitList el, Cil.TArray (_, Some arr_exp, _) ->
       let stmts, _, scope =
         mk_arr_stmt scope fundec loc action varinfo arr_exp field_offset el
       in
@@ -1129,8 +1130,7 @@ and mk_tmp_var fundec loc expr_list_len scope =
   let one = Cil.BinOp (Cil.PlusA, tmp_var_expr, Cil.one, Cil.intType) in
   (tmp_var_lval, tmp_var_expr, tmp_var_stmt, one, scope)
 
-and mk_arr_stmt scope fundec loc action varinfo arr_exp field_offset el =
-  let len_exp = Option.get arr_exp in
+and mk_arr_stmt scope fundec loc action varinfo len_exp field_offset el =
   let arr_len =
     match len_exp with
     | Cil.Const c -> (

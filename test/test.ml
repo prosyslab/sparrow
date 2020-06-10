@@ -120,6 +120,7 @@ let test_suites =
           "clang/variable-array1.c";
           "clang/duplicated-label0.c";
           "clang/array-subscript0.c";
+          "clang/array-init0.c";
         ];
     };
   ]
