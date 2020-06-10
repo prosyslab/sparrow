@@ -96,6 +96,7 @@ let test_suites =
           "clang/if0.c";
           "clang/if1.c";
           "clang/if2.c";
+          "clang/if3.c";
           "clang/init-list0.c";
           "clang/init-list1.c";
           "clang/nested-init-0.c";

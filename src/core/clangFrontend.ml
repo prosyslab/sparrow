@@ -1675,7 +1675,6 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
         ans
     | None -> Chunk.empty
   in
-  let cond_expr = Option.get cond_expr in
   let duplicate chunk =
     if
       chunk.Chunk.cases <> []
@@ -1729,7 +1728,11 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
             user_typs = init_stmt.user_typs;
           } )
   in
-  let _, if_chunk = compile_cond scope cond_expr then_stmt else_stmt in
+  let if_chunk =
+    match cond_expr with
+    | Some cond_expr -> compile_cond scope cond_expr then_stmt else_stmt |> snd
+    | None -> Chunk.empty
+  in
   let stmts = decl_stmt @ init_stmt.stmts @ cond_sl @ if_chunk.Chunk.stmts in
   let cases = init_stmt.cases @ then_stmt.cases @ else_stmt.cases in
   {
