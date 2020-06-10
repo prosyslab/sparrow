@@ -946,8 +946,7 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr []) ] }, scope)
   | Compound sl ->
       (* CIL does not need to have local blocks because all variables have unique names *)
-      let chunk = trans_compound scope fundec sl in
-      (chunk, scope)
+      (trans_compound scope fundec sl, scope)
   | For fdesc ->
       ( trans_for scope fundec loc fdesc.init fdesc.condition_variable
           fdesc.cond fdesc.inc fdesc.body,
@@ -1019,8 +1018,7 @@ and trans_compound scope fundec sl =
   List.fold_left
     (fun (l, scope) s ->
       let chunk, scope = trans_stmt scope fundec s in
-      let ans = (Chunk.append l chunk, scope) in
-      ans)
+      (Chunk.append l chunk, scope))
     (Chunk.empty, scope) sl
   |> fst
 
@@ -1744,9 +1742,7 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
 
 and trans_block scope fundec body =
   match body.C.Ast.desc with
-  | C.Ast.Compound l ->
-      let ans = trans_compound scope fundec l in
-      ans
+  | C.Ast.Compound l -> trans_compound scope fundec l
   | _ -> trans_stmt scope fundec body |> fst
 
 and trans_switch scope fundec loc init cond_var cond body =
@@ -1767,7 +1763,13 @@ and trans_switch scope fundec loc init cond_var cond body =
     init.Chunk.stmts @ decl_sl @ cond_sl
     @ [ Cil.mkStmt (Cil.Switch (cond_expr, body, cases, loc)) ]
   in
-  { Chunk.empty with stmts }
+  {
+    Chunk.stmts;
+    cases = body_stmt.cases;
+    labels = body_stmt.labels;
+    gotos = body_stmt.gotos;
+    user_typs = body_stmt.user_typs;
+  }
 
 and trans_case scope fundec loc lhs body =
   let lhs_expr = trans_expr scope (Some fundec) loc ADrop lhs |> snd in
