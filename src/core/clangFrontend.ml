@@ -1117,27 +1117,69 @@ and trans_var_decl ?(storage = Cil.NoStorage) (scope : Scope.t) fundec loc
 
 and handle_stmt_init scope typ fundec loc action field_offset varinfo
     (e : C.Ast.expr) =
+  let is_primitive_typ typ =
+    match Cil.unrollType typ with Cil.TComp (_, _) -> false | _ -> true
+  in
+  let is_struct_typ typ = not (is_primitive_typ typ) in
   match (e.C.Ast.desc, Cil.unrollType typ) with
   | C.Ast.InitList _, Cil.TArray (_, None, _) | C.Ast.InitList _, Cil.TPtr _ ->
       ([], scope)
-  | C.Ast.InitList el, Cil.TArray (_, Some arr_exp, _) ->
+  (* primitive array *)
+  | C.Ast.InitList el, Cil.TArray (arr_typ, Some arr_exp, _)
+    when is_primitive_typ arr_typ ->
       let stmts, _, scope =
         mk_arr_stmt scope fundec loc action varinfo arr_exp field_offset el
       in
       (stmts, scope)
+  (* struct array *)
+  | C.Ast.InitList el, Cil.TArray (arr_typ, Some arr_exp, _)
+    when is_struct_typ arr_typ ->
+      let unroll_nested_init e =
+        let ci =
+          match Cil.unrollType arr_typ with
+          | Cil.TComp (ci, _) -> ci
+          | _ -> failwith "expected only struct type"
+        in
+        if is_init_list e then
+          handle_stmt_init scope typ fundec loc action field_offset varinfo e
+        else
+          let stmts, _, scope =
+            mk_array_stmt el field_offset (List.hd ci.cfields) loc fundec action
+              varinfo scope arr_typ (Some arr_exp) false
+          in
+          (stmts, scope)
+      in
+      List.fold_left
+        (fun _ e ->
+          let stmts, scope = unroll_nested_init e in
+          (stmts, scope))
+        ([], scope) el
+  (* struct *)
   | C.Ast.InitList el, Cil.TComp (ci, _) ->
       let stmts, _, scope =
         mk_struct_stmt field_offset scope ci.cfields fundec action loc varinfo
           el
       in
       (stmts, scope)
+  (* primitive init list (contains only one element) *)
+  | C.Ast.InitList el, _ ->
+      let e =
+        if List.length el <> 1 then
+          failwith "primitive literal init list should be only one element"
+        else List.hd el
+      in
+      let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
+      let expr = get_opt "var_decl" expr_opt in
+      let var = (Cil.Var varinfo, field_offset) in
+      let instr = Cil.Set (var, expr, loc) in
+      (append_instr sl_expr instr, scope)
+  (* primitive *)
   | _ ->
       let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
       let expr = get_opt "var_decl" expr_opt in
-      let var = (Cil.Var varinfo, Cil.NoOffset) in
+      let var = (Cil.Var varinfo, field_offset) in
       let instr = Cil.Set (var, expr, loc) in
       (append_instr sl_expr instr, scope)
-
 and mk_while_stmt arr_len loc tmp_var_expr tmp_var_lval unary_plus_expr
     var_stmts =
   let cond_expr =
@@ -1406,7 +1448,7 @@ and mk_init_stmt field_offset scope loc fundec action fi varinfo expr_list =
         expr_list
   | Cil.TArray (arr_type, arr_exp, _), _ ->
       mk_array_stmt expr_list field_offset fi loc fundec action varinfo scope
-        arr_type arr_exp
+        arr_type arr_exp true
   | Cil.TEnum (_, _), e :: el ->
       let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
       let expr = get_opt "var_decl" expr_opt in
@@ -1417,13 +1459,16 @@ and mk_init_stmt field_offset scope loc fundec action fi varinfo expr_list =
   | _ -> failwith "not expected"
 
 and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
-    fundec action loc tmp_var varinfo flags primitive_arr_remainders scope =
+    fundec action loc tmp_var varinfo flags primitive_arr_remainders scope
+    attach_flag =
   let stmts', expr_remainders', tmp_var, flags, scope =
     if (expr_list <> [] && List.length expr_remainders <> 0) || flags.skip_while
     then
-      let field_offset = CilHelper.add_field_offset field_offset fi in
       let field_offset =
-        CilHelper.add_index_offset field_offset (Cil.integer o)
+        if attach_flag then
+          let field_offset = CilHelper.add_field_offset field_offset fi in
+          CilHelper.add_index_offset field_offset (Cil.integer o)
+        else CilHelper.add_index_offset field_offset (Cil.integer o)
       in
       let stmts', expr_remainders', scope =
         mk_struct_stmt field_offset scope ci.Cil.cfields fundec action loc
@@ -1451,9 +1496,11 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
         let tmp_var =
           Some { tmp_var_lval; tmp_var_expr; tmp_var_stmt; unary_plus_expr }
         in
-        let field_offset = CilHelper.add_field_offset field_offset fi in
         let field_offset =
-          CilHelper.add_index_offset field_offset tmp_var_expr
+          if attach_flag then
+            let field_offset = CilHelper.add_field_offset field_offset fi in
+            CilHelper.add_index_offset field_offset tmp_var_expr
+          else CilHelper.add_index_offset field_offset tmp_var_expr
         in
         let flags =
           { flags with tmp_var_cond_update = flags.tmp_var_cond_update + 1 }
@@ -1471,9 +1518,11 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
         in
         (stmts', expr_remainders', tmp_var, flags, scope)
       else
-        let field_offset = CilHelper.add_field_offset field_offset fi in
         let field_offset =
-          CilHelper.add_index_offset field_offset (Cil.integer o)
+          if attach_flag then
+            let field_offset = CilHelper.add_field_offset field_offset fi in
+            CilHelper.add_index_offset field_offset (Cil.integer o)
+          else CilHelper.add_index_offset field_offset (Cil.integer o)
         in
         let stmts', expr_remainders', scope =
           mk_struct_stmt field_offset scope ci.cfields fundec action loc varinfo
@@ -1491,7 +1540,6 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
     tmp_var,
     flags,
     o + 1 )
-
 and mk_primitive_array_stmt stmts expr_list expr_remainders o arr_type arr_len
     origin_field_offset fi fundec action loc tmp_var varinfo flags
     primitive_arr_remainders scope =
@@ -1558,7 +1606,7 @@ and mk_primitive_array_stmt stmts expr_list expr_remainders o arr_type arr_len
       o + 1 )
 
 and mk_array_stmt expr_list field_offset fi loc fundec action varinfo scope
-    arr_type arr_exp =
+    arr_type arr_exp attach_flag =
   let len_exp = Option.get arr_exp in
   let arr_len =
     match len_exp with
@@ -1597,7 +1645,7 @@ and mk_array_stmt expr_list field_offset fi loc fundec action varinfo scope
         | Cil.TComp (ci, _) ->
             mk_tcomp_array_stmt stmts expr_list expr_remainders o ci
               field_offset fi fundec action loc tmp_var varinfo flags
-              primitive_arr_remainders scope
+              primitive_arr_remainders scope attach_flag
         | _ ->
             mk_primitive_array_stmt stmts expr_list expr_remainders o arr_type
               arr_len field_offset fi fundec action loc tmp_var varinfo flags

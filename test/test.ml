@@ -107,6 +107,10 @@ let test_suites =
           "clang/local-init3.c";
           "clang/local-init4.c";
           "clang/local-init5.c";
+          "clang/local-init6.c";
+          "clang/local-init7.c";
+          "clang/local-init8.c";
+          "clang/local-init9.c";
           "clang/label0.c";
           "clang/label1.c";
           "clang/label2.c";
