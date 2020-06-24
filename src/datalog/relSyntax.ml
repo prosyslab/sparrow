@@ -42,6 +42,30 @@ let new_lv_id lv =
   Hashtbl.add lv_map lv id;
   id
 
+let pp_binop fmt = function
+  | Cil.PlusA -> F.fprintf fmt "PlusA"
+  | PlusPI -> F.fprintf fmt "PlusPI"
+  | IndexPI -> F.fprintf fmt "IndexPI"
+  | MinusA -> F.fprintf fmt "MinusA"
+  | MinusPI -> F.fprintf fmt "MinusPI"
+  | MinusPP -> F.fprintf fmt "MinusPP"
+  | Mult -> F.fprintf fmt "Mult"
+  | Div -> F.fprintf fmt "Div"
+  | Mod -> F.fprintf fmt "Mod"
+  | Shiftlt -> F.fprintf fmt "Shiftlt"
+  | Shiftrt -> F.fprintf fmt "Shiftrt"
+  | Lt -> F.fprintf fmt "Lt"
+  | Gt -> F.fprintf fmt "Gt"
+  | Le -> F.fprintf fmt "Le"
+  | Ge -> F.fprintf fmt "Ge"
+  | Eq -> F.fprintf fmt "Eq"
+  | Ne -> F.fprintf fmt "Ne"
+  | BAnd -> F.fprintf fmt "BAnd"
+  | BXor -> F.fprintf fmt "BXor"
+  | BOr -> F.fprintf fmt "BOr"
+  | LAnd -> F.fprintf fmt "LAand"
+  | LOr -> F.fprintf fmt "LOr"
+
 let rec pp_lv fmt lv =
   if Hashtbl.mem lv_map lv then ()
   else
@@ -65,8 +89,7 @@ and pp_exp fmt e =
         pp_exp fmt e2;
         let e1_id = Hashtbl.find exp_map e1 in
         let e2_id = Hashtbl.find exp_map e2 in
-        F.fprintf fmt.binop_exp "%s\t%s\t%s\t%s\n" id (CilHelper.s_bop bop)
-          e1_id e2_id
+        F.fprintf fmt.binop_exp "%s\t%a\t%s\t%s\n" id pp_binop bop e1_id e2_id
     | Cil.CastE (_, e1) ->
         pp_exp fmt e1;
         let e1_id = Hashtbl.find exp_map e1 in
