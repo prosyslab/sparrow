@@ -148,13 +148,17 @@ let print analysis global dug alarms =
   let oc_tb = open_out (dirname ^ "/TrueBranch.facts") in
   let oc_fc = open_out (dirname ^ "/FalseCond.facts") in
   let oc_fb = open_out (dirname ^ "/FalseBranch.facts") in
+  let oc_loophead = open_out (dirname ^ "/LoopHead.facts") in
   let fmt_edge = Format.formatter_of_out_channel oc_edge in
   let fmt_tc = Format.formatter_of_out_channel oc_tc in
   let fmt_tb = Format.formatter_of_out_channel oc_tb in
   let fmt_fc = Format.formatter_of_out_channel oc_fc in
   let fmt_fb = Format.formatter_of_out_channel oc_fb in
+  let fmt_loophead = Format.formatter_of_out_channel oc_loophead in
   G.iter_edges
     (fun src dst ->
+      if BatSet.mem dst (G.loopheads dug) then
+        F.fprintf fmt_loophead "%a\n" Node.pp dst;
       if PowNode.mem dst true_branch then (
         F.fprintf fmt_tc "%a\n" Node.pp src;
         F.fprintf fmt_tb "%a\t%a\n" Node.pp src Node.pp dst )

@@ -53,6 +53,10 @@ module type S = sig
 
   val access : t -> Access.t
 
+  val update_loopheads : node BatSet.t -> t -> t
+
+  val loopheads : t -> node BatSet.t
+
   (** {2 Iterator } *)
 
   val fold_node : (node -> 'a -> 'a) -> t -> 'a -> 'a

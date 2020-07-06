@@ -52,6 +52,10 @@ module type S = sig
 
   val access : t -> Access.t
 
+  val update_loopheads : node BatSet.t -> t -> t
+
+  val loopheads : t -> node BatSet.t
+
   (** {2 Iterator } *)
 
   val fold_node : (node -> 'a -> 'a) -> t -> 'a -> 'a
@@ -169,12 +173,13 @@ module Make (Access : Access.S) = struct
       with _ -> add_edge_e g (s, def, d)
   end
 
-  type t = { graph : G.t; access : Access.t }
+  type t = { graph : G.t; access : Access.t; loopheads : node BatSet.t }
 
   let create ?(size = 0) ?(access = Access.empty) () =
-    { graph = G.create ~size (); access }
+    { graph = G.create ~size (); access; loopheads = BatSet.empty }
 
-  let copy dug = { graph = G.copy dug.graph; access = dug.access }
+  let copy dug =
+    { graph = G.copy dug.graph; access = dug.access; loopheads = dug.loopheads }
 
   let nodesof dug = G.fold_vertex BatSet.add dug.graph BatSet.empty
 
@@ -247,6 +252,10 @@ module Make (Access : Access.S) = struct
   let succ_e n g = List.map (fun s -> (s, get_abslocs n s g)) (succ n g)
 
   let pred_e n g = List.map (fun p -> (p, get_abslocs p n g)) (pred n g)
+
+  let update_loopheads loopheads g = { g with loopheads }
+
+  let loopheads g = g.loopheads
 
   let to_dot dug =
     "digraph dugraph {\n"

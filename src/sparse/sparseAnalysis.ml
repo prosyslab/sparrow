@@ -295,6 +295,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
     let worklist =
       StepManager.stepf false "Workorder computation" Worklist.init dug
     in
+    let dug = DUGraph.update_loopheads (Worklist.loopheads worklist) dug in
     (worklist, global, initialize spec dug access, Table.empty)
     |> StepManager.stepf false "Fixpoint iteration with widening"
          (widening spec dug)

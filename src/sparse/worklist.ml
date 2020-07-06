@@ -26,6 +26,8 @@ module type S = sig
   val push_set : BasicDom.Node.t -> BasicDom.Node.t BatSet.t -> t -> t
 
   val is_loopheader : BasicDom.Node.t -> t -> bool
+
+  val loopheads : t -> BasicDom.Node.t BatSet.t
 end
 
 module NGraph = struct
@@ -269,6 +271,8 @@ module Make (DUGraph : Dug.S) = struct
   let init dug = { set = S.empty; order = Workorder.perform dug }
 
   let is_loopheader idx ws = Workorder.is_loopheader idx ws.order
+
+  let loopheads ws = ws.order.loopheads
 
   let pick ws =
     try

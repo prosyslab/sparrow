@@ -24,6 +24,8 @@ module type S = sig
   val push_set : BasicDom.Node.t -> BasicDom.Node.t BatSet.t -> t -> t
 
   val is_loopheader : BasicDom.Node.t -> t -> bool
+
+  val loopheads : t -> BasicDom.Node.t BatSet.t
 end
 
 module Make (DUGraph : Dug.S) : S with type DUGraph.t = DUGraph.t
