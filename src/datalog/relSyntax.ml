@@ -6,6 +6,7 @@ module Node = InterCfg.Node
 type formatter = {
   entry : F.formatter;
   exit : F.formatter;
+  join : F.formatter;
   skip : F.formatter;
   assign : F.formatter;
   alloc : F.formatter;
@@ -97,6 +98,8 @@ and pp_exp fmt e =
     | _ -> F.fprintf fmt.other_exp "%s\n" id
 
 let pp_cmd fmt icfg n =
+  if InterCfg.pred n icfg |> List.length = 2 then
+    F.fprintf fmt.join "%a\n" Node.pp n;
   match InterCfg.cmdof icfg n with
   | Cskip _ ->
       if InterCfg.is_entry n then F.fprintf fmt.entry "%a\n" Node.pp n
@@ -144,6 +147,7 @@ let make_formatters dirname =
   let oc_entry = open_out (dirname ^ "/Entry.facts") in
   let oc_exit = open_out (dirname ^ "/Exit.facts") in
   let oc_skip = open_out (dirname ^ "/Skip.facts") in
+  let oc_join = open_out (dirname ^ "/Join.facts") in
   let oc_assign = open_out (dirname ^ "/Assign.facts") in
   let oc_alloc = open_out (dirname ^ "/Alloc.facts") in
   let oc_libcall = open_out (dirname ^ "/LibCall.facts") in
@@ -155,6 +159,7 @@ let make_formatters dirname =
     {
       entry = F.formatter_of_out_channel oc_entry;
       exit = F.formatter_of_out_channel oc_exit;
+      join = F.formatter_of_out_channel oc_join;
       skip = F.formatter_of_out_channel oc_skip;
       assign = F.formatter_of_out_channel oc_assign;
       alloc = F.formatter_of_out_channel oc_alloc;

@@ -168,6 +168,10 @@ let entryof _ pid = Node.make pid IntraCfg.Node.entry
 
 let exitof _ pid = Node.make pid IntraCfg.Node.exit
 
+let pred (pid, node) g =
+  let intra_cfg = cfgof g pid in
+  IntraCfg.pred node intra_cfg |> List.map (Node.make pid)
+
 let unreachable_node_pid pid icfg =
   IntraNodeSet.fold
     (fun node -> NodeSet.add (pid, node))

@@ -58,6 +58,8 @@ val callof : node -> t -> node
 
 val returnof : node -> t -> node
 
+val pred : node -> t -> node list
+
 val is_entry : node -> bool
 
 val is_exit : node -> bool
