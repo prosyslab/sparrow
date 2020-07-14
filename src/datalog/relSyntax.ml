@@ -9,6 +9,7 @@ type formatter = {
   join : F.formatter;
   skip : F.formatter;
   assign : F.formatter;
+  assume : F.formatter;
   alloc : F.formatter;
   call : F.formatter;
   libcall : F.formatter;
@@ -18,6 +19,7 @@ type formatter = {
   const_exp : F.formatter;
   lval_exp : F.formatter;
   binop_exp : F.formatter;
+  unop_exp : F.formatter;
   cast_exp : F.formatter;
   other_exp : F.formatter;
   lval : F.formatter;
@@ -67,6 +69,11 @@ let pp_binop fmt = function
   | LAnd -> F.fprintf fmt "LAand"
   | LOr -> F.fprintf fmt "LOr"
 
+let pp_unop fmt = function
+  | Cil.BNot -> F.fprintf fmt "BNot"
+  | LNot -> F.fprintf fmt "LNot"
+  | Neg -> F.fprintf fmt "Neg"
+
 let rec pp_lv fmt lv =
   if Hashtbl.mem lv_map lv then ()
   else
@@ -91,6 +98,10 @@ and pp_exp fmt e =
         let e1_id = Hashtbl.find exp_map e1 in
         let e2_id = Hashtbl.find exp_map e2 in
         F.fprintf fmt.binop_exp "%s\t%a\t%s\t%s\n" id pp_binop bop e1_id e2_id
+    | Cil.UnOp (unop, e, _) ->
+        pp_exp fmt e;
+        let e_id = Hashtbl.find exp_map e in
+        F.fprintf fmt.unop_exp "%s\t%a\t%s\n" id pp_unop unop e_id
     | Cil.CastE (_, e1) ->
         pp_exp fmt e1;
         let e1_id = Hashtbl.find exp_map e1 in
@@ -134,13 +145,17 @@ let pp_cmd fmt icfg n =
       pp_exp fmt e;
       let id = Hashtbl.find exp_map e in
       F.fprintf fmt.return "%a\t%s\n" Node.pp n id
-  | Cassume (_, _, _) -> F.fprintf fmt.cmd "assume\n"
+  | Cassume (e, _, _) ->
+      pp_exp fmt e;
+      let e_id = Hashtbl.find exp_map e in
+      F.fprintf fmt.assume "%a\t%s\n" Node.pp n e_id
   | _ -> F.fprintf fmt.cmd "unknown"
 
 let make_formatters dirname =
   let oc_const = open_out (dirname ^ "/ConstExp.facts") in
   let oc_lval = open_out (dirname ^ "/LvalExp.facts") in
   let oc_binop = open_out (dirname ^ "/BinOpExp.facts") in
+  let oc_unop = open_out (dirname ^ "/UnOpExp.facts") in
   let oc_cast = open_out (dirname ^ "/CastExp.facts") in
   let oc_exp = open_out (dirname ^ "/OtherExp.facts") in
   let oc_cmd = open_out (dirname ^ "/Cmd.facts") in
@@ -149,6 +164,7 @@ let make_formatters dirname =
   let oc_skip = open_out (dirname ^ "/Skip.facts") in
   let oc_join = open_out (dirname ^ "/Join.facts") in
   let oc_assign = open_out (dirname ^ "/Assign.facts") in
+  let oc_assume = open_out (dirname ^ "/Assume.facts") in
   let oc_alloc = open_out (dirname ^ "/Alloc.facts") in
   let oc_libcall = open_out (dirname ^ "/LibCall.facts") in
   let oc_call = open_out (dirname ^ "/Call.facts") in
@@ -162,6 +178,7 @@ let make_formatters dirname =
       join = F.formatter_of_out_channel oc_join;
       skip = F.formatter_of_out_channel oc_skip;
       assign = F.formatter_of_out_channel oc_assign;
+      assume = F.formatter_of_out_channel oc_assume;
       alloc = F.formatter_of_out_channel oc_alloc;
       libcall = F.formatter_of_out_channel oc_libcall;
       call = F.formatter_of_out_channel oc_call;
@@ -171,6 +188,7 @@ let make_formatters dirname =
       const_exp = F.formatter_of_out_channel oc_const;
       lval_exp = F.formatter_of_out_channel oc_lval;
       binop_exp = F.formatter_of_out_channel oc_binop;
+      unop_exp = F.formatter_of_out_channel oc_unop;
       cast_exp = F.formatter_of_out_channel oc_cast;
       other_exp = F.formatter_of_out_channel oc_exp;
       lval = F.formatter_of_out_channel oc_lv;
@@ -211,6 +229,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.const_exp ();
   F.pp_print_flush fmt.lval_exp ();
   F.pp_print_flush fmt.binop_exp ();
+  F.pp_print_flush fmt.unop_exp ();
   F.pp_print_flush fmt.cast_exp ();
   F.pp_print_flush fmt.other_exp ();
   F.pp_print_flush fmt.lval ();
