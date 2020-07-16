@@ -23,6 +23,8 @@ type formatter = {
   cast_exp : F.formatter;
   other_exp : F.formatter;
   lval : F.formatter;
+  mem : F.formatter;
+  start_of : F.formatter;
 }
 
 let exp_count = ref 0
@@ -80,6 +82,10 @@ let rec pp_lv fmt lv =
     let id = new_lv_id lv in
     match lv with
     | Cil.Var vi, Cil.NoOffset -> F.fprintf fmt.lval "%s\t%s\n" id vi.vname
+    | Cil.Mem e, _ ->
+        pp_exp fmt e;
+        let e_id = new_exp_id e in
+        F.fprintf fmt.mem "%s\t%s\n" id e_id
     | _, _ -> F.fprintf fmt.lval "%s\tOther\n" id
 
 and pp_exp fmt e =
@@ -106,6 +112,10 @@ and pp_exp fmt e =
         pp_exp fmt e1;
         let e1_id = Hashtbl.find exp_map e1 in
         F.fprintf fmt.cast_exp "%s\t%s\n" id e1_id
+    | Cil.StartOf l ->
+        pp_lv fmt l;
+        let l_id = Hashtbl.find lv_map l in
+        F.fprintf fmt.start_of "%s\t%s\n" id l_id
     | _ -> F.fprintf fmt.other_exp "%s\n" id
 
 let pp_cmd fmt icfg n =
@@ -132,13 +142,15 @@ let pp_cmd fmt icfg n =
   | Calloc (_, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
   | Csalloc (_, _, _) -> F.fprintf fmt.cmd "salloc\n"
   | Cfalloc (_, _, _) -> F.fprintf fmt.cmd "falloc\n"
-  | Ccall (_, (Lval (Var f, NoOffset) as e), _, _) when f.vstorage = Cil.Extern
+  | Ccall (_, (Lval (Var f, NoOffset) as e), el, _) when f.vstorage = Cil.Extern
     ->
       pp_exp fmt e;
+      List.iter (pp_exp fmt) el;
       let id = Hashtbl.find exp_map e in
       F.fprintf fmt.libcall "%a\t%s\n" Node.pp n id
-  | Ccall (_, e, _, _) ->
+  | Ccall (_, e, el, _) ->
       pp_exp fmt e;
+      List.iter (pp_exp fmt) el;
       let id = Hashtbl.find exp_map e in
       F.fprintf fmt.call "%a\t%s\n" Node.pp n id
   | Creturn (Some e, _) ->
@@ -171,6 +183,8 @@ let make_formatters dirname =
   let oc_arg = open_out (dirname ^ "/Arg.facts") in
   let oc_return = open_out (dirname ^ "/Return.facts") in
   let oc_lv = open_out (dirname ^ "/Lval.facts") in
+  let oc_mem = open_out (dirname ^ "/Mem.facts") in
+  let oc_start_of = open_out (dirname ^ "/StartOf.facts") in
   let fmt =
     {
       entry = F.formatter_of_out_channel oc_entry;
@@ -192,6 +206,8 @@ let make_formatters dirname =
       cast_exp = F.formatter_of_out_channel oc_cast;
       other_exp = F.formatter_of_out_channel oc_exp;
       lval = F.formatter_of_out_channel oc_lv;
+      mem = F.formatter_of_out_channel oc_mem;
+      start_of = F.formatter_of_out_channel oc_start_of;
     }
   in
   let channels =
@@ -212,6 +228,8 @@ let make_formatters dirname =
       oc_arg;
       oc_return;
       oc_lv;
+      oc_mem;
+      oc_start_of;
     ]
   in
   (fmt, channels)
