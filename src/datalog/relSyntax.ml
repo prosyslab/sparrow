@@ -22,6 +22,8 @@ type formatter = {
   unop_exp : F.formatter;
   cast_exp : F.formatter;
   other_exp : F.formatter;
+  global_var : F.formatter;
+  local_var : F.formatter;
   lval : F.formatter;
   mem : F.formatter;
   start_of : F.formatter;
@@ -81,10 +83,12 @@ let rec pp_lv fmt lv =
   else
     let id = new_lv_id lv in
     match lv with
-    | Cil.Var vi, Cil.NoOffset -> F.fprintf fmt.lval "%s\t%s\n" id vi.vname
+    | Cil.Var vi, Cil.NoOffset ->
+        if vi.Cil.vglob then F.fprintf fmt.global_var "%s\t%s\n" id vi.vname
+        else F.fprintf fmt.local_var "%s\t%s\n" id vi.vname
     | Cil.Mem e, _ ->
         pp_exp fmt e;
-        let e_id = new_exp_id e in
+        let e_id = Hashtbl.find exp_map e in
         F.fprintf fmt.mem "%s\t%s\n" id e_id
     | _, _ -> F.fprintf fmt.lval "%s\tOther\n" id
 
@@ -182,6 +186,8 @@ let make_formatters dirname =
   let oc_call = open_out (dirname ^ "/Call.facts") in
   let oc_arg = open_out (dirname ^ "/Arg.facts") in
   let oc_return = open_out (dirname ^ "/Return.facts") in
+  let oc_global_var = open_out (dirname ^ "/GlobalVar.facts") in
+  let oc_local_var = open_out (dirname ^ "/LocalVar.facts") in
   let oc_lv = open_out (dirname ^ "/Lval.facts") in
   let oc_mem = open_out (dirname ^ "/Mem.facts") in
   let oc_start_of = open_out (dirname ^ "/StartOf.facts") in
@@ -205,6 +211,8 @@ let make_formatters dirname =
       unop_exp = F.formatter_of_out_channel oc_unop;
       cast_exp = F.formatter_of_out_channel oc_cast;
       other_exp = F.formatter_of_out_channel oc_exp;
+      global_var = F.formatter_of_out_channel oc_global_var;
+      local_var = F.formatter_of_out_channel oc_local_var;
       lval = F.formatter_of_out_channel oc_lv;
       mem = F.formatter_of_out_channel oc_mem;
       start_of = F.formatter_of_out_channel oc_start_of;
@@ -227,6 +235,8 @@ let make_formatters dirname =
       oc_libcall;
       oc_arg;
       oc_return;
+      oc_global_var;
+      oc_local_var;
       oc_lv;
       oc_mem;
       oc_start_of;
@@ -250,6 +260,8 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.unop_exp ();
   F.pp_print_flush fmt.cast_exp ();
   F.pp_print_flush fmt.other_exp ();
+  F.pp_print_flush fmt.global_var ();
+  F.pp_print_flush fmt.local_var ();
   F.pp_print_flush fmt.lval ();
   List.iter close_out channels
 
