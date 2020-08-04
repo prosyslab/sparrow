@@ -748,7 +748,7 @@ and trans_call scope skip_lhs fundec_opt loc callee args =
       ([], []) args
   in
   let retvar =
-    match Cil.typeOf callee with
+    match Cil.typeOf callee |> Cil.unrollType with
     | (Cil.TFun (rt, _, _, _) | TPtr (TFun (rt, _, _, _), _))
       when (not (Cil.isVoidType rt)) && not skip_lhs ->
         let temp = (Cil.Var (Cil.makeTempVar fundec rt), Cil.NoOffset) in
