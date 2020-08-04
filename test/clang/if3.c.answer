@@ -8,12 +8,16 @@ int b() ;
 #line 3 "clang/if3.c"
 int c(void) 
 { 
-
+  int __cil_tmp1 ;
 
   {
   {
 #line 4
-  ((a *)b)();
+  __cil_tmp1 = ((a *)b)();
+  }
+#line 4
+  if (__cil_tmp1) {
+
   }
 }
 }
