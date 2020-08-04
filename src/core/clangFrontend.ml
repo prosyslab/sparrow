@@ -155,10 +155,18 @@ let struct_id_count = ref 0
 let is_init_list (expr : C.Ast.expr) =
   match expr.C.Ast.desc with C.Ast.InitList _ -> true | _ -> false
 
+let anonymous_id_table = H.create 1024
+
 let new_record_id is_struct (rdecl : C.Ast.record_decl) =
-  if rdecl.C.Ast.name = "" then
-    let kind = if is_struct then "struct" else "union" in
-    "__anon" ^ kind ^ "_" ^ string_of_int (H.hash rdecl)
+  if rdecl.C.Ast.name = "" then (
+    let h = H.hash rdecl in
+    if H.mem anonymous_id_table h then H.find anonymous_id_table h
+    else
+      let kind = if is_struct then "struct" else "union" in
+      let name = "__anon" ^ kind ^ "_" ^ string_of_int !struct_id_count in
+      struct_id_count := !struct_id_count + 1;
+      H.add anonymous_id_table h name;
+      name )
   else rdecl.name
 
 let new_enum_id name =

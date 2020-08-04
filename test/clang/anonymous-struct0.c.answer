@@ -2,25 +2,25 @@
 /* print_CIL_Input is false */
 
 #line 2 "clang/anonymous-struct0.c"
-struct __anonstruct_1016322898 {
+struct __anonstruct_0 {
    unsigned int overload ;
 };
 #line 5 "clang/anonymous-struct0.c"
-struct __anonstruct_687592106 {
+struct __anonstruct_1 {
    unsigned int shreg ;
 };
 #line 8 "clang/anonymous-struct0.c"
-struct __anonstruct_847425524 {
+struct __anonstruct_2 {
    unsigned int send ;
 };
 #line 1 "clang/anonymous-struct0.c"
-struct __anonstruct_636564927 {
-   struct __anonstruct_1016322898 com ;
-   struct __anonstruct_687592106 bit ;
-   struct __anonstruct_847425524 boo ;
+struct __anonstruct_3 {
+   struct __anonstruct_0 com ;
+   struct __anonstruct_1 bit ;
+   struct __anonstruct_2 boo ;
 };
 #line 11 "clang/anonymous-struct0.c"
-typedef struct __anonstruct_636564927 cvsd_t;
+typedef struct __anonstruct_3 cvsd_t;
 #line 13 "clang/anonymous-struct0.c"
 typedef cvsd_t prev_t;
 #line 15 "clang/anonymous-struct0.c"
