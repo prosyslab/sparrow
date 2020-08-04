@@ -663,7 +663,7 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
           Cil.Lval (Cil.addOffsetLval (Cil.Index (Cil.zero, Cil.NoOffset)) base)
         )
       else (sl, Cil.Lval (Cil.Mem var, Cil.NoOffset))
-  | C.Plus -> (sl, Cil.Lval (lval_of_expr var))
+  | C.Plus -> (sl, var)
   | C.Minus -> (sl, Cil.UnOp (Cil.Neg, var, typ))
   | C.Not -> (sl, Cil.UnOp (Cil.BNot, var, typ))
   | C.LNot -> (sl, Cil.UnOp (Cil.LNot, var, typ))

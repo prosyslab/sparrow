@@ -133,6 +133,7 @@ let test_suites =
           "clang/designated-init1.c";
           "clang/UL0.c";
           "clang/local-fun0.c";
+          "clang/unary_operator0.c";
         ];
     };
   ]
