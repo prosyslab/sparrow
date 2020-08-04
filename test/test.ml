@@ -163,9 +163,9 @@ let msg_pass = color_green ^ "PASS" ^ color_reset
 let msg_fail = color_red ^ "FAIL" ^ color_reset
 
 let check f =
-  let ic = Unix.open_process_in ("diff " ^ f ^ ".answer " ^ f ^ ".out") in
+  let oc = Unix.open_process_out ("diff " ^ f ^ ".answer " ^ f ^ ".out") in
   print_string (f ^ ".....");
-  match Unix.close_process_in ic with
+  match Unix.close_process_out oc with
   | Unix.WEXITED i when i = 0 ->
       print_endline msg_pass;
       Unix.unlink (f ^ ".out");
