@@ -2,11 +2,11 @@
 /* print_CIL_Input is false */
 
 #line 1 "clang/struct0.c"
-struct __anonstruct_0 {
+struct __anonstruct_775311173 {
    int __val[2] ;
 };
 #line 3 "clang/struct0.c"
-typedef struct __anonstruct_0 __fsid_t;
+typedef struct __anonstruct_775311173 __fsid_t;
 #line 7 "clang/struct0.c"
 int f(int x ) 
 { 

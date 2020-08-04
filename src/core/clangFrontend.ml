@@ -134,8 +134,8 @@ module Scope = struct
     | [], _ when compinfo <> None ->
         let compinfo = Option.get compinfo in
         if compinfo.Cil.cname = name then Cil.TComp (compinfo, [])
-        else failwith ("type of " ^ name ^ " not found")
-    | _ -> failwith ("type of " ^ name ^ " not found")
+        else failwith ("type of " ^ name ^ " not found (case 1)")
+    | _ -> failwith ("type of " ^ name ^ " not found (case 2)")
 
   let pp fmt scope =
     List.iter
@@ -155,11 +155,11 @@ let struct_id_count = ref 0
 let is_init_list (expr : C.Ast.expr) =
   match expr.C.Ast.desc with C.Ast.InitList _ -> true | _ -> false
 
-let new_record_id is_struct =
-  let kind = if is_struct then "struct" else "union" in
-  let new_id = "__anon" ^ kind ^ "_" ^ string_of_int !struct_id_count in
-  struct_id_count := !struct_id_count + 1;
-  new_id
+let new_record_id is_struct (rdecl : C.Ast.record_decl) =
+  if rdecl.C.Ast.name = "" then
+    let kind = if is_struct then "struct" else "union" in
+    "__anon" ^ kind ^ "_" ^ string_of_int (H.hash rdecl)
+  else rdecl.name
 
 let new_enum_id name =
   let new_id = "__anonenum_" ^ name ^ "_" ^ string_of_int !struct_id_count in
@@ -403,7 +403,16 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
   | FunctionType ft -> trans_function_type scope None ft |> fst
   | Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
   | Elaborated et -> trans_type ~compinfo scope et.named_type
-  | Record rt -> Scope.find_type ~compinfo (name_of_ident_ref rt) scope
+  | Record rt ->
+      let decl = typ.cxtype |> C.get_type_declaration |> C.Decl.of_cxcursor in
+      let rdecl, is_struct =
+        match decl.C.Ast.desc with
+        | C.Ast.RecordDecl rdecl -> (rdecl, rdecl.C.Ast.keyword = C.Struct)
+        | _ -> failwith "Invalid type"
+      in
+      let name = name_of_ident_ref rt in
+      let name = if name = "" then new_record_id is_struct rdecl else name in
+      Scope.find_type ~compinfo name scope
   | Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
   | InvalidType -> failwith "invalid type"
   | Vector _ -> failwith "vector type"
@@ -1080,12 +1089,12 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
       | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
           let is_struct = rdecl.keyword = C.Struct in
           let globals, scope =
-            trans_global_decl ~new_name:(new_record_id is_struct) scope d
+            trans_global_decl ~new_name:(new_record_id is_struct rdecl) scope d
           in
           (sl, user_typs @ globals, scope)
       | C.Ast.RecordDecl rdecl ->
           let is_struct = rdecl.keyword = C.Struct in
-          let name = new_record_id is_struct in
+          let name = new_record_id is_struct rdecl in
           if Scope.mem_typ name scope then (sl, user_typs, scope)
           else
             let globals, scope = trans_global_decl ~new_name:name scope d in
@@ -2006,9 +2015,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
           [] rdecl.fields
       in
       let name =
-        if new_name = "" then
-          if rdecl.name = "" then new_record_id is_struct else rdecl.name
-        else new_name
+        if new_name = "" then new_record_id is_struct rdecl else new_name
       in
       let compinfo = Cil.mkCompInfo is_struct name callback [] in
       compinfo.cdefined <- true;
@@ -2019,14 +2026,12 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
         (globals @ [ Cil.GCompTag (prev_ci, loc) ], scope) )
       else
         let typ = Cil.TComp (compinfo, []) in
-        let scope = Scope.add_type rdecl.name typ scope in
+        let scope = Scope.add_type name typ scope in
         (globals @ [ Cil.GCompTag (compinfo, loc) ], scope)
   | C.Ast.RecordDecl rdecl ->
       let is_struct = rdecl.keyword = C.Struct in
       let name =
-        if new_name = "" then
-          if rdecl.name = "" then new_record_id is_struct else rdecl.name
-        else new_name
+        if new_name = "" then new_record_id is_struct rdecl else new_name
       in
       if Scope.mem_typ name scope then
         let typ = Scope.find_type name scope in

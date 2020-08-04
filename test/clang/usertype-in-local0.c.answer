@@ -2,13 +2,13 @@
 /* print_CIL_Input is false */
 
 #line 2 "clang/usertype-in-local0.c"
-struct __anonstruct_0 {
+struct A {
    int a ;
 };
 #line 1 "clang/usertype-in-local0.c"
 int foo(void) 
 { 
-  struct __anonstruct_0 sa ;
+  struct A sa ;
 
   {
 #line 5
@@ -16,13 +16,13 @@ int foo(void)
 }
 }
 #line 9 "clang/usertype-in-local0.c"
-struct __anonstruct_1 {
+struct A {
    int a ;
 };
 #line 8 "clang/usertype-in-local0.c"
 int main(void) 
 { 
-  struct __anonstruct_1 sa ;
+  struct A sa ;
 
   {
   {

@@ -2,11 +2,11 @@
 /* print_CIL_Input is false */
 
 #line 2 "clang/local-init8.c"
-struct __anonstruct_0 {
+struct atom {
    int A[42] ;
 };
 #line 5 "clang/local-init8.c"
-typedef struct __anonstruct_0 atom_t;
+typedef struct atom atom_t;
 #line 1 "clang/local-init8.c"
 int main(void) 
 { 

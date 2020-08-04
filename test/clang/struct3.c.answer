@@ -2,14 +2,14 @@
 /* print_CIL_Input is false */
 
 #line 3 "clang/struct3.c"
-struct __anonstruct_0 {
+struct __anonstruct_264823981 {
    unsigned int __low ;
    unsigned int __high ;
 };
 #line 1 "clang/struct3.c"
 struct __pthread_cond_s {
    unsigned long long __wseq ;
-   struct __anonstruct_0 __wseq32 ;
+   struct __anonstruct_264823981 __wseq32 ;
 };
 #line 9 "clang/struct3.c"
 int main(void) 

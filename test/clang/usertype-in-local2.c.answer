@@ -2,12 +2,12 @@
 /* print_CIL_Input is false */
 
 #line 2 "clang/usertype-in-local2.c"
-struct __anonstruct_0 {
+struct _A {
    int a ;
    int arr[3] ;
 };
 #line 2 "clang/usertype-in-local2.c"
-typedef struct __anonstruct_0 A;
+typedef struct _A A;
 #line 1 "clang/usertype-in-local2.c"
 void foo(void) 
 { 
