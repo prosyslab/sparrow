@@ -585,7 +585,10 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
   | C.Ast.UnexposedExpr _ ->
       L.warn "UnexposedExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
-  | C.Ast.InitList _ -> failwith "init list"
+  | C.Ast.InitList _ ->
+      (* TODO: https://github.com/prosyslab/sparrow/issues/27 *)
+      L.warn "Warning: init list @ %s\n" (CilHelper.s_location loc);
+      ([], Some Cil.zero)
   | C.Ast.ImaginaryLiteral _ -> failwith "Unsupported syntax (ImaginaryLiteral)"
   | C.Ast.BoolLiteral _ -> failwith "Unsupported syntax (BoolLiteral)"
   | C.Ast.NullPtrLiteral -> failwith "Unsupported syntax (NullPtrLiteral)"
