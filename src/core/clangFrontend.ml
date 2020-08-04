@@ -593,8 +593,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
       (* StmtExpr is not supported yet *)
       L.warn "StmtExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
-  | C.Ast.DesignatedInit d ->
-      trans_expr scope fundec_opt loc action d.init
+  | C.Ast.DesignatedInit d -> trans_expr scope fundec_opt loc action d.init
   | C.Ast.UnknownExpr (_, _) -> ([], Some Cil.zero)
   | _ -> failwith "unknown trans_expr"
 
@@ -1092,6 +1091,9 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
             trans_global_decl ~new_name:(new_enum_id edecl.name) scope d
           in
           (sl, user_typs @ globals, scope)
+      | Function _ ->
+          (* if the program is valid, there must be the corresponding def somewhere *)
+          (sl, user_typs, scope)
       | Field _ | EmptyDecl | AccessSpecifier _ | Namespace _ | UsingDirective _
       | UsingDeclaration _ | Constructor _ | Destructor _ | LinkageSpec _
       | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
@@ -1101,7 +1103,6 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
           (sl, [], scope)
       | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
           failwith "Unsupported C++ features"
-      | Function _ -> failwith "not allowed in basic block"
       | Concept _ | Export _ -> failwith "new cases: Concept | Export")
     ([], [], scope) dl
 
@@ -1180,6 +1181,7 @@ and handle_stmt_init scope typ fundec loc action field_offset varinfo
       let var = (Cil.Var varinfo, field_offset) in
       let instr = Cil.Set (var, expr, loc) in
       (append_instr sl_expr instr, scope)
+
 and mk_while_stmt arr_len loc tmp_var_expr tmp_var_lval unary_plus_expr
     var_stmts =
   let cond_expr =
@@ -1332,7 +1334,7 @@ and mk_struct_stmt field_offset scope cfields fundec action loc varinfo
                 expr_list
             in
             loop scope union_flag fl expr_remainders (f :: fis) (stmts @ stmts')
-              (i :: idx_list) (idx+1)
+              (i :: idx_list) (idx + 1)
         else
           match is_init_list e with
           | true ->
@@ -1540,6 +1542,7 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci field_offset fi
     tmp_var,
     flags,
     o + 1 )
+
 and mk_primitive_array_stmt stmts expr_list expr_remainders o arr_type arr_len
     origin_field_offset fi fundec action loc tmp_var varinfo flags
     primitive_arr_remainders scope =
@@ -2186,7 +2189,7 @@ and mk_struct_init scope loc typ cfields expr_list =
               mk_init scope loc f.Cil.ftype expr_list
             in
             loop union_flag fl expr_remainders (f :: fis) (init :: inits)
-              (i :: idx_list) (idx+1)
+              (i :: idx_list) (idx + 1)
         else
           match is_init_list e with
           | true ->
