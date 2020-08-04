@@ -394,7 +394,12 @@ let rec append_stmt_list sl1 sl2 =
 
 let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
   match typ.C.Ast.desc with
-  | Pointer pt -> Cil.TPtr (trans_type ~compinfo scope pt, trans_attribute typ)
+  | Pointer pt -> (
+      try Cil.TPtr (trans_type ~compinfo scope pt, trans_attribute typ)
+      with _ ->
+        (* TODO: https://github.com/prosyslab/sparrow/issues/28 *)
+        L.warn "WARN: type not found";
+        Cil.voidPtrType )
   | FunctionType ft -> trans_function_type scope None ft |> fst
   | Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
   | Elaborated et -> trans_type ~compinfo scope et.named_type
