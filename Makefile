@@ -8,6 +8,7 @@ all:
 
 test: all
 	dune build test/test.exe
+	@script/check-format
 	@cd test; ../_build/default/test/test.exe
 
 promote:

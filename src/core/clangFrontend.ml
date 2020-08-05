@@ -412,14 +412,20 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
   | Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
   | Elaborated et -> trans_type ~compinfo scope et.named_type
   | Record rt ->
-      let decl = typ.cxtype |> C.get_type_declaration |> C.Decl.of_cxcursor in
-      let rdecl, is_struct =
-        match decl.C.Ast.desc with
-        | C.Ast.RecordDecl rdecl -> (rdecl, rdecl.C.Ast.keyword = C.Struct)
-        | _ -> failwith "Invalid type"
-      in
       let name = name_of_ident_ref rt in
-      let name = if name = "" then new_record_id is_struct rdecl else name in
+      let name =
+        if name = "" then
+          let decl =
+            typ.cxtype |> C.get_type_declaration |> C.Decl.of_cxcursor
+          in
+          let rdecl, is_struct =
+            match decl.C.Ast.desc with
+            | C.Ast.RecordDecl rdecl -> (rdecl, rdecl.C.Ast.keyword = C.Struct)
+            | _ -> failwith "Invalid type"
+          in
+          new_record_id is_struct rdecl
+        else name
+      in
       Scope.find_type ~compinfo name scope
   | Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
   | InvalidType -> failwith "invalid type"
@@ -500,19 +506,19 @@ and trans_parameter_types scope fundec_opt = function
   | Some params ->
       let scope, formals =
         List.fold_left
-          (fun p (param : C.Ast.parameter) ->
-            let scope, formals = p in
-            let param_name = param.desc.name in
+          (fun (scope, formals) (param : C.Ast.parameter) ->
             let param_typ = trans_type scope param.desc.qual_type in
-            let result = (param_name, param_typ, []) in
-            let make_var =
-              match fundec_opt with
-              | Some fundec -> fun n t -> Cil.makeFormalVar fundec n t
-              | None -> fun n t -> Cil.makeVarinfo false n t
-            in
-            let vi = make_var param_name param_typ in
-            let scope = Scope.add param.desc.name (EnvData.EnvVar vi) scope in
-            (scope, formals @ [ result ]))
+            let result = (param.desc.name, param_typ, []) in
+            if param.desc.name = "" then (scope, formals @ [ result ])
+            else
+              let make_var =
+                match fundec_opt with
+                | Some fundec -> fun n t -> Cil.makeFormalVar fundec n t
+                | None -> fun n t -> Cil.makeVarinfo false n t
+              in
+              let vi = make_var param.desc.name param_typ in
+              let scope = Scope.add param.desc.name (EnvData.EnvVar vi) scope in
+              (scope, formals @ [ result ]))
           (scope, []) params.C.Ast.non_variadic
       in
       (Some formals, params.C.Ast.variadic, scope)
