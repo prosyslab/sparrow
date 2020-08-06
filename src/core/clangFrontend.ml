@@ -1972,12 +1972,16 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
   match decl.desc with
   | C.Ast.Function fdecl when fdecl.body = None ->
       let name = string_of_declaration_name fdecl.name in
+      let typ = Cil.TFun (Cil.voidType, None, false, []) in
+      let svar, scope = find_global_variable scope name typ in
+      let scope = Scope.enter_function scope in
       let typ, scope =
         trans_function_type scope None fdecl.C.Ast.function_type
       in
-      let svar, scope = find_global_variable scope name typ in
+      svar.vtype <- typ;
       svar.vstorage <- storage;
       svar.vattr <- trans_decl_attribute decl;
+      let scope = Scope.exit_function scope in
       ([ Cil.GVarDecl (svar, loc) ], scope)
   | C.Ast.Function fdecl ->
       let name = string_of_declaration_name fdecl.name in

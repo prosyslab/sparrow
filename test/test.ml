@@ -136,6 +136,7 @@ let test_suites =
           "clang/unary_operator0.c";
           "clang/anonymous-struct0.c";
           "clang/type0.c";
+          "clang/param0.c";
         ];
     };
   ]
