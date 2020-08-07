@@ -24,6 +24,7 @@ type formatter = {
   other_exp : F.formatter;
   global_var : F.formatter;
   local_var : F.formatter;
+  field : F.formatter;
   lval : F.formatter;
   mem : F.formatter;
   start_of : F.formatter;
@@ -86,6 +87,7 @@ let rec pp_lv fmt lv =
     | Cil.Var vi, Cil.NoOffset ->
         if vi.Cil.vglob then F.fprintf fmt.global_var "%s\t%s\n" id vi.vname
         else F.fprintf fmt.local_var "%s\t%s\n" id vi.vname
+    | Cil.Var _, Cil.Field (_, _) -> F.fprintf fmt.field "%s\n" id
     | Cil.Mem e, _ ->
         pp_exp fmt e;
         let e_id = Hashtbl.find exp_map e in
@@ -188,6 +190,7 @@ let make_formatters dirname =
   let oc_return = open_out (dirname ^ "/Return.facts") in
   let oc_global_var = open_out (dirname ^ "/GlobalVar.facts") in
   let oc_local_var = open_out (dirname ^ "/LocalVar.facts") in
+  let oc_field = open_out (dirname ^ "/Field.facts") in
   let oc_lv = open_out (dirname ^ "/Lval.facts") in
   let oc_mem = open_out (dirname ^ "/Mem.facts") in
   let oc_start_of = open_out (dirname ^ "/StartOf.facts") in
@@ -213,6 +216,7 @@ let make_formatters dirname =
       other_exp = F.formatter_of_out_channel oc_exp;
       global_var = F.formatter_of_out_channel oc_global_var;
       local_var = F.formatter_of_out_channel oc_local_var;
+      field = F.formatter_of_out_channel oc_field;
       lval = F.formatter_of_out_channel oc_lv;
       mem = F.formatter_of_out_channel oc_mem;
       start_of = F.formatter_of_out_channel oc_start_of;
@@ -237,6 +241,7 @@ let make_formatters dirname =
       oc_return;
       oc_global_var;
       oc_local_var;
+      oc_field;
       oc_lv;
       oc_mem;
       oc_start_of;
@@ -262,6 +267,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.other_exp ();
   F.pp_print_flush fmt.global_var ();
   F.pp_print_flush fmt.local_var ();
+  F.pp_print_flush fmt.field ();
   F.pp_print_flush fmt.lval ();
   List.iter close_out channels
 
