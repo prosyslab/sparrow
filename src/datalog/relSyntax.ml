@@ -88,8 +88,11 @@ let rec pp_lv fmt lv =
         if vi.Cil.vglob then F.fprintf fmt.global_var "%s\t%s\n" id vi.vname
         else F.fprintf fmt.local_var "%s\t%s\n" id vi.vname
     | Cil.Var _, Cil.Field (_, _) -> F.fprintf fmt.field "%s\n" id
-    | Cil.Mem e, _ ->
+    | Cil.Mem e, offset ->
         pp_exp fmt e;
+        ( match offset with
+        | Cil.Field (_, _) -> F.fprintf fmt.field "%s\n" id
+        | _ -> () );
         let e_id = Hashtbl.find exp_map e in
         F.fprintf fmt.mem "%s\t%s\n" id e_id
     | _, _ -> F.fprintf fmt.lval "%s\tOther\n" id
