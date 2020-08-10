@@ -136,6 +136,7 @@ let test_suites =
           "clang/local-fun0.c";
           "clang/unary_operator0.c";
           "clang/anonymous-struct0.c";
+          "clang/anonymous-struct1.c";
           "clang/type0.c";
           "clang/param0.c";
         ];

@@ -157,9 +157,9 @@ let is_init_list (expr : C.Ast.expr) =
 
 let anonymous_id_table = H.create 1024
 
-let new_record_id is_struct (rdecl : C.Ast.record_decl) =
+let new_record_id is_struct (rdecl : C.Ast.record_decl) cursor =
   if rdecl.C.Ast.name = "" then (
-    let h = H.hash rdecl in
+    let h = C.hash_cursor cursor in
     if H.mem anonymous_id_table h then H.find anonymous_id_table h
     else
       let kind = if is_struct then "struct" else "union" in
@@ -406,7 +406,7 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
       try Cil.TPtr (trans_type ~compinfo scope pt, trans_attribute typ)
       with _ ->
         (* TODO: https://github.com/prosyslab/sparrow/issues/28 *)
-        L.warn "WARN: type not found";
+        L.warn "WARN: type not found\n";
         Cil.voidPtrType )
   | FunctionType ft -> trans_function_type scope None ft |> fst
   | Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
@@ -415,15 +415,14 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
       let name = name_of_ident_ref rt in
       let name =
         if name = "" then
-          let decl =
-            typ.cxtype |> C.get_type_declaration |> C.Decl.of_cxcursor
-          in
+          let decl = C.Type.get_declaration typ in
           let rdecl, is_struct =
             match decl.C.Ast.desc with
             | C.Ast.RecordDecl rdecl -> (rdecl, rdecl.C.Ast.keyword = C.Struct)
             | _ -> failwith "Invalid type"
           in
-          new_record_id is_struct rdecl
+          let cursor = C.Ast.cursor_of_decoration decl.decoration in
+          new_record_id is_struct rdecl cursor
         else name
       in
       Scope.find_type ~compinfo name scope
@@ -1102,13 +1101,17 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
           (sl @ decl_stmts, user_typs, scope)
       | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
           let is_struct = rdecl.keyword = C.Struct in
+          let cursor = C.Ast.cursor_of_decoration d.decoration in
           let globals, scope =
-            trans_global_decl ~new_name:(new_record_id is_struct rdecl) scope d
+            trans_global_decl
+              ~new_name:(new_record_id is_struct rdecl cursor)
+              scope d
           in
           (sl, user_typs @ globals, scope)
       | C.Ast.RecordDecl rdecl ->
           let is_struct = rdecl.keyword = C.Struct in
-          let name = new_record_id is_struct rdecl in
+          let cursor = C.Ast.cursor_of_decoration d.decoration in
+          let name = new_record_id is_struct rdecl cursor in
           if Scope.mem_typ name scope then (sl, user_typs, scope)
           else
             let globals, scope = trans_global_decl ~new_name:name scope d in
@@ -2032,8 +2035,9 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
             | _ -> fl)
           [] rdecl.fields
       in
+      let cursor = C.Ast.cursor_of_decoration decl.decoration in
       let name =
-        if new_name = "" then new_record_id is_struct rdecl else new_name
+        if new_name = "" then new_record_id is_struct rdecl cursor else new_name
       in
       let compinfo = Cil.mkCompInfo is_struct name callback [] in
       compinfo.cdefined <- true;
@@ -2048,8 +2052,9 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
         (globals @ [ Cil.GCompTag (compinfo, loc) ], scope)
   | C.Ast.RecordDecl rdecl ->
       let is_struct = rdecl.keyword = C.Struct in
+      let cursor = C.Ast.cursor_of_decoration decl.decoration in
       let name =
-        if new_name = "" then new_record_id is_struct rdecl else new_name
+        if new_name = "" then new_record_id is_struct rdecl cursor else new_name
       in
       if Scope.mem_typ name scope then
         let typ = Scope.find_type name scope in
