@@ -584,24 +584,24 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
   | C.Ast.ArraySubscript arr -> (
       let sl1, base = trans_expr scope fundec_opt loc action arr.base in
       let sl2, idx = trans_expr scope fundec_opt loc action arr.index in
-      match Option.get base |> CilHelper.remove_cast with
-      | Cil.Lval base ->
+      let base = Option.get base in
+      (* base may contain casting such as (char * ) 0. But we have to preserve such important castings. Otherwise, CIL will crash  *)
+      match CilHelper.remove_cast base with
+      | Cil.Lval base' ->
           let new_lval =
             match idx with
-            | Some x when Cil.isPointerType (Cil.typeOfLval base) ->
-                ( Cil.Mem
-                    (Cil.BinOp
-                       (Cil.PlusPI, Cil.Lval base, x, Cil.typeOfLval base)),
+            | Some x when Cil.isPointerType (Cil.typeOfLval base') ->
+                ( Cil.Mem (Cil.BinOp (Cil.PlusPI, base, x, Cil.typeOf base)),
                   Cil.NoOffset )
-            | Some x -> Cil.addOffsetLval (Cil.Index (x, Cil.NoOffset)) base
+            | Some x -> Cil.addOffsetLval (Cil.Index (x, Cil.NoOffset)) base'
             | _ -> failwith "lval"
           in
           (sl1 @ sl2, Some (Cil.Lval new_lval))
-      | e ->
+      | _ ->
           let new_lval =
             match idx with
             | Some x ->
-                ( Cil.Mem (Cil.BinOp (Cil.PlusPI, e, x, Cil.typeOf e)),
+                ( Cil.Mem (Cil.BinOp (Cil.PlusPI, base, x, Cil.typeOf base)),
                   Cil.NoOffset )
             | _ -> failwith "lval"
           in

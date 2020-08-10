@@ -66,6 +66,7 @@ let test_suites =
           "clang/implicit-cast1.c";
           "clang/implicit-cast2.c";
           "clang/implicit-cast3.c";
+          "clang/implicit-cast4.c";
           "clang/binop0.c";
           "clang/ternop0.c";
           "clang/ternop1.c";
