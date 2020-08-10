@@ -14,6 +14,8 @@ let log_file = ref None
 
 let report_file = ref None
 
+let set_level x = level := x
+
 let copy_formatter f =
   let out_string, flush = F.pp_get_formatter_output_functions f () in
   let out_funs = F.pp_get_formatter_out_functions f () in
@@ -69,6 +71,10 @@ let flush = function
       F.pp_print_flush logger.file ();
       F.pp_print_flush logger.dual ()
   | _ -> ()
+
+let flush_all () =
+  flush !logger;
+  flush !reporter
 
 let finalize () =
   flush !logger;

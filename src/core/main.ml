@@ -107,6 +107,7 @@ let initialize () =
   Arg.parse_dynamic Options.options Frontend.parse_arg usageMsg;
   FileManager.mk_outdir ();
   L.init ();
+  if !Options.debug then L.set_level L.DEBUG;
   L.info "%s\n" (String.concat " " !Frontend.files);
   Profiler.start_logger ();
   Cil.initCIL ()
