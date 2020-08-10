@@ -225,11 +225,7 @@ let trans_location node =
   let location =
     C.Ast.location_of_node node |> C.Ast.concrete_of_source_location C.Presumed
   in
-  {
-    Cil.file = location.C.Ast.filename;
-    line = location.C.Ast.line;
-    byte = location.C.Ast.column;
-  }
+  { Cil.file = location.filename; line = location.line; byte = location.column }
 
 let get_compinfo typ =
   match Cil.unrollType typ with
@@ -427,7 +423,9 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
       in
       Scope.find_type ~compinfo name scope
   | Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
-  | InvalidType -> failwith "invalid type"
+  | InvalidType ->
+      L.warn "WARN: invalid type (use int instead)\n";
+      Cil.intType
   | Vector _ -> failwith "vector type"
   | BuiltinType _ -> trans_builtin_type ~compinfo scope typ
   | ConstantArray ca ->
