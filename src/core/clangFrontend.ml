@@ -402,7 +402,7 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
       try Cil.TPtr (trans_type ~compinfo scope pt, trans_attribute typ)
       with _ ->
         (* TODO: https://github.com/prosyslab/sparrow/issues/28 *)
-        L.warn "WARN: type not found %a\n" C.Type.pp typ;
+        L.warn "WARN: type not found\n";
         Cil.voidPtrType )
   | FunctionType ft -> trans_function_type scope None ft |> fst
   | Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
@@ -2312,7 +2312,7 @@ let initialize_builtins scope =
 let parse fname =
   let options = { C.Ast.Options.default with ignore_implicit_cast = false } in
   L.debug "Loading %s\n" fname;
-  L.flush_all ();
+  if !Options.debug then L.flush_all ();
   let tu = C.Ast.parse_file ~options fname in
   let scope = initialize_builtins (Scope.create ()) in
   let globals =
