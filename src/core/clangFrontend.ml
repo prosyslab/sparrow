@@ -1162,18 +1162,22 @@ and handle_stmt_init scope typ fundec loc action lv (e : C.Ast.expr) =
   (* primitive array *)
   | C.Ast.InitList el, Cil.TArray (arr_typ, Some arr_exp, _)
     when is_primitive_typ arr_typ ->
-      let stmts, scope = mk_arr_stmt scope fundec loc action lv arr_exp el in
-      (stmts, scope)
+      mk_arr_stmt scope fundec loc action lv arr_exp el
   (* struct array *)
   | C.Ast.InitList el, Cil.TArray (arr_typ, Some arr_exp, _)
     when is_struct_typ arr_typ ->
-      let unroll_nested_init e =
-        let ci =
-          match Cil.unrollType arr_typ with
-          | Cil.TComp (ci, _) -> ci
-          | _ -> failwith "expected only struct type"
-        in
-        if is_init_list e then handle_stmt_init scope typ fundec loc action lv e
+      let ci =
+        match Cil.unrollType arr_typ with
+        | Cil.TComp (ci, _) -> ci
+        | _ -> failwith "expected only struct type"
+      in
+      let unroll_nested_init scope idx e =
+        if is_init_list e then
+          let typ = type_of_expr e |> trans_type scope in
+          let lv =
+            Cil.addOffsetLval (Cil.Index (Cil.integer idx, Cil.NoOffset)) lv
+          in
+          handle_stmt_init scope typ fundec loc action lv e
         else
           let stmts, _, scope =
             mk_array_stmt el (List.hd ci.cfields) loc fundec action lv scope
@@ -1181,11 +1185,14 @@ and handle_stmt_init scope typ fundec loc action lv (e : C.Ast.expr) =
           in
           (stmts, scope)
       in
-      List.fold_left
-        (fun _ e ->
-          let stmts, scope = unroll_nested_init e in
-          (stmts, scope))
-        ([], scope) el
+      let stmts, scope, _ =
+        List.fold_left
+          (fun (stmts, scope, idx) e ->
+            let stmts', scope' = unroll_nested_init scope idx e in
+            (stmts @ stmts', scope', idx + 1))
+          ([], scope, 0) el
+      in
+      (stmts, scope)
   (* struct *)
   | C.Ast.InitList el, Cil.TComp (ci, _) ->
       let stmts, _, scope =

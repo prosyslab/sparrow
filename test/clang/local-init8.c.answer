@@ -15,7 +15,7 @@ int main(void)
 
   {
 #line 7
-  ramb16_atoms[0].A[0] = (int )17;
+  ramb16_atoms[0].A[0] = 17;
 #line 7
   tmp = (unsigned int )1;
   {
