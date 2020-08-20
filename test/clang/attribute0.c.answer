@@ -11,5 +11,6 @@ void f(void)
   {
 #line 3
   p = x;
+  return;
 }
 }

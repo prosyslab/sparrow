@@ -53,5 +53,6 @@ int main(void)
   c.b[1].a[1].b = 16;
 #line 14
   c.b[1].f = (float )77;
+  return (0);
 }
 }

@@ -70,5 +70,6 @@ int main(void)
   }
   while_break: /* CIL Label */ ;
   }
+  return (0);
 }
 }

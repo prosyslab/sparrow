@@ -19,5 +19,6 @@ int c(void)
   if (__cil_tmp1) {
 
   }
+  return (0);
 }
 }

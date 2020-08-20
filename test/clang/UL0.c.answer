@@ -27,5 +27,6 @@ int main(void)
   d = 2147483648UL;
 #line 10
   e = 3614090360UL;
+  return (0);
 }
 }

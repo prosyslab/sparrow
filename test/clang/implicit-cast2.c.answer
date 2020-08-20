@@ -14,5 +14,6 @@ void f(void)
 #line 1
   x = __cil_tmp2;
   }
+  return;
 }
 }

@@ -21,5 +21,6 @@ void f(void)
 #line 4
   x = g();
   }
+  return;
 }
 }

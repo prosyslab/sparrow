@@ -17,5 +17,6 @@ void b(void)
   switch_break: /* CIL Label */ ;
   }
   c: ;
+  return;
 }
 }

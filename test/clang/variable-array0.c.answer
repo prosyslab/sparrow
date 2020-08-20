@@ -13,5 +13,6 @@ int main(void)
 #line 3
   f(1, (char *)2);
   }
+  return (0);
 }
 }

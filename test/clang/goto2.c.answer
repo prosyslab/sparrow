@@ -18,5 +18,6 @@ void f(int x )
 #line 6
   x ++;
   case_neg_1: ;
+  return;
 }
 }

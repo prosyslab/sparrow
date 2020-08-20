@@ -9,5 +9,6 @@ void f(char *p )
   {
 #line 1
   *(p + 1) = (char )10;
+  return;
 }
 }

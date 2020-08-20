@@ -29,5 +29,6 @@ int main(void)
   b.k[0].y = 0;
 #line 10
   b.k[1].y = 0;
+  return (0);
 }
 }

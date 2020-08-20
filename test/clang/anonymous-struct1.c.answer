@@ -23,5 +23,6 @@ int d(void)
   {
 #line 7
   p = (void *)(& c.b);
+  return (0);
 }
 }

@@ -211,3 +211,75 @@ module Exp = struct
 
   let pp fmt x = F.fprintf fmt "%s" (s_exp x)
 end
+
+(* Copied from CIL code.
+ * Reference: https://github.com/cil-project/cil/blob/936b04103eb573f320c6badf280e8bb17f6e7b26/src/frontc/cabs2cil.ml#L6052 *)
+let instrFallsThrough = function
+  | Cil.Set _ -> true
+  | Cil.Call (None, Lval (Var e, NoOffset), _, _) ->
+      (* See if this is exit, or if it has the noreturn attribute *)
+      if e.vname = "exit" then false
+      else if hasAttribute "noreturn" e.vattr then false
+      else true
+  | Call _ -> true
+  | Asm _ -> true
+
+let rec stmtFallsThrough s =
+  match s.skind with
+  | Instr il -> List.for_all instrFallsThrough il
+  | Return _ | Break _ | Continue _ -> false
+  | Goto _ | ComputedGoto _ -> false
+  | If (_, b1, b2, _) -> blockFallsThrough b1 || blockFallsThrough b2
+  | Switch (_, b, targets, _) ->
+      (* See if there is a "default" case *)
+      if
+        not
+          (List.exists
+             (fun s ->
+               List.exists (function Default _ -> true | _ -> false) s.labels)
+             targets)
+      then true
+      else blockFallsThrough b || blockCanBreak b
+  | Loop (b, _, _, _) -> blockCanBreak b
+  | Block b -> blockFallsThrough b
+  | TryFinally (_, h, _) -> blockFallsThrough h
+  | TryExcept (_, _, _, _) -> true
+
+and blockFallsThrough b =
+  let rec fall = function
+    | [] -> true
+    | s :: rest -> if stmtFallsThrough s then fall rest else labels rest
+  and labels = function
+    | [] -> false
+    | s :: rest when s.labels <> [] -> fall (s :: rest)
+    | _ :: rest -> labels rest
+  in
+  fall b.bstmts
+
+and stmtCanBreak s =
+  match s.skind with
+  | Instr _ | Return _ | Continue _ | Goto _ | ComputedGoto _ -> false
+  | Break _ -> true
+  | If (_, b1, b2, _) -> blockCanBreak b1 || blockCanBreak b2
+  | Switch _ | Loop _ -> false
+  | Block b -> blockCanBreak b
+  | TryFinally (b, h, _) -> blockCanBreak b || blockCanBreak h
+  | TryExcept (b, _, h, _) -> blockCanBreak b || blockCanBreak h
+
+and blockCanBreak b = List.exists stmtCanBreak b.bstmts
+
+let insert_missing_return fundec =
+  if blockFallsThrough fundec.sbody then
+    let retval =
+      match unrollType fundec.svar.vtype with
+      | TFun (TVoid _, _, _, _) -> None
+      | TFun ((TInt _ as rt), _, _, _)
+      | TFun ((TEnum _ as rt), _, _, _)
+      | TFun ((TFloat _ as rt), _, _, _)
+      | TFun ((TPtr _ as rt), _, _, _) ->
+          Some (Cil.mkCast ~e:zero ~newt:rt)
+      | _ -> None
+    in
+    if not (hasAttribute "noreturn" fundec.svar.vattr) then
+      fundec.sbody.bstmts <-
+        fundec.sbody.bstmts @ [ mkStmt (Return (retval, locUnknown)) ]

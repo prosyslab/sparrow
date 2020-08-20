@@ -78,3 +78,5 @@ module Exp : sig
 
   val pp : Format.formatter -> t -> unit
 end
+
+val insert_missing_return : Cil.fundec -> unit

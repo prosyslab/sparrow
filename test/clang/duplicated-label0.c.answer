@@ -45,5 +45,6 @@ int f(void)
 #line 15
     a = 2;
   }
+  return (0);
 }
 }

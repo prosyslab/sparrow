@@ -47,5 +47,6 @@ void f(int x )
 #line 11
     y = x + 2;
   }
+  return;
 }
 }

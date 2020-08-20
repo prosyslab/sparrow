@@ -15,5 +15,6 @@ void f(void)
   y = 2;
 #line 9
   y___0 = 1;
+  return;
 }
 }

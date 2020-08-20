@@ -26,5 +26,6 @@ void g(void)
 #line 5
   x = (short )__cil_tmp2;
   }
+  return;
 }
 }

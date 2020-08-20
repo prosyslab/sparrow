@@ -22,5 +22,6 @@ void f(void)
   while_break___0: /* CIL Label */ ;
   }
   while_break: ;
+  return;
 }
 }

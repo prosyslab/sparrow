@@ -77,5 +77,6 @@ int main(void)
   }
 #line 12
   b.b = 0;
+  return (0);
 }
 }

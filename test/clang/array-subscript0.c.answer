@@ -14,5 +14,6 @@ int main(void)
   i = 0;
 #line 4
   *((result + i) + 1) = (char )1;
+  return (0);
 }
 }

@@ -13,6 +13,7 @@ int foo(void)
   {
 #line 5
   sa.a = 1;
+  return (0);
 }
 }
 #line 9 "clang/usertype-in-local0.c"
@@ -31,5 +32,6 @@ int main(void)
 #line 13
   foo();
   }
+  return (0);
 }
 }

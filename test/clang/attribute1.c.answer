@@ -9,5 +9,6 @@ __inline void f(void)
   {
 #line 1
   x = 0;
+  return;
 }
 }

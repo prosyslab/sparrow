@@ -17,5 +17,6 @@ int main(void)
 #line 3
   y = (int )1.10000000001;
   }
+  return (0);
 }
 }

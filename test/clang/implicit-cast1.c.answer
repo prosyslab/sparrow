@@ -12,5 +12,6 @@ void f(void)
   x = 10;
 #line 3
   y = (long )x;
+  return;
 }
 }

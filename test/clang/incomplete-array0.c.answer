@@ -9,5 +9,6 @@ int a(int b[] )
   {
 #line 1
   y = b[0];
+  return (0);
 }
 }

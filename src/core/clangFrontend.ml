@@ -1989,6 +1989,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       let fun_body = trans_function_body scope fundec (Option.get fdecl.body) in
       fundec.sbody <- fst fun_body;
       let scope = Scope.exit_function scope in
+      CilHelper.insert_missing_return fundec;
       (snd fun_body @ [ Cil.GFun (fundec, loc) ], scope)
   | C.Ast.Var vdecl when vdecl.var_init = None ->
       let typ = trans_type scope vdecl.var_type in

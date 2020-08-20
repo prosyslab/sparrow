@@ -45,5 +45,6 @@ void f(void)
   lenfix[4].bits = (unsigned char )7;
 #line 8
   lenfix[4].val = (unsigned short )31;
+  return;
 }
 }
