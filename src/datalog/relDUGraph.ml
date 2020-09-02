@@ -184,6 +184,9 @@ type formatter = {
   div_exp : F.formatter;
   strcpy : F.formatter;
   strncpy : F.formatter;
+  memcpy : F.formatter;
+  memmove : F.formatter;
+  bufferoverrunlib : F.formatter;
   strcat : F.formatter;
   taint : F.formatter;
 }
@@ -242,15 +245,17 @@ let pp_alarm_exp fmt aexp =
           find_exp RelSyntax.exp_map e2,
           find_exp RelSyntax.exp_map e3 )
       in
-      F.fprintf fmt.strncpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
+      F.fprintf fmt.memcpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
   | Memmove (e1, e2, e3, _) ->
       let e1_id, e2_id, e3_id =
         ( find_exp RelSyntax.exp_map e1,
           find_exp RelSyntax.exp_map e2,
           find_exp RelSyntax.exp_map e3 )
       in
-      F.fprintf fmt.strncpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
-  | BufferOverrunLib (_, _, _) -> F.fprintf fmt.strncpy "%s\n" id
+      F.fprintf fmt.memmove "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
+  | BufferOverrunLib (name, el, _) ->
+      let e_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e_id
   | AllocSize (_, _, _) | Printf (_, _, _) -> F.fprintf fmt.taint "%s\n" id
 
 let close_formatters fmt channels =
@@ -268,6 +273,11 @@ let print_alarm analysis alarms =
   let oc_div_exp = open_out (dirname ^ "/AlarmDivExp.facts") in
   let oc_strcpy = open_out (dirname ^ "/AlarmStrcpy.facts") in
   let oc_strncpy = open_out (dirname ^ "/AlarmStrncpy.facts") in
+  let oc_memmove = open_out (dirname ^ "/AlarmMemmove.facts") in
+  let oc_memcpy = open_out (dirname ^ "/AlarmMemcpy.facts") in
+  let oc_bufferoverrunlib =
+    open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
+  in
   let oc_strcat = open_out (dirname ^ "/AlarmStrcat.facts") in
   let oc_taint = open_out (dirname ^ "/AlarmTaint.facts") in
   let fmt =
@@ -278,6 +288,9 @@ let print_alarm analysis alarms =
       div_exp = F.formatter_of_out_channel oc_div_exp;
       strcpy = F.formatter_of_out_channel oc_strcpy;
       strncpy = F.formatter_of_out_channel oc_strncpy;
+      memcpy = F.formatter_of_out_channel oc_memcpy;
+      memmove = F.formatter_of_out_channel oc_memmove;
+      bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
       strcat = F.formatter_of_out_channel oc_strcat;
       taint = F.formatter_of_out_channel oc_taint;
     }
