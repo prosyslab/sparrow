@@ -263,8 +263,16 @@ let pp_alarm_exp fmt aexp =
 
 let close_formatters fmt channels =
   F.pp_print_flush fmt.alarm ();
-  F.pp_print_flush fmt.deref_exp ();
   F.pp_print_flush fmt.array_exp ();
+  F.pp_print_flush fmt.deref_exp ();
+  F.pp_print_flush fmt.div_exp ();
+  F.pp_print_flush fmt.strcpy ();
+  F.pp_print_flush fmt.strncpy ();
+  F.pp_print_flush fmt.strcat ();
+  F.pp_print_flush fmt.memcpy ();
+  F.pp_print_flush fmt.memmove ();
+  F.pp_print_flush fmt.bufferoverrunlib ();
+  F.pp_print_flush fmt.taint ();
   List.iter close_out channels
 
 let print_alarm analysis alarms =
@@ -311,4 +319,17 @@ let print_alarm analysis alarms =
              AlarmSet.add (src_node, alarm.node) set
          | _ -> set)
        AlarmSet.empty alarms);
-  close_formatters fmt [ oc_alarm; oc_array_exp; oc_deref_exp ]
+  close_formatters fmt
+    [
+      oc_alarm;
+      oc_array_exp;
+      oc_deref_exp;
+      oc_div_exp;
+      oc_strcpy;
+      oc_strncpy;
+      oc_memmove;
+      oc_memcpy;
+      oc_bufferoverrunlib;
+      oc_strcat;
+      oc_taint;
+    ]
