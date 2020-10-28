@@ -189,6 +189,8 @@ type formatter = {
   strncpy : F.formatter;
   memcpy : F.formatter;
   memmove : F.formatter;
+  memchr : F.formatter;
+  strncmp : F.formatter;
   bufferoverrunlib : F.formatter;
   strcat : F.formatter;
   taint : F.formatter;
@@ -256,10 +258,19 @@ let pp_alarm_exp fmt aexp =
           find_exp RelSyntax.exp_map e3 )
       in
       F.fprintf fmt.memmove "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
-  | BufferOverrunLib (name, el, _) ->
-      let e_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
-      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e_id
+  | BufferOverrunLib (("memchr" as name), el, _) ->
+      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
+      let e2_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
+      F.fprintf fmt.memchr "%s\t%s\t%s\n" id e1_id e2_id;
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
+  | BufferOverrunLib (("strncmp" as name), el, _) ->
+      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
+      let e2_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
+      let e3_id = List.nth el 3 |> find_exp RelSyntax.exp_map in
+      F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id;
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
   | AllocSize (_, _, _) | Printf (_, _, _) -> F.fprintf fmt.taint "%s\n" id
+  | BufferOverrunLib (name, _, _) -> failwith name
 
 let close_formatters fmt channels =
   F.pp_print_flush fmt.alarm ();
@@ -271,6 +282,8 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.strcat ();
   F.pp_print_flush fmt.memcpy ();
   F.pp_print_flush fmt.memmove ();
+  F.pp_print_flush fmt.memchr ();
+  F.pp_print_flush fmt.strncmp ();
   F.pp_print_flush fmt.bufferoverrunlib ();
   F.pp_print_flush fmt.taint ();
   List.iter close_out channels
@@ -286,6 +299,8 @@ let print_alarm analysis alarms =
   let oc_strncpy = open_out (dirname ^ "/AlarmStrncpy.facts") in
   let oc_memmove = open_out (dirname ^ "/AlarmMemmove.facts") in
   let oc_memcpy = open_out (dirname ^ "/AlarmMemcpy.facts") in
+  let oc_memchr = open_out (dirname ^ "/AlarmMemchr.facts") in
+  let oc_strncmp = open_out (dirname ^ "/AlarmStrncmp.facts") in
   let oc_bufferoverrunlib =
     open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
   in
@@ -301,6 +316,8 @@ let print_alarm analysis alarms =
       strncpy = F.formatter_of_out_channel oc_strncpy;
       memcpy = F.formatter_of_out_channel oc_memcpy;
       memmove = F.formatter_of_out_channel oc_memmove;
+      memchr = F.formatter_of_out_channel oc_memchr;
+      strncmp = F.formatter_of_out_channel oc_strncmp;
       bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
       strcat = F.formatter_of_out_channel oc_strcat;
       taint = F.formatter_of_out_channel oc_taint;
