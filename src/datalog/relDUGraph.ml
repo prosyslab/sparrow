@@ -259,15 +259,15 @@ let pp_alarm_exp fmt aexp =
       in
       F.fprintf fmt.memmove "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
   | BufferOverrunLib (("memchr" as name), el, _) ->
+      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
       let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
-      let e2_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
-      F.fprintf fmt.memchr "%s\t%s\t%s\n" id e1_id e2_id;
-      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
+      F.fprintf fmt.memchr "%s\t%s\t%s\n" id e0_id e1_id;
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e1_id
   | BufferOverrunLib (("strncmp" as name), el, _) ->
+      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
       let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
       let e2_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
-      let e3_id = List.nth el 3 |> find_exp RelSyntax.exp_map in
-      F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id;
+      F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e0_id e1_id e2_id;
       F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
   | AllocSize (_, _, _) | Printf (_, _, _) -> F.fprintf fmt.taint "%s\n" id
   | BufferOverrunLib (name, _, _) -> failwith name
