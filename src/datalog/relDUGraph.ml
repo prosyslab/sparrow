@@ -193,7 +193,8 @@ type formatter = {
   strncmp : F.formatter;
   bufferoverrunlib : F.formatter;
   strcat : F.formatter;
-  taint : F.formatter;
+  allocsize : F.formatter;
+  printf : F.formatter;
 }
 
 let alarm_count = ref 0
@@ -269,7 +270,8 @@ let pp_alarm_exp fmt aexp =
       let e2_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
       F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e0_id e1_id e2_id;
       F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
-  | AllocSize (_, _, _) | Printf (_, _, _) -> F.fprintf fmt.taint "%s\n" id
+  | AllocSize (_, _, _) -> F.fprintf fmt.allocsize "%s\n" id
+  | Printf (_, _, _) -> F.fprintf fmt.printf "%s\n" id
   | BufferOverrunLib (name, _, _) -> failwith name
 
 let close_formatters fmt channels =
@@ -285,7 +287,8 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.memchr ();
   F.pp_print_flush fmt.strncmp ();
   F.pp_print_flush fmt.bufferoverrunlib ();
-  F.pp_print_flush fmt.taint ();
+  F.pp_print_flush fmt.allocsize ();
+  F.pp_print_flush fmt.printf ();
   List.iter close_out channels
 
 let print_alarm analysis alarms =
@@ -305,7 +308,8 @@ let print_alarm analysis alarms =
     open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
   in
   let oc_strcat = open_out (dirname ^ "/AlarmStrcat.facts") in
-  let oc_taint = open_out (dirname ^ "/AlarmTaint.facts") in
+  let oc_allocsize = open_out (dirname ^ "/AlarmAllocSize.facts") in
+  let oc_printf = open_out (dirname ^ "/AlarmPrintf.facts") in
   let fmt =
     {
       alarm = F.formatter_of_out_channel oc_alarm;
@@ -320,7 +324,8 @@ let print_alarm analysis alarms =
       strncmp = F.formatter_of_out_channel oc_strncmp;
       bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
       strcat = F.formatter_of_out_channel oc_strcat;
-      taint = F.formatter_of_out_channel oc_taint;
+      allocsize = F.formatter_of_out_channel oc_allocsize;
+      printf = F.formatter_of_out_channel oc_printf;
     }
   in
   ignore
@@ -348,5 +353,6 @@ let print_alarm analysis alarms =
       oc_memcpy;
       oc_bufferoverrunlib;
       oc_strcat;
-      oc_taint;
+      oc_allocsize;
+      oc_printf;
     ]
