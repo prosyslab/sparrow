@@ -270,8 +270,12 @@ let pp_alarm_exp fmt aexp =
       let e2_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
       F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e0_id e1_id e2_id;
       F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
-  | AllocSize (_, _, _) -> F.fprintf fmt.allocsize "%s\n" id
-  | Printf (_, _, _) -> F.fprintf fmt.printf "%s\n" id
+  | AllocSize (_, e1, _) ->
+      let e1_id = find_exp RelSyntax.exp_map e1 in
+      F.fprintf fmt.allocsize "%s\t%s\n" id e1_id
+  | Printf (_, e1, _) ->
+      let e1_id = find_exp RelSyntax.exp_map e1 in
+      F.fprintf fmt.printf "%s\t%s\n" id e1_id
   | BufferOverrunLib (name, _, _) -> failwith name
 
 let close_formatters fmt channels =
