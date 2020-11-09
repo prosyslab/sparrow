@@ -195,6 +195,7 @@ type formatter = {
   strcat : F.formatter;
   allocsize : F.formatter;
   printf : F.formatter;
+  taint : F.formatter;
 }
 
 let alarm_count = ref 0
@@ -272,10 +273,12 @@ let pp_alarm_exp fmt aexp =
       F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
   | AllocSize (_, e1, _) ->
       let e1_id = find_exp RelSyntax.exp_map e1 in
-      F.fprintf fmt.allocsize "%s\t%s\n" id e1_id
+      F.fprintf fmt.allocsize "%s\t%s\n" id e1_id;
+      F.fprintf fmt.taint "%s\t%s\n" id e1_id
   | Printf (_, e1, _) ->
       let e1_id = find_exp RelSyntax.exp_map e1 in
-      F.fprintf fmt.printf "%s\t%s\n" id e1_id
+      F.fprintf fmt.printf "%s\t%s\n" id e1_id;
+      F.fprintf fmt.taint "%s\t%s\n" id e1_id
   | BufferOverrunLib (name, _, _) -> failwith name
 
 let close_formatters fmt channels =
@@ -293,6 +296,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.bufferoverrunlib ();
   F.pp_print_flush fmt.allocsize ();
   F.pp_print_flush fmt.printf ();
+  F.pp_print_flush fmt.taint ();
   List.iter close_out channels
 
 let print_alarm analysis alarms =
@@ -314,6 +318,7 @@ let print_alarm analysis alarms =
   let oc_strcat = open_out (dirname ^ "/AlarmStrcat.facts") in
   let oc_allocsize = open_out (dirname ^ "/AlarmAllocSize.facts") in
   let oc_printf = open_out (dirname ^ "/AlarmPrintf.facts") in
+  let oc_taint = open_out (dirname ^ "/AlarmTaint.facts") in
   let fmt =
     {
       alarm = F.formatter_of_out_channel oc_alarm;
@@ -330,6 +335,7 @@ let print_alarm analysis alarms =
       strcat = F.formatter_of_out_channel oc_strcat;
       allocsize = F.formatter_of_out_channel oc_allocsize;
       printf = F.formatter_of_out_channel oc_printf;
+      taint = F.formatter_of_out_channel oc_taint;
     }
   in
   ignore
@@ -359,4 +365,5 @@ let print_alarm analysis alarms =
       oc_strcat;
       oc_allocsize;
       oc_printf;
+      oc_taint;
     ]
