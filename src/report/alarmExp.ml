@@ -130,8 +130,10 @@ let c_lib f es loc =
 
 let c_lib_taint f es loc =
   match f.vname with
-  | "mmap" | "realloc" -> [ AllocSize (f.vname, List.nth es 1, loc) ]
-  | "calloc" | "g_malloc" | "g_malloc_n" | "g_malloc0" ->
+  | "mmap" | "realloc" | "g_realloc" | "g_realloc_n" ->
+      [ AllocSize (f.vname, List.nth es 1, loc) ]
+  | "calloc" | "g_malloc" | "g_malloc_n" | "g_malloc0" | "g_try_malloc"
+  | "g_try_malloc_n" | "__builtin_alloca" ->
       [ AllocSize (f.vname, List.nth es 0, loc) ]
   | "printf" -> [ Printf (f.vname, List.nth es 0, loc) ]
   | "fprintf" | "sprintf" | "vfprintf" | "vsprintf" | "vasprintf" | "__asprintf"
