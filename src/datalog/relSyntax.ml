@@ -460,6 +460,7 @@ let print_raw dirname =
 let print analysis icfg =
   Hashtbl.reset exp_map;
   Hashtbl.reset lv_map;
+  Hashtbl.reset binop_map;
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   print_relation dirname icfg;
   print_raw dirname
