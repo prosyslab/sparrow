@@ -31,7 +31,7 @@ module ProcSet = BatSet.Make (Proc)
 type pid = Proc.t
 
 module Node = struct
-  type t = Proc.t * IntraCfg.Node.t [@@deriving compare, eq]
+  type t = Proc.t * IntraCfg.Node.t [@@deriving compare, equal]
 
   let to_string (pid, node) = pid ^ "-" ^ IntraCfg.Node.to_string node
 
