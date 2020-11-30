@@ -426,7 +426,11 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
   | InvalidType ->
       L.warn "WARN: invalid type (use int instead)\n";
       Cil.intType
-  | Vector _ -> failwith "vector type"
+  | Vector vt ->
+      let size = Cil.integer vt.size in
+      let elem_type = trans_type ~compinfo scope vt.element in
+      let attr = trans_attribute typ in
+      Cil.TArray (elem_type, Some size, attr)
   | BuiltinType _ -> trans_builtin_type ~compinfo scope typ
   | ConstantArray ca ->
       let size = Cil.integer ca.size in
