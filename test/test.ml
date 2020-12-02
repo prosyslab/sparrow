@@ -141,6 +141,7 @@ let test_suites =
           "clang/anonymous-struct1.c";
           "clang/type0.c";
           "clang/param0.c";
+          "clang/predef-macro.c";
         ];
     };
   ]

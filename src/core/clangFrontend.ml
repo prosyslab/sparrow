@@ -627,7 +627,13 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
       ([], Some Cil.zero)
   | C.Ast.DesignatedInit d -> trans_expr scope fundec_opt loc action d.init
   | C.Ast.UnknownExpr (_, _) -> ([], Some Cil.zero)
-  | _ -> failwith "unknown trans_expr"
+  | C.Ast.Predefined pre ->
+      let cstr = Cil.CStr pre.function_name in
+      let const = Cil.Const cstr in
+      ([], Some const)
+  | _ ->
+      L.warn "Unknown at %s\n" (CilHelper.s_location loc);
+      failwith "unknown trans_expr"
 
 and trans_unary_operator scope fundec_opt loc action typ kind expr =
   let sl, var_opt = trans_expr scope fundec_opt loc action expr in
