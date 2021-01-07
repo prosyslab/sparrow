@@ -438,6 +438,26 @@ let post_process spec (global, dug, inputof, outputof) =
     print_datalog_fact spec global dug alarms;
   (global, dug, inputof, outputof, alarms)
 
+let stat locset =
+  let gvar, lvar, allocsite, field =
+    PowLoc.fold
+      (fun loc (gvar, lvar, allocsite, field) ->
+        if Loc.is_gvar loc then (gvar + 1, lvar, allocsite, field)
+        else if Loc.is_lvar loc then (gvar, lvar + 1, allocsite, field)
+        else if Loc.is_allocsite loc then (gvar, lvar, allocsite + 1, field)
+        else (gvar, lvar, allocsite + 1, field + 1))
+      locset (0, 0, 0, 0)
+  in
+  let cardinal = PowLoc.cardinal locset |> float_of_int in
+  L.info ~level:1 "#global variables = %d (%.1f%%)\n" gvar
+    (float_of_int gvar /. cardinal *. 100.0);
+  L.info ~level:1 "#local variables  = %d (%.1f%%)\n" lvar
+    (float_of_int lvar /. cardinal *. 100.0);
+  L.info ~level:1 "#allocsite        = %d (%.1f%%)\n" allocsite
+    (float_of_int allocsite /. cardinal *. 100.0);
+  L.info ~level:1 "#fields           = %d (%.1f%%)\n" field
+    (float_of_int field /. cardinal *. 100.0)
+
 let do_analysis global =
   let _ = prerr_memory_usage () in
   let locset = get_locset global.mem in
@@ -457,6 +477,7 @@ let do_analysis global =
       unsound_bitwise;
     }
   in
+  stat locset;
   cond !Options.marshal_in marshal_in (Analysis.perform spec) global
   |> opt !Options.marshal_out marshal_out
   |> post_process spec
