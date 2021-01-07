@@ -67,13 +67,15 @@ let print_il file =
   exit 0
 
 let print_cfg global =
+  let oc = open_out (Filename.concat !Options.outdir "cfg.json") in
   `Assoc
     [
       ("callgraph", CallGraph.to_json global.callgraph);
       ("cfgs", InterCfg.to_json global.icfg);
     ]
-  |> Yojson.Safe.pretty_to_channel stdout;
-  exit 0
+  |> Yojson.Safe.pretty_to_channel oc;
+  close_out oc;
+  global
 
 let finalize t0 =
   L.info ~level:1 "Finished properly.\n";

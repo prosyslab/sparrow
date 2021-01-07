@@ -92,6 +92,8 @@ let dump_cfgs = function
   | _ -> raise (Failure "Invalid json format")
 
 let dump_cfgs_with_dug json dug =
+  Printf.printf "Dump control flow graphs...\n";
+  flush stdout;
   match json with
   | `Assoc l ->
       List.iter
@@ -120,6 +122,8 @@ let dump_cfgs_with_dug json dug =
   | _ -> raise (Failure "Invalid json format")
 
 let dump_callgraph json =
+  Printf.printf "Dump call graph...\n";
+  flush stdout;
   let index = "callgraph.dot" in
   let chan = open_out index in
   Printf.fprintf chan "digraph %s {\n" "callgraph";
@@ -201,7 +205,7 @@ let dump json =
 
 let main () =
   Arg.parse opts args usage;
-  let json = Yojson.Safe.from_file !file in
-  dump json
+  Printf.printf "Reading the input file...\n";
+  Yojson.Safe.from_file !file |> dump
 
 let _ = main ()
