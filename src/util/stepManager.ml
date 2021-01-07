@@ -19,6 +19,7 @@ let step s stg i fn =
   let v = fn i in
   if s then Logging.info ~to_consol "\n";
   Logging.info ~to_consol "%s completes: %f\n" stg (Sys.time () -. t0);
+  Logging.flush_all ();
   v
 
 let stepf s stg fn i = if !Options.verbose >= 1 then step s stg i fn else fn i
