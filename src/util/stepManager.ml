@@ -16,6 +16,7 @@ let step s stg i fn =
   let to_consol = true in
   if s then Logging.info ~to_consol "\n\n\n%s\n%s begins...\n%s\n" line stg line
   else Logging.info ~to_consol "%s begins...\n" stg;
+  Logging.flush_all ();
   let v = fn i in
   if s then Logging.info ~to_consol "\n";
   Logging.info ~to_consol "%s completes: %f\n" stg (Sys.time () -. t0);
