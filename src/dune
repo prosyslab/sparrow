@@ -1,11 +1,20 @@
 (include_subdirs unqualified)
 
-(executable
- (name main)
+(library
+ (name sparrow)
+ (wrapped false)
  (modules_without_implementation absDom absSem)
- (modules :standard \ vis)
+ (modules :standard \ vis main)
  (libraries apron apron.octMPQ batteries cil cil.all-features clangml
    clangml.printer lymp ocamlgraph str yojson)
+ (preprocess
+  (pps ppx_compare)))
+
+(executable
+ (name main)
+ (modules main)
+ (libraries apron apron.octMPQ batteries cil cil.all-features clangml
+   clangml.printer lymp ocamlgraph str yojson sparrow)
  (preprocess
   (pps ppx_compare)))
 
@@ -13,6 +22,6 @@
  (name vis)
  (modules vis)
  (modules_without_implementation absDom absSem)
- (libraries batteries yojson)
+ (libraries batteries yojson sparrow)
  (preprocess
   (pps ppx_compare)))
