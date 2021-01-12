@@ -57,6 +57,14 @@ module type S = sig
 
   val loopheads : t -> node BatSet.t
 
+  val shortest_path : t -> node -> node -> node list
+
+  val shortest_path_loc : t -> node -> node -> Loc.t -> node list
+
+  val shortest_path_loc_str : t -> node -> node -> string -> node list
+
+  val find_node_of_string : t -> string -> node option
+
   (** {2 Iterator } *)
 
   val fold_node : (node -> 'a -> 'a) -> t -> 'a -> 'a
@@ -79,7 +87,7 @@ module type S = sig
 
   (** {2 Print } *)
 
-  val to_dot : t -> string
+  val to_dot : ?color:(node * string) list -> t -> string
 
   val to_json : t -> Yojson.Safe.t
 end

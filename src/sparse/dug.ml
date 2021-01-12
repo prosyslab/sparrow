@@ -56,6 +56,14 @@ module type S = sig
 
   val loopheads : t -> node BatSet.t
 
+  val shortest_path : t -> node -> node -> node list
+
+  val shortest_path_loc : t -> node -> node -> Loc.t -> node list
+
+  val shortest_path_loc_str : t -> node -> node -> string -> node list
+
+  val find_node_of_string : t -> string -> node option
+
   (** {2 Iterator } *)
 
   val fold_node : (node -> 'a -> 'a) -> t -> 'a -> 'a
@@ -78,7 +86,7 @@ module type S = sig
 
   (** {2 Print } *)
 
-  val to_dot : t -> string
+  val to_dot : ?color:(node * string) list -> t -> string
 
   val to_json : t -> Yojson.Safe.t
 end
@@ -94,6 +102,22 @@ module Make (Access : Access.S) = struct
 
   module G = struct
     module I = Graph.Imperative.Digraph.ConcreteBidirectional (BasicDom.Node)
+
+    module W = struct
+      type edge = I.E.t
+
+      type t = int
+
+      let weight _ = 1
+
+      let compare = compare
+
+      let add = ( + )
+
+      let zero = 0
+    end
+
+    module Dijkstra = Graph.Path.Dijkstra (I) (W)
 
     type t = { graph : I.t; label : (node * node, locset) Hashtbl.t }
 
@@ -171,6 +195,71 @@ module Make (Access : Access.S) = struct
         Hashtbl.replace g.label (s, d) new_label;
         g
       with _ -> add_edge_e g (s, def, d)
+
+    let shortest_path_loc g src dst loc =
+      let module W :
+        Graph.Sig.WEIGHT with type t = int option and type edge = I.E.t = struct
+        type edge = I.E.t
+
+        type t = int option
+
+        let weight edge =
+          let src, dst = (I.E.src edge, I.E.dst edge) in
+          try
+            let locset = find_label g src dst in
+            if PowLoc.mem loc locset then Some 1 else None
+          with _ -> None
+
+        let compare x y =
+          match (x, y) with
+          | Some x, Some y -> compare x y
+          | Some _, None -> -1
+          | None, Some _ -> 1
+          | None, None -> 0
+
+        let add x y =
+          match (x, y) with
+          | Some x, Some y -> Some (x + y)
+          | None, _ | _, None -> None
+
+        let zero = Some 0
+      end in
+      let module D = Graph.Path.Dijkstra (I) (W) in
+      let path, w = D.shortest_path g.graph src dst in
+      match w with None -> [] | Some _ -> path
+
+    let shortest_path_loc_str g src dst loc =
+      let module W :
+        Graph.Sig.WEIGHT with type t = int option and type edge = I.E.t = struct
+        type edge = I.E.t
+
+        type t = int option
+
+        let weight edge =
+          try
+            let src, dst = (I.E.src edge, I.E.dst edge) in
+            let locset = find_label g src dst in
+            if PowLoc.exists (fun x -> Loc.to_string x = loc) locset then Some 1
+            else None
+          with _ -> None
+
+        let compare x y =
+          match (x, y) with
+          | Some x, Some y -> compare x y
+          | Some _, None -> -1
+          | None, Some _ -> 1
+          | None, None -> 0
+
+        let add x y =
+          match (x, y) with
+          | Some x, Some y -> Some (x + y)
+          | None, _ | _, None -> None
+
+        let zero = Some 0
+      end in
+      let module D = Graph.Path.Dijkstra (I) (W) in
+      let path, w = D.shortest_path g.graph src dst in
+      match w with None -> [] | Some _ -> path
   end
 
   type t = { graph : G.t; access : Access.t; loopheads : node BatSet.t }
@@ -257,8 +346,46 @@ module Make (Access : Access.S) = struct
 
   let loopheads g = g.loopheads
 
-  let to_dot dug =
+  let shortest_path g src dst =
+    let el = G.Dijkstra.shortest_path g.graph.graph src dst |> fst in
+    List.fold_left
+      (fun l edge ->
+        let src, dst = (G.I.E.src edge, G.I.E.dst edge) in
+        match l with [] -> [ dst; src ] | _ -> dst :: l)
+      [] el
+
+  let shortest_path_loc g src dst loc =
+    let el = G.shortest_path_loc g.graph src dst loc in
+    List.fold_left
+      (fun l edge ->
+        let src, dst = (G.I.E.src edge, G.I.E.dst edge) in
+        match l with [] -> [ dst; src ] | _ -> dst :: l)
+      [] el
+
+  let shortest_path_loc_str g src dst loc =
+    let el = G.shortest_path_loc_str g.graph src dst loc in
+    List.fold_left
+      (fun l edge ->
+        let src, dst = (G.I.E.src edge, G.I.E.dst edge) in
+        match l with [] -> [ dst; src ] | _ -> dst :: l)
+      [] el
+
+  let find_node_of_string dug name =
+    fold_node
+      (fun node result ->
+        if Option.is_some result then result
+        else if BasicDom.Node.to_string node = name then Some node
+        else None)
+      dug None
+
+  let to_dot ?(color = []) dug =
     "digraph dugraph {\n"
+    ^ List.fold_left
+        (fun str (node, color) ->
+          str ^ "\""
+          ^ BasicDom.Node.to_string node
+          ^ "\"[style=filled, fillcolor=" ^ color ^ "]\n")
+        "" color
     ^ fold_edges
         (fun src dst str ->
           let addrset = get_abslocs src dst dug in
