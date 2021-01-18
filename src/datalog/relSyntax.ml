@@ -194,7 +194,7 @@ and pp_exp fmt e =
 let pp_cmd fmt icfg n =
   if InterCfg.pred n icfg |> List.length = 2 then
     F.fprintf fmt.join "%a\n" Node.pp n;
-  F.fprintf fmt.func "%s\t%a" (Node.get_pid n) Node.pp n;
+  F.fprintf fmt.func "%s\t%a\n" (Node.get_pid n) Node.pp n;
   match InterCfg.cmdof icfg n with
   | Cskip _ ->
       if InterCfg.is_entry n then F.fprintf fmt.entry "%a\n" Node.pp n
