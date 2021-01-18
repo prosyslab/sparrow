@@ -20,6 +20,8 @@ module type S = sig
 
   module Access : Access.S with type Loc.t = Loc.t and type PowLoc.t = PowLoc.t
 
+  type path_checker
+
   val create : ?size:int -> ?access:Access.t -> unit -> t
 
   val copy : t -> t
@@ -61,6 +63,10 @@ module type S = sig
   val shortest_path_loc : t -> node -> node -> Loc.t -> node list
 
   val shortest_path_loc_str : t -> node -> node -> string -> node list
+
+  val create_path_checker : t -> path_checker
+
+  val check_path : path_checker -> node -> node -> bool
 
   val find_node_of_string : t -> string -> node option
 
@@ -118,8 +124,11 @@ module Make (Access : Access.S) = struct
     end
 
     module Dijkstra = Graph.Path.Dijkstra (I) (W)
+    module Check = Graph.Path.Check (I)
 
     type t = { graph : I.t; label : (node * node, locset) Hashtbl.t }
+
+    type path_checker = Check.path_checker
 
     let create ~size () =
       { graph = I.create ~size (); label = Hashtbl.create (2 * size) }
@@ -260,9 +269,15 @@ module Make (Access : Access.S) = struct
       let module D = Graph.Path.Dijkstra (I) (W) in
       let path, w = D.shortest_path g.graph src dst in
       match w with None -> [] | Some _ -> path
+
+    let create_path_checker g = Check.create g.graph
+
+    let check_path pc src dst = Check.check_path pc src dst
   end
 
   type t = { graph : G.t; access : Access.t; loopheads : node BatSet.t }
+
+  type path_checker = G.path_checker
 
   let create ?(size = 0) ?(access = Access.empty) () =
     { graph = G.create ~size (); access; loopheads = BatSet.empty }
@@ -369,6 +384,10 @@ module Make (Access : Access.S) = struct
         let src, dst = (G.I.E.src edge, G.I.E.dst edge) in
         match l with [] -> [ dst; src ] | _ -> dst :: l)
       [] el
+
+  let create_path_checker g = G.create_path_checker g.graph
+
+  let check_path pc src dst = G.check_path pc src dst
 
   let find_node_of_string dug name =
     fold_node

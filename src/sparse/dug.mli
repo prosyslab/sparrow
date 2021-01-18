@@ -21,6 +21,8 @@ module type S = sig
 
   module Access : Access.S with type Loc.t = Loc.t and type PowLoc.t = PowLoc.t
 
+  type path_checker
+
   val create : ?size:int -> ?access:Access.t -> unit -> t
 
   val copy : t -> t
@@ -62,6 +64,10 @@ module type S = sig
   val shortest_path_loc : t -> node -> node -> Loc.t -> node list
 
   val shortest_path_loc_str : t -> node -> node -> string -> node list
+
+  val create_path_checker : t -> path_checker
+
+  val check_path : path_checker -> node -> node -> bool
 
   val find_node_of_string : t -> string -> node option
 
