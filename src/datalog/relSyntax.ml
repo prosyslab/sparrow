@@ -4,6 +4,9 @@ module F = Format
 module Node = InterCfg.Node
 
 type formatter = {
+  (* Function body *)
+  func : F.formatter;
+  (* Command *)
   entry : F.formatter;
   exit : F.formatter;
   join : F.formatter;
@@ -11,11 +14,13 @@ type formatter = {
   assign : F.formatter;
   assume : F.formatter;
   alloc : F.formatter;
+  salloc : F.formatter;
   call : F.formatter;
   libcall : F.formatter;
   arg : F.formatter;
   return : F.formatter;
   cmd : F.formatter;
+  (* Expressions *)
   const_exp : F.formatter;
   lval_exp : F.formatter;
   binop_exp : F.formatter;
@@ -189,6 +194,7 @@ and pp_exp fmt e =
 let pp_cmd fmt icfg n =
   if InterCfg.pred n icfg |> List.length = 2 then
     F.fprintf fmt.join "%a\n" Node.pp n;
+  F.fprintf fmt.func "%s\t%a" (Node.get_pid n) Node.pp n;
   match InterCfg.cmdof icfg n with
   | Cskip _ ->
       if InterCfg.is_entry n then F.fprintf fmt.entry "%a\n" Node.pp n
@@ -208,7 +214,10 @@ let pp_cmd fmt icfg n =
       let e_id = Hashtbl.find exp_map e in
       F.fprintf fmt.alloc "%a\t%s\t%s\n" Node.pp n lv_id e_id
   | Calloc (_, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
-  | Csalloc (_, _, _) -> F.fprintf fmt.cmd "salloc\n"
+  | Csalloc (lv, _, _) ->
+      pp_lv fmt lv;
+      let lv_id = Hashtbl.find lv_map lv in
+      F.fprintf fmt.salloc "%a\t%s\n" Node.pp n lv_id
   | Cfalloc (_, _, _) -> F.fprintf fmt.cmd "falloc\n"
   | Ccall (_, (Lval (Var f, NoOffset) as e), el, _) when f.vstorage = Cil.Extern
     ->
@@ -232,6 +241,7 @@ let pp_cmd fmt icfg n =
   | _ -> F.fprintf fmt.cmd "unknown"
 
 let make_formatters dirname =
+  let oc_func = open_out (dirname ^ "/Func.facts") in
   let oc_const = open_out (dirname ^ "/ConstExp.facts") in
   let oc_lval = open_out (dirname ^ "/LvalExp.facts") in
   let oc_binop = open_out (dirname ^ "/BinOpExp.facts") in
@@ -246,6 +256,7 @@ let make_formatters dirname =
   let oc_assign = open_out (dirname ^ "/Assign.facts") in
   let oc_assume = open_out (dirname ^ "/Assume.facts") in
   let oc_alloc = open_out (dirname ^ "/Alloc.facts") in
+  let oc_salloc = open_out (dirname ^ "/SAlloc.facts") in
   let oc_libcall = open_out (dirname ^ "/LibCall.facts") in
   let oc_call = open_out (dirname ^ "/Call.facts") in
   let oc_arg = open_out (dirname ^ "/Arg.facts") in
@@ -285,6 +296,7 @@ let make_formatters dirname =
   let oc_neg = open_out (dirname ^ "/Neg.facts") in
   let fmt =
     {
+      func = F.formatter_of_out_channel oc_func;
       entry = F.formatter_of_out_channel oc_entry;
       exit = F.formatter_of_out_channel oc_exit;
       join = F.formatter_of_out_channel oc_join;
@@ -292,6 +304,7 @@ let make_formatters dirname =
       assign = F.formatter_of_out_channel oc_assign;
       assume = F.formatter_of_out_channel oc_assume;
       alloc = F.formatter_of_out_channel oc_alloc;
+      salloc = F.formatter_of_out_channel oc_salloc;
       libcall = F.formatter_of_out_channel oc_libcall;
       call = F.formatter_of_out_channel oc_call;
       arg = F.formatter_of_out_channel oc_arg;
@@ -340,6 +353,7 @@ let make_formatters dirname =
   in
   let channels =
     [
+      oc_func;
       oc_const;
       oc_lval;
       oc_binop;
@@ -351,6 +365,7 @@ let make_formatters dirname =
       oc_skip;
       oc_assign;
       oc_alloc;
+      oc_salloc;
       oc_call;
       oc_libcall;
       oc_arg;
@@ -366,10 +381,13 @@ let make_formatters dirname =
   (fmt, channels)
 
 let close_formatters fmt channels =
+  F.pp_print_flush fmt.func ();
   F.pp_print_flush fmt.entry ();
   F.pp_print_flush fmt.exit ();
   F.pp_print_flush fmt.skip ();
   F.pp_print_flush fmt.assign ();
+  F.pp_print_flush fmt.alloc ();
+  F.pp_print_flush fmt.salloc ();
   F.pp_print_flush fmt.call ();
   F.pp_print_flush fmt.libcall ();
   F.pp_print_flush fmt.arg ();
