@@ -46,12 +46,17 @@ module IntAllocsite = struct
 end
 
 module Allocsite = struct
-  type t = Internal of IntAllocsite.t | External of ExtAllocsite.t
+  type t =
+    | Internal of IntAllocsite.t
+    | External of ExtAllocsite.t
+    | Super of string
   [@@deriving compare]
 
   let allocsite_of_node n = Internal (n, false)
 
   let allocsite_of_string n = Internal (n, true)
+
+  let of_super s = Super s
 
   let is_node_allocsite = function Internal (_, false) -> true | _ -> false
 
@@ -67,6 +72,8 @@ module Allocsite = struct
     | External e -> ExtAllocsite.is_cmd_arg e
     | _ -> false
 
+  let is_superloc = function Super _ -> true | _ -> false
+
   let allocsite_of_ext = function
     | None -> External ExtAllocsite.input
     | Some fid -> External (ExtAllocsite.unknown fid)
@@ -74,10 +81,12 @@ module Allocsite = struct
   let to_string = function
     | Internal i -> IntAllocsite.to_string i
     | External e -> ExtAllocsite.to_string e
+    | Super s -> s
 
   let pp fmt = function
     | Internal i -> Format.fprintf fmt "%a" IntAllocsite.pp i
     | External e -> Format.fprintf fmt "%a" ExtAllocsite.pp e
+    | Super s -> Format.fprintf fmt "%s" s
 end
 
 module Loc = struct
@@ -139,6 +148,10 @@ module Loc = struct
   let is_lvar = function LVar _ -> true | _ -> false
 
   let is_allocsite = function Allocsite _ -> true | _ -> false
+
+  let is_super_allocsite = function
+    | Allocsite a -> Allocsite.is_superloc a
+    | _ -> false
 
   let is_string_allocsite = function
     | Allocsite a -> Allocsite.is_string_allocsite a

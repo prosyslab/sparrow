@@ -27,6 +27,8 @@ module Allocsite : sig
 
   val allocsite_of_string : Node.t -> t
 
+  val of_super : string -> t
+
   val is_string_allocsite : t -> bool
 
   val is_global_allocsite : t -> bool
@@ -62,6 +64,8 @@ module Loc : sig
   val is_gvar : t -> bool
 
   val is_allocsite : t -> bool
+
+  val is_super_allocsite : t -> bool
 
   val is_ext_allocsite : t -> bool
 
