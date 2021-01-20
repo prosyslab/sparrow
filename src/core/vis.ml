@@ -9,7 +9,12 @@
 (*                                                                     *)
 (***********************************************************************)
 
-let opts = []
+module P = Printf
+
+let interactive = ref false
+
+let opts =
+  [ ("-interactive", Arg.Set interactive, "Run with interactive mode") ]
 
 let usage = ""
 
@@ -203,9 +208,142 @@ let dump json =
       dump_cfgs_with_dug (List.assoc "cfgs" global) dug
   | _ -> raise (Failure "error")
 
+module DUGraph = ItvAnalysis.DUGraph
+module PowLoc = DUGraph.PowLoc
+module Loc = PowLoc.A
+module Node = BasicDom.Node
+
+let history_filename = ".sparrow-vis-history.txt"
+
+let initialize () =
+  LNoise.history_load ~filename:history_filename |> ignore;
+  LNoise.history_set ~max_length:100 |> ignore;
+  LNoise.set_completion_callback (fun line_so_far ln_completions ->
+      if line_so_far <> "" && line_so_far.[0] = 'c' then
+        [ "common" ] |> List.iter (LNoise.add_completion ln_completions))
+
+let cmd_exit () =
+  flush_all ();
+  exit 0
+
+module PowNode = BasicDom.PowNode
+
+type env = { filename : string; dug : DUGraph.t }
+
+let rec slice allocs pc workset allocsites dug new_dug =
+  if PowNode.is_empty workset then new_dug
+  else
+    let work, workset = PowNode.pop workset in
+    let workset, new_dug =
+      DUGraph.fold_pred
+        (fun p (workset, new_dug) ->
+          if List.exists (fun alloc -> DUGraph.check_path pc p alloc) allocs
+          then
+            let filtered =
+              DUGraph.get_abslocs p work dug
+              |> DUGraph.PowLoc.filter (fun x ->
+                     List.mem (Loc.to_string x) allocsites)
+            in
+            if PowLoc.is_empty filtered then (workset, new_dug)
+            else
+              let workset =
+                if DUGraph.mem_node p new_dug then workset
+                else PowNode.add p workset
+              in
+              (workset, DUGraph.add_abslocs p filtered work new_dug)
+          else (workset, new_dug))
+        dug work (workset, new_dug)
+    in
+    slice allocs pc workset allocsites dug new_dug
+
+let cmd_common { filename; dug } alarm allocsites =
+  let allocsite_nodes =
+    List.map
+      (fun x -> DUGraph.find_node_of_string dug x |> Option.get)
+      allocsites
+  in
+  let alarm = DUGraph.find_node_of_string dug alarm |> Option.get in
+  let nodes =
+    List.fold_left
+      (fun nodes alloc ->
+        DUGraph.shortest_path_loc_str dug alloc alarm (Node.to_string alloc)
+        |> BasicDom.PowNode.of_list
+        |> BasicDom.PowNode.union nodes)
+      BasicDom.PowNode.empty allocsite_nodes
+  in
+  PowNode.iter (fun x -> prerr_endline (BasicDom.Node.to_string x)) nodes;
+  let path_checker = DUGraph.create_path_checker dug in
+  let dug =
+    slice allocsite_nodes path_checker (PowNode.singleton alarm) allocsites dug
+      (DUGraph.create ())
+  in
+  let dirname = Filename.dirname filename in
+  let basename =
+    Filename.basename filename |> Fun.flip Filename.chop_suffix ".bin"
+  in
+  let filename = Filename.concat dirname basename in
+  let oc = open_out (filename ^ ".dot") in
+  let color =
+    (alarm, "red") :: List.map (fun x -> (x, "cyan")) allocsite_nodes
+  in
+  P.fprintf oc "%s\n" (DUGraph.to_dot ~color dug);
+  close_out oc;
+  Unix.create_process "dot"
+    [| "dot"; "-Tsvg"; "-o"; filename ^ ".svg"; filename ^ ".dot" |]
+    Unix.stdin Unix.stdout Unix.stderr
+  |> ignore;
+  Unix.wait () |> ignore;
+  P.printf "Done\n";
+  P.printf "#nodes     = %d\n" (DUGraph.nb_node dug);
+  P.printf "#edges     = %d\n" (DUGraph.nb_edge dug);
+  P.printf "#abs locs  = %d\n" (DUGraph.nb_loc dug)
+
+let cmd_help () =
+  P.printf
+    "    common [alarm] [allocsite1] [allocsite2] ... : draw a common subgraph\n"
+
+let repl env cmd =
+  let components = Str.split (Str.regexp "[ \t]+") cmd in
+  match components with
+  | "common" :: alarm :: allocsites -> cmd_common env alarm allocsites
+  | [ "help" ] -> cmd_help ()
+  | [ "exit" ] -> cmd_exit ()
+  | _ -> P.eprintf "Invalid command\nTry help\n"
+
+let rec user_input prompt env cb =
+  match LNoise.linenoise prompt with
+  | None -> ()
+  | Some v ->
+      repl env v;
+      flush_all ();
+      cb v;
+      user_input prompt env cb
+  | exception Sys.Break -> cmd_exit ()
+
+let dump_bin filename =
+  let ic = open_in filename in
+  let dug = Marshal.from_channel ic in
+  close_in ic;
+  let env = { filename; dug } in
+  P.printf "Processing...\n";
+  P.printf "#nodes     = %d\n" (DUGraph.nb_node dug);
+  P.printf "#edges     = %d\n" (DUGraph.nb_edge dug);
+  P.printf "#abs locs  = %d\n" (DUGraph.nb_loc dug);
+  flush_all ();
+  initialize ();
+  (fun from_user ->
+    LNoise.history_add from_user |> ignore;
+    LNoise.history_save ~filename:history_filename |> ignore)
+  |> user_input "visualizer> " env
+
 let main () =
   Arg.parse opts args usage;
   Printf.printf "Reading the input file...\n";
-  Yojson.Safe.from_file !file |> dump
+  if Filename.check_suffix !file ".json" then
+    Yojson.Safe.from_file !file |> dump
+  else if Filename.check_suffix !file ".bin" then dump_bin !file
+  else
+    let _ = Printf.eprintf "Unknown file type" in
+    exit 1
 
 let _ = main ()
