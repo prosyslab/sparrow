@@ -4,7 +4,6 @@ open Global
 open Report
 open Vocab
 module F = Format
-module L = Logging
 
 let analysis = Spec.Taint
 
@@ -167,6 +166,8 @@ let do_analysis (global, itvdug, itvinputof) =
   in
   (* NOTE: fully flow-sensitive taint analysis *)
   let _ = Options.pfs := 100 in
-  cond !Options.marshal_in marshal_in (Analysis.perform spec) global
+  let dug = Analysis.generate_dug spec global in
+  ( if !Options.marshal_in then marshal_in global
+  else Analysis.perform spec global dug )
   |> opt !Options.marshal_out marshal_out
   |> post_process spec itvdug

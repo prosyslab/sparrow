@@ -289,7 +289,9 @@ let do_analysis (global, itvinputof) =
       premem = Mem.top packconf;
     }
   in
-  cond !Options.marshal_in marshal_in (Analysis.perform spec) global
+  let dug = Analysis.generate_dug spec global in
+  ( if !Options.marshal_in then marshal_in global
+  else Analysis.perform spec global dug )
   |> opt !Options.marshal_out marshal_out
   |> StepManager.stepf true "Generate Alarm Report"
        (fun (global, _, inputof, outputof) ->

@@ -478,6 +478,8 @@ let do_analysis global =
     }
   in
   stat locset;
-  cond !Options.marshal_in marshal_in (Analysis.perform spec) global
+  let dug = Analysis.generate_dug spec global in
+  ( if !Options.marshal_in then marshal_in global
+  else Analysis.perform spec global dug )
   |> opt !Options.marshal_out marshal_out
   |> post_process spec

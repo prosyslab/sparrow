@@ -341,7 +341,8 @@ let do_analysis (global, itvinputof) =
       Spec.premem = Mem.top OctImpactDom.packconf;
     }
   in
-  Analysis.perform spec global |> fun (g, _, i, o) -> (g, itvinputof, i, o)
+  let dug = Analysis.generate_dug spec global in
+  Analysis.perform spec global dug |> fun (g, _, i, o) -> (g, itvinputof, i, o)
 
 (* ********** *
  * Marshaling *

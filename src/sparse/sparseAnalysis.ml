@@ -38,7 +38,10 @@ module type S = sig
        and type Dom.A.t = Dom.A.t
        and type Dom.PowA.t = Dom.PowA.t
 
-  val perform : Spec.t -> Global.t -> Global.t * DUGraph.t * Table.t * Table.t
+  val generate_dug : Spec.t -> Global.t -> DUGraph.t
+
+  val perform :
+    Spec.t -> Global.t -> DUGraph.t -> Global.t * DUGraph.t * Table.t * Table.t
 end
 
 module MakeWithAccess (Sem : AccessSem.S) = struct
@@ -234,10 +237,12 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
     L.info "#Nodes in def-use graph : %d\n" (DUGraph.nb_node dug);
     L.info "#Locs on def-use graph : %d\n" (DUGraph.nb_loc dug)
 
-  let bind_fi_locs mem_fi dug access inputof =
+  let bind_fi_locs mem_fi dug inputof =
     DUGraph.fold_node
       (fun n t ->
-        let used = Access.Info.useof (Access.find_node n access) in
+        let used =
+          Access.Info.useof (Access.find_node n (DUGraph.access dug))
+        in
         let pred = DUGraph.pred n dug in
         let locs_on_edge =
           list_fold
@@ -254,7 +259,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
       dug inputof
 
   (* add pre-analysis memory to unanalyzed nodes *)
-  let bind_unanalyzed_node global mem_fi dug access inputof =
+  let bind_unanalyzed_node global mem_fi dug inputof =
     let nodes = InterCfg.nodesof global.icfg in
     let nodes_in_dug = DUGraph.nodesof dug in
     list_fold
@@ -264,20 +269,20 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
           let mem_with_access =
             PowLoc.fold
               (fun loc -> Dom.add loc (Dom.find loc mem_fi))
-              (Access.Info.useof (Access.find_node node access))
+              (Access.Info.useof (Access.find_node node (DUGraph.access dug)))
               Dom.bot
           in
           Table.add node mem_with_access t)
       nodes inputof
 
-  let initialize spec dug access =
+  let initialize spec dug =
     Table.add InterCfg.start_node (Sem.initial spec.Spec.locset) Table.empty
-    |> cond (!Options.pfs < 100) (bind_fi_locs spec.Spec.premem dug access) id
+    |> cond (!Options.pfs < 100) (bind_fi_locs spec.Spec.premem dug) id
 
-  let finalize spec dug access (worklist, global, inputof, outputof) =
+  let finalize spec dug (worklist, global, inputof, outputof) =
     let inputof =
       if !Options.pfs < 100 then
-        bind_unanalyzed_node global spec.Spec.premem dug access inputof
+        bind_unanalyzed_node global spec.Spec.premem dug inputof
       else inputof
     in
     (worklist, global, inputof, outputof)
@@ -288,7 +293,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
     L.info ~level:1 "#flow-sensitive abstract locations  = %d\n"
       (PowLoc.cardinal spec.Spec.locset_fs)
 
-  let perform spec global =
+  let generate_dug spec global =
     print_spec spec;
     let access =
       StepManager.stepf false "Access Analysis"
@@ -300,14 +305,17 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
         (global, access, spec.Spec.locset_fs)
     in
     print_dug (global, dug);
+    dug
+
+  let perform spec global dug =
     let worklist =
       StepManager.stepf false "Workorder computation" Worklist.init dug
     in
     let dug = DUGraph.update_loopheads (Worklist.loopheads worklist) dug in
-    (worklist, global, initialize spec dug access, Table.empty)
+    (worklist, global, initialize spec dug, Table.empty)
     |> StepManager.stepf false "Fixpoint iteration with widening"
          (widening spec dug)
-    |> finalize spec dug access
+    |> finalize spec dug
     |> StepManager.stepf_opt !Options.narrow false
          "Fixpoint iteration with narrowing" (narrowing spec dug)
     |> fun (_, global, inputof, outputof) -> (global, dug, inputof, outputof)

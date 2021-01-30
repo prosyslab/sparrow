@@ -27,7 +27,10 @@ module type S = sig
        and type Dom.A.t = Dom.A.t
        and type Dom.PowA.t = Dom.PowA.t
 
-  val perform : Spec.t -> Global.t -> Global.t * DUGraph.t * Table.t * Table.t
+  val generate_dug : Spec.t -> Global.t -> DUGraph.t
+
+  val perform :
+    Spec.t -> Global.t -> DUGraph.t -> Global.t * DUGraph.t * Table.t * Table.t
 end
 
 module Make (Sem : AbsSem.S) :
