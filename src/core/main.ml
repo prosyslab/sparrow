@@ -112,7 +112,11 @@ let initialize () =
   if !Options.debug then L.set_level L.DEBUG;
   L.info "%s\n" (String.concat " " !Frontend.files);
   Profiler.start_logger ();
-  Cil.initCIL ()
+  Cil.initCIL ();
+  if !Options.memtrace then
+    Memtrace.start_tracing ~context:(Some "sparrow") ~sampling_rate:1e-6
+      ~filename:(Filename.concat !Options.outdir "memtrace")
+    |> ignore
 
 let main () =
   let t0 = Sys.time () in

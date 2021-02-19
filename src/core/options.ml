@@ -151,6 +151,8 @@ let verbose = ref 1
 
 let int_overflow = ref false
 
+let memtrace = ref false
+
 let unsoundness_opts =
   [
     ( "-unsound_loop",
@@ -296,6 +298,7 @@ let opts =
       "Write analysis results to marshaled data" );
     ("-outdir", Arg.Set_string outdir, "Output directory (default: sparrow-out)");
     ("-int_overflow", Arg.Set int_overflow, "Consider integer overflow");
+    ("-memtrace", Arg.Set memtrace, "Profile with memtrace");
   ]
   @ unsoundness_opts @ datalog_opts
 

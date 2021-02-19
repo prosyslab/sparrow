@@ -90,6 +90,8 @@ val scaffold : bool ref
 
 val int_overflow : bool ref
 
+val memtrace : bool ref
+
 (** {2 Alarm Report } *)
 
 val bo : bool ref

@@ -14,7 +14,7 @@
  (name main)
  (modules main)
  (libraries apron apron.octMPQ batteries cil cil.all-features clangml
-   clangml.printer lymp ocamlgraph str yojson sparrow)
+   clangml.printer lymp memtrace ocamlgraph str yojson sparrow)
  (preprocess
   (pps ppx_compare)))
 
