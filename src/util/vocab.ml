@@ -128,9 +128,9 @@ let my_prerr_newline () = if !Options.verbose >= 1 then prerr_newline ()
 let my_prerr_string str = if !Options.verbose >= 1 then prerr_string str
 
 let prerr_memory_usage () =
-  if !Options.verbose <= 1 then ()
+  if !Options.verbose = 0 then ()
   else
     let stat = Gc.stat () in
-    let kB_of_word w = w * Sys.word_size / 1000 / 8 in
-    let live_kB = kB_of_word stat.Gc.live_words in
-    prerr_endline ("live memory : " ^ string_of_int live_kB ^ " kB")
+    let kB_of_word w = w * Sys.word_size / 1024 / 8 in
+    let live_mb = kB_of_word stat.Gc.live_words / 1024 in
+    Logging.info ~level:1 "live memory : %d MB\n" live_mb
