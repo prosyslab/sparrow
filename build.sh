@@ -24,7 +24,7 @@ fi
 eval $(SHELL=bash opam config env --switch=$SPARROW_OPAM_SWITCH)
 opam install depext
 echo -e "\e[31m[NOTE]\e[0m If you are not a sudo user, press Ctrl+D and skip installing system libraries. Contact the sysadmin, if they are not installed."
-opam depext apron clangml || continue
+opam depext apron clangml || echo "Skip system library install"
 opam pin add cil https://github.com/prosyslab/cil.git -n
 opam pin add sparrow . -n
 opam install -j $NCPU sparrow --deps-only
