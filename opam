@@ -31,4 +31,5 @@ depends: [
   "ppx_compare"
   "clangml" {>= "4.4.0"}
   "linenoise"
+  "memtrace"
 ]
