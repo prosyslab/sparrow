@@ -300,7 +300,7 @@ let add_array_content _ cond _ feat =
   let exists_deref_lval = function
     | (Var _, _) as lval -> (
         let _, offset = Cil.removeOffsetLval lval in
-        match offset with Index (_, _) -> true | _ -> false )
+        match offset with Index (_, _) -> true | _ -> false)
     | Mem _, NoOffset -> true
     | _, _ -> false
   in
@@ -775,8 +775,8 @@ let normalize trset =
         scc_size = feat.scc_size /. max_scc;
         points_to = feat.points_to /. max_points_to;
         diff_array_access =
-          ( if feat.diff_array_access = 0.0 then 0.0
-          else feat.diff_array_access /. max_diff_array_access );
+          (if feat.diff_array_access = 0.0 then 0.0
+          else feat.diff_array_access /. max_diff_array_access);
         idx_pp = (if feat.idx_pp = 0.0 then 0.0 else feat.idx_pp /. max_idx_pp);
       })
     trset
@@ -793,7 +793,7 @@ let extract_feature global =
               in
               let cfg = InterCfg.cfgof global.icfg fd.svar.vname in
               extract global cfg loop_info trset
-            with _ -> trset )
+            with _ -> trset)
         | _ -> trset)
       BatMap.empty
   in
@@ -801,7 +801,7 @@ let extract_feature global =
     prerr_endline "== features for loop ==";
     BatMap.iter
       (fun k v -> prerr_endline (k ^ "\n" ^ string_of_feature v))
-      trset );
+      trset);
   normalize trset
 
 class loopRemoveVisitor (loops : string BatSet.t) =

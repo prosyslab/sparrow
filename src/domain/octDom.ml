@@ -66,7 +66,7 @@ module PackConf = struct
       with _ ->
         if !Options.debug then
           prerr_endline ("get_pack.Not_found : " ^ OctLoc.to_string lv);
-        Pack.singleton lv )
+        Pack.singleton lv)
 
   let get_all_octlocs itvinputof =
     ItvAnalysis.Table.fold
@@ -121,7 +121,7 @@ module PackConf = struct
           prerr_int (Pack.cardinal x);
           prerr_string " : {";
           Pack.iter (fun x -> prerr_string (OctLoc.to_string x ^ ", ")) x;
-          prerr_endline "}, " ))
+          prerr_endline "}, "))
       packconf
 end
 
@@ -219,7 +219,7 @@ module Octagon = struct
           | Scalar.Float f -> Itv.Integer.of_int (int_of_float f)
           | Scalar.Mpqf f -> Itv.Integer.of_int (int_of_float (Mpqf.to_float f))
           | Scalar.Mpfrf f ->
-              Itv.Integer.of_int (int_of_float (Mpfrf.to_float f)) )
+              Itv.Integer.of_int (int_of_float (Mpfrf.to_float f)))
     in
     let lb, ub = (f i.Interval.inf, f i.Interval.sup) in
     if not (Itv.Integer.le lb ub) then Itv.bot else Itv.of_integer lb ub

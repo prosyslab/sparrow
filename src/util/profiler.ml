@@ -95,7 +95,7 @@ let start_logger () = log_start := Sys.time ()
 let start_event name =
   if !Options.profile then (
     let st = Sys.time () in
-    if incr_recursive name == 1 then events := BatMap.add name st !events )
+    if incr_recursive name == 1 then events := BatMap.add name st !events)
   else ()
 
 let finish_event name =
@@ -107,7 +107,7 @@ let finish_event name =
       let t0 = BatMap.find name !events in
       let el = ft -. t0 in
       events := BatMap.remove name !events;
-      update_log name el ) )
+      update_log name el))
   else ()
 
 let event name f x =
@@ -151,7 +151,7 @@ let report c =
        print_endline("- Marshaled datas");
        BatMap.iter (fun x v -> Printf.fprintf c "4. %s - %s\n" x (make_file !v)) !arguments_log;
        print_endline("-------------------------------");
-    *) )
+    *))
   else ()
 
 let reset () =

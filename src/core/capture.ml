@@ -11,7 +11,7 @@ let rec create_dirs path =
   else (
     prerr_endline path;
     Filename.dirname path |> create_dirs;
-    FileManager.mkdir path )
+    FileManager.mkdir path)
 
 let preprocess_one_file cwd entry =
   let directory = List.assoc "directory" entry |> json_to_string in

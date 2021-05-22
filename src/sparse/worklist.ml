@@ -154,7 +154,7 @@ module Make (DUGraph : Dug.S) = struct
             in
             let ng' = cut_backedges ng' lh in
             let sccs' = List.rev (NGraph.scc_list ng') in
-            get_order1 sccs' ng' (wo, lhs, ho) order )
+            get_order1 sccs' ng' (wo, lhs, ho) order)
           else
             let n = List.hd scc in
             get_order1 t ng (BatMap.add n order wo, lhs, ho) (order + 1)
@@ -179,7 +179,7 @@ module Make (DUGraph : Dug.S) = struct
             let sccs' =
               List.rev (NGraph.scc_list ng') |> List.map (fun scc -> (scc, ng'))
             in
-            get_order2 (sccs' @ t) (wo, lhs, ho) (order + 1) )
+            get_order2 (sccs' @ t) (wo, lhs, ho) (order + 1))
           else
             let n = List.hd scc in
             get_order2 t (BatMap.add n order wo, lhs, ho) (order + 1)

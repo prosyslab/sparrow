@@ -73,8 +73,8 @@ let inspect_aexp packconf node aexp ptrmem mem queries =
   let pid = InterCfg.Node.get_pid node in
   if !Options.oct_debug then (
     prerr_endline "query";
-    prerr_endline (AlarmExp.to_string aexp) );
-  ( match aexp with
+    prerr_endline (AlarmExp.to_string aexp));
+  (match aexp with
   | ArrayExp (lv, e, loc) ->
       let v1 =
         ItvDom.Mem.lookup
@@ -158,7 +158,7 @@ let inspect_aexp packconf node aexp ptrmem mem queries =
       lst1 @ lst2
       |> List.map (fun (status, a, desc) ->
              { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
-  | _ -> [] )
+  | _ -> [])
   @ queries
 
 let inspect_alarm global spec inputof =
@@ -290,8 +290,8 @@ let do_analysis (global, itvinputof) =
     }
   in
   let dug = Analysis.generate_dug spec global in
-  ( if !Options.marshal_in then marshal_in global
-  else Analysis.perform spec global dug )
+  (if !Options.marshal_in then marshal_in global
+  else Analysis.perform spec global dug)
   |> opt !Options.marshal_out marshal_out
   |> StepManager.stepf true "Generate Alarm Report"
        (fun (global, _, inputof, outputof) ->

@@ -194,8 +194,8 @@ and eval ?(spec = Spec.empty) pid e mem =
       Val.of_itv (try CilHelper.byteSizeOf t |> Itv.of_int with _ -> Itv.pos)
   | Cil.SizeOfE e ->
       Val.of_itv
-        ( try CilHelper.byteSizeOf (Cil.typeOf e) |> Itv.of_int
-          with _ -> Itv.pos )
+        (try CilHelper.byteSizeOf (Cil.typeOf e) |> Itv.of_int
+         with _ -> Itv.pos)
   | Cil.SizeOfStr s -> Val.of_itv (Itv.of_int (String.length s + 1))
   | Cil.AlignOf t -> Val.of_itv (Itv.of_int (Cil.alignOf_int t))
   (* TODO: type information is required for precise semantics of AlignOfE. *)
@@ -211,7 +211,7 @@ and eval ?(spec = Spec.empty) pid e mem =
       else Val.join (eval ~spec pid e2 mem) (eval ~spec pid e3 mem)
   | Cil.CastE (t, e) -> (
       let v = eval ~spec pid e mem in
-      try Val.cast (Cil.typeOf e) t v with _ -> v )
+      try Val.cast (Cil.typeOf e) t v with _ -> v)
   | Cil.AddrOf l -> eval_lv ~spec pid l mem |> Val.of_pow_loc
   | Cil.AddrOfLabel _ ->
       invalid_arg
@@ -368,7 +368,7 @@ let model_realloc mode spec node (lvo, exps) (mem, global) =
               (eval_array_alloc ~spec node size false mem)
               mem,
             global )
-      | _ -> raise (Failure "Error: arguments of realloc are not given") )
+      | _ -> raise (Failure "Error: arguments of realloc are not given"))
   | _ -> (mem, global)
 
 let model_calloc mode spec node (lvo, exps) (mem, global) =
@@ -382,7 +382,7 @@ let model_calloc mode spec node (lvo, exps) (mem, global) =
               (eval_array_alloc ~spec node new_size false mem)
               mem,
             global )
-      | _ -> raise (Failure "Error: arguments of realloc are not given") )
+      | _ -> raise (Failure "Error: arguments of realloc are not given"))
   | _ -> (mem, global)
 
 let model_scanf mode spec pid exps (mem, global) =
@@ -483,7 +483,7 @@ let rec model_sprintf mode spec pid (lvo, exps) (mem, global) =
       let buf_val =
         ArrayBlk.set_null_pos buf_arr null_pos |> ItvDom.Val.of_array
       in
-      ( mem
+      (mem
       |> update mode spec global buf_lv buf_val
       |> update mode spec global allocsites (lookup arrays mem)
       |>
@@ -491,7 +491,7 @@ let rec model_sprintf mode spec pid (lvo, exps) (mem, global) =
       | Some lv ->
           update mode spec global (eval_lv ~spec pid lv mem)
             (Val.of_itv null_pos)
-      | _ -> id )
+      | _ -> id)
       |> fun mem -> (mem, global)
   | [ CastE (_, buf); str ] | [ buf; CastE (_, str) ] ->
       model_sprintf mode spec pid (lvo, [ buf; str ]) (mem, global)
@@ -501,7 +501,7 @@ let rec model_sprintf mode spec pid (lvo, exps) (mem, global) =
           ( update mode spec global (eval_lv ~spec pid lv mem)
               (Val.of_itv Itv.nat) mem,
             global )
-      | _ -> (mem, global) )
+      | _ -> (mem, global))
 
 (* argc, argv *)
 let sparrow_arg mode spec pid exps (mem, global) =
@@ -655,7 +655,7 @@ let model_memset mode spec pid (lvo, exps) (mem, global) =
             update mode spec global (eval_lv ~spec pid lv mem) arr mem
           in
           (mem, global)
-      | _ -> (mem, global) )
+      | _ -> (mem, global))
   | _ -> (mem, global)
 
 let sparrow_array_init mode spec node pid exps (mem, global) =
@@ -1005,7 +1005,7 @@ let run mode spec node (mem, global) =
             update mode spec global (eval_lv ~spec pid l mem) ext_v mem
           in
           let mem = update mode spec global ext_loc ext_v mem in
-          (mem, global) )
+          (mem, global))
   | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, is_static, _) ->
       let ploc = eval_lv ~spec pid l mem in
       let v = eval_array_alloc ~spec node e is_static mem in
@@ -1100,7 +1100,7 @@ let run mode spec node (mem, global) =
       (mem, { global with relations })
   | IntraCfg.Cmd.Cskip _ when InterCfg.is_returnnode node global.icfg ->
       let callnode = InterCfg.callof node global.icfg in
-      ( match InterCfg.cmdof global.icfg callnode with
+      (match InterCfg.cmdof global.icfg callnode with
       | IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
           let callees = Val.pow_proc_of_val (eval ~spec pid f mem) in
           (* TODO: optimize this. memory access and du edges *)
@@ -1113,7 +1113,7 @@ let run mode spec node (mem, global) =
           in
           update Weak spec global (eval_lv ~spec pid lv mem)
             (lookup retvar_set mem) mem
-      | _ -> mem )
+      | _ -> mem)
       |> fun mem -> (mem, global)
   | IntraCfg.Cmd.Cskip _ -> (mem, global)
   | IntraCfg.Cmd.Casm _ -> (mem, global) (* Not supported *)

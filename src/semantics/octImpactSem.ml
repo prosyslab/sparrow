@@ -250,8 +250,7 @@ let handle_undefined_functions mode node pid (lvo, f, exps) ptrmem (mem, global)
                 Allocsite.allocsite_of_ext (Some f.vname)
                 |> Loc.of_allocsite |> OctLoc.of_loc |> PowOctLoc.singleton
               in
-              mem |> forget mode global pid size |> forget mode global pid loc )
-      )
+              mem |> forget mode global pid size |> forget mode global pid loc))
 
 let binding mode global ptrmem pid paramset args mem =
   let rec adjust params args new_params new_args =

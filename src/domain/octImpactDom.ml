@@ -134,12 +134,12 @@ module AbsOct = struct
     | _, Bot -> false
     | V (x, c1, d1), V (y, c2, d2) ->
         PowOctLoc.le d1 d2
-        && ( try
-               G.fold_edges
-                 (fun s d _ ->
-                   if G.mem_edge x s d then true else raise Not_found)
-                 y true
-             with Not_found -> false )
+        && (try
+              G.fold_edges
+                (fun s d _ ->
+                  if G.mem_edge x s d then true else raise Not_found)
+                y true
+            with Not_found -> false)
         && PowOctLoc.le c2 c1
 
   let extend (o1, d1) (o2, _) =

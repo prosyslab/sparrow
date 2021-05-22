@@ -85,7 +85,7 @@ let is_varargs fid file =
     (fun b global ->
       match global with
       | GFun (fd, _) when fd.svar.vname = fid -> (
-          match fd.svar.vtype with TFun (_, _, b_va, _) -> b_va | _ -> b )
+          match fd.svar.vtype with TFun (_, _, b_va, _) -> b_va | _ -> b)
       | _ -> b)
     false
 

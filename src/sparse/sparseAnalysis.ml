@@ -73,16 +73,16 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
     total_iterations := !total_iterations + 1;
     if !total_iterations = 1 then (
       g_clock := Sys.time ();
-      l_clock := Sys.time () )
+      l_clock := Sys.time ())
     else if !total_iterations mod 10000 = 0 then (
       let g_time = Format.sprintf "%.2f" (Sys.time () -. !g_clock) in
       let l_time = Format.sprintf "%.2f" (Sys.time () -. !l_clock) in
       my_prerr_string
-        ( "\r#iters: "
+        ("\r#iters: "
         ^ string_of_int !total_iterations
-        ^ " took " ^ g_time ^ "s  (" ^ l_time ^ "s / last 10000 iters)" );
+        ^ " took " ^ g_time ^ "s  (" ^ l_time ^ "s / last 10000 iters)");
       flush stderr;
-      l_clock := Sys.time () )
+      l_clock := Sys.time ())
 
   let propagate dug idx (works, inputof, outputof)
       (unstables, new_output, global) =
@@ -221,7 +221,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
            than json.\n";
         let oc = open_out (Filename.concat !Options.outdir "dug.bin") in
         Marshal.to_channel oc dug [];
-        close_out oc )
+        close_out oc)
       else
         let oc = open_out (Filename.concat !Options.outdir "dug.json") in
         `Assoc
@@ -232,7 +232,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
             (*          ("dugraph-inter", DUGraph.to_json_inter dug access);*)
           ]
         |> Yojson.Safe.pretty_to_channel oc;
-        close_out oc );
+        close_out oc);
     prerr_memory_usage ();
     L.info "#Nodes in def-use graph : %d\n" (DUGraph.nb_node dug);
     L.info "#Locs on def-use graph : %d\n" (DUGraph.nb_loc dug)

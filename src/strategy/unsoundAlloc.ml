@@ -31,7 +31,7 @@ let rec is_alloc_ptr stmt p =
         when p = v.vname ->
           is_alloc_ptr pred tmp.vname
       | Instr instr -> is_alloc_ptr_instr instr p
-      | _ -> false )
+      | _ -> false)
   | _ -> false
 
 let check_null op stmt exp =
@@ -67,7 +67,7 @@ let rec split stmts (live, dead) =
       | Return (_, _) ->
           let dead', live' = split_dead t [] in
           (List.rev (h :: live) @ live', dead')
-      | _ -> split t (h :: live, dead) )
+      | _ -> split t (h :: live, dead))
   | _ -> (List.rev live, dead)
 
 (* Remove statements after returns. For example,

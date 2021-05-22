@@ -463,7 +463,7 @@ let extract_feature global =
             try
               let cfg = InterCfg.cfgof global.icfg fd.svar.vname in
               lib_feature global cfg trset
-            with _ -> trset )
+            with _ -> trset)
         | _ -> trset)
       BatMap.empty
   in
@@ -471,7 +471,7 @@ let extract_feature global =
     prerr_endline "== features for library ==";
     BatMap.iter
       (fun k v -> prerr_endline (k ^ "\n" ^ string_of_feature v))
-      trset );
+      trset);
   normalize trset
 
 let print_feature data = string_of_trset data |> print_string

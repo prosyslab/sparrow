@@ -20,11 +20,11 @@ remove: [
 ]
 
 depends: [
-  "ocaml" {>="4.08.0"}
+  "ocaml" {>="4.11.0"}
   "ocamlfind" {build}
   "batteries" {>= "2.3.1"}
   "cil" {>= "1.7.3"}
-  "ocamlgraph" {= "1.8.8"}
+  "ocamlgraph"
   "apron" {>= "0.9.10"}
   "yojson" {>= "1.2.3"}
   "lymp" {>= "0.1.3"}

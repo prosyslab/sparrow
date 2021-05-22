@@ -406,7 +406,7 @@ let run_cmd mode node itvmem (mem, global) =
           update Weak global
             (ItvSem.eval_lv pid lv itvmem)
             (lookup retvar_set mem) mem
-      | _ -> mem )
+      | _ -> mem)
   | IntraCfg.Cmd.Cskip _ -> mem
   | IntraCfg.Cmd.Casm _ -> mem
   | _ -> invalid_arg "taintSem.ml: run"

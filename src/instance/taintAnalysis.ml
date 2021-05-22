@@ -167,7 +167,7 @@ let do_analysis (global, itvdug, itvinputof) =
   (* NOTE: fully flow-sensitive taint analysis *)
   let _ = Options.pfs := 100 in
   let dug = Analysis.generate_dug spec global in
-  ( if !Options.marshal_in then marshal_in global
-  else Analysis.perform spec global dug )
+  (if !Options.marshal_in then marshal_in global
+  else Analysis.perform spec global dug)
   |> opt !Options.marshal_out marshal_out
   |> post_process spec itvdug

@@ -164,10 +164,10 @@ let print analysis global dug alarms =
       then F.fprintf fmt_loophead "%a\n" Node.pp dst;
       if PowNode.mem dst true_branch then (
         F.fprintf fmt_tc "%a\n" Node.pp src;
-        F.fprintf fmt_tb "%a\t%a\n" Node.pp src Node.pp dst )
+        F.fprintf fmt_tb "%a\t%a\n" Node.pp src Node.pp dst)
       else if PowNode.mem dst false_branch then (
         F.fprintf fmt_fc "%a\n" Node.pp src;
-        F.fprintf fmt_fb "%a\t%a\n" Node.pp src Node.pp dst )
+        F.fprintf fmt_fb "%a\t%a\n" Node.pp src Node.pp dst)
       else F.fprintf fmt_edge "%a\t%a\n" Node.pp src Node.pp dst)
     dug;
   close_out oc_edge;

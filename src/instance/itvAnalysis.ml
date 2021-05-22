@@ -44,15 +44,15 @@ let print_abslocs_info locs =
  * **************** *)
 let ignore_alarm a arr offset =
   !Options.bugfinder >= 1
-  && ( Allocsite.is_string_allocsite a
+  && (Allocsite.is_string_allocsite a
      || arr.ArrInfo.size = Itv.top || arr.ArrInfo.size = Itv.one
      || (offset = Itv.top && arr.ArrInfo.size = Itv.nat)
-     || offset = Itv.zero )
+     || offset = Itv.zero)
   || (!Options.bugfinder >= 2 && not (Itv.is_const arr.ArrInfo.size))
   || !Options.bugfinder >= 3
-     && ( offset = Itv.top
+     && (offset = Itv.top
         || Itv.meet arr.ArrInfo.size Itv.zero <> Itv.bot
-        || (offset = Itv.top && arr.ArrInfo.offset <> Itv.top) )
+        || (offset = Itv.top && arr.ArrInfo.offset <> Itv.top))
 
 let check_bo v1 v2opt =
   let arr = Val.array_of_val v1 in
@@ -85,7 +85,7 @@ let check_nd v1 =
   else [ (Proven, None, "") ]
 
 let inspect_aexp_bo node aexp mem queries =
-  ( match aexp with
+  (match aexp with
   | ArrayExp (lv, e, loc) ->
       let v1 =
         Mem.lookup (ItvSem.eval_lv (InterCfg.Node.get_pid node) lv mem) mem
@@ -163,11 +163,11 @@ let inspect_aexp_bo node aexp mem queries =
         (fun (status, a, desc) ->
           { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         lst1
-  | _ -> [] )
+  | _ -> [])
   @ queries
 
 let inspect_aexp_nd node aexp mem queries =
-  ( match aexp with
+  (match aexp with
   | DerefExp (e, loc) ->
       let v = ItvSem.eval (InterCfg.Node.get_pid node) e mem in
       let lst = check_nd v in
@@ -192,7 +192,7 @@ let inspect_aexp_nd node aexp mem queries =
             else
               { node; exp = aexp; loc; status; allocsite = a; desc; src = None })
           lst
-  | _ -> [] )
+  | _ -> [])
   @ queries
 
 let check_dz v =
@@ -201,7 +201,7 @@ let check_dz v =
   else [ (Proven, None, "") ]
 
 let inspect_aexp_dz node aexp mem queries =
-  ( match aexp with
+  (match aexp with
   | DivExp (_, e, loc) ->
       let v = ItvSem.eval (InterCfg.Node.get_pid node) e mem in
       let lst = check_dz v in
@@ -209,7 +209,7 @@ let inspect_aexp_dz node aexp mem queries =
         (fun (status, _, desc) ->
           { node; exp = aexp; loc; allocsite = None; status; desc; src = None })
         lst
-  | _ -> [] )
+  | _ -> [])
   @ queries
 
 let machine_gen_code q =
@@ -479,7 +479,7 @@ let do_analysis global =
   in
   stat locset;
   let dug = Analysis.generate_dug spec global in
-  ( if !Options.marshal_in then marshal_in global
-  else Analysis.perform spec global dug )
+  (if !Options.marshal_in then marshal_in global
+  else Analysis.perform spec global dug)
   |> opt !Options.marshal_out marshal_out
   |> post_process spec

@@ -441,24 +441,24 @@ let extract_set pid (lv, e) mem global feature =
     feature
     |> (if is_const e then PowLoc.fold add_assign_const locs else id)
     |> (if is_sizeof e then PowLoc.fold add_assign_sizeof locs else id)
-    |> ( if inc_itself_by_one (lv, e) then PowLoc.fold add_inc_itself_by_one locs
-       else id )
-    |> ( if incptr_itself_by_one (lv, e) then
-         PowLoc.fold add_incptr_itself_by_one locs
-       else id )
-    |> ( if incptr_itself_by_const (lv, e) then
-         PowLoc.fold add_incptr_itself_by_const locs
-       else id )
-    |> ( if inc_itself_by_const (lv, e) then
-         PowLoc.fold add_inc_itself_by_const locs
-       else id )
-    |> ( if inc_itself_by_var (lv, e) then PowLoc.fold add_inc_itself_by_var locs
-       else id )
-    |> ( if mul_itself_by_const (lv, e) then
-         PowLoc.fold add_mul_itself_by_const locs
-       else id )
-    |> ( if mul_itself_by_var (lv, e) then PowLoc.fold add_mul_itself_by_var locs
-       else id )
+    |> (if inc_itself_by_one (lv, e) then PowLoc.fold add_inc_itself_by_one locs
+       else id)
+    |> (if incptr_itself_by_one (lv, e) then
+        PowLoc.fold add_incptr_itself_by_one locs
+       else id)
+    |> (if incptr_itself_by_const (lv, e) then
+        PowLoc.fold add_incptr_itself_by_const locs
+       else id)
+    |> (if inc_itself_by_const (lv, e) then
+        PowLoc.fold add_inc_itself_by_const locs
+       else id)
+    |> (if inc_itself_by_var (lv, e) then PowLoc.fold add_inc_itself_by_var locs
+       else id)
+    |> (if mul_itself_by_const (lv, e) then
+        PowLoc.fold add_mul_itself_by_const locs
+       else id)
+    |> (if mul_itself_by_var (lv, e) then PowLoc.fold add_mul_itself_by_var locs
+       else id)
     |> (if dec_itself (lv, e) then PowLoc.fold add_dec_itself locs else id)
     |> (if is_inc (lv, e) then PowLoc.fold add_inc locs else id)
     |> (if is_dec (lv, e) then PowLoc.fold add_dec locs else id)
@@ -486,7 +486,7 @@ let extract_assume node pid e mem global feature =
           >>> if is_var e then PowLoc.fold add_prune_by_var locs else id
       | UnOp (LNot, Lval x, _) ->
           PowLoc.fold add_prune_by_not (ItvSem.eval_lv pid x mem)
-      | _ -> id )
+      | _ -> id)
 
 let extract_alloc node pid lv mem global feature =
   let locs_lv = ItvSem.eval_lv pid lv mem in
@@ -535,10 +535,10 @@ let extract_used_index pid mem cmd feature =
       let locs =
         Access.Info.useof
           (accessof_eval pid
-             ( match q with
+             (match q with
              | AlarmExp.ArrayExp (_, e, _) -> e
              | AlarmExp.DerefExp (BinOp (_, _, e2, _), _) -> e2
-             | _ -> Cil.zero (* dummy exp *) )
+             | _ -> Cil.zero (* dummy exp *))
              mem)
       in
       PowLoc.fold add_used_as_array_index locs)
@@ -551,11 +551,11 @@ let extract_used_buf pid mem cmd feature =
       let locs =
         Access.Info.useof
           (accessof_eval pid
-             ( match q with
+             (match q with
              | AlarmExp.ArrayExp (lv, _, _) -> Lval lv
              | AlarmExp.DerefExp (BinOp (_, e1, _, _), _) -> e1
              | AlarmExp.DerefExp (e, _) -> e
-             | _ -> Cil.zero (* dummy exp *) )
+             | _ -> Cil.zero (* dummy exp *))
              mem)
       in
       PowLoc.fold add_used_as_array_buf locs)
@@ -577,14 +577,14 @@ let extract1 icfg mem global node feature =
   let cmd = InterCfg.cmdof icfg node in
   try
     feature
-    |> ( match cmd with
+    |> (match cmd with
        | Cset (lv, e, _) -> extract_set pid (lv, e) mem global
        | Cassume (e, _, _) -> extract_assume node pid e mem global
        | Calloc (lv, IntraCfg.Cmd.Array _, _, _) ->
            extract_alloc node pid lv mem global
        | Ccall (lvo, fe, el, _) ->
            extract_call node pid (lvo, fe, el) mem global
-       | _ -> id )
+       | _ -> id)
     |> extract_used_index pid mem cmd
     |> extract_used_buf pid mem cmd
     |> extract_loops pid mem cmd node icfg
@@ -612,20 +612,20 @@ let extract2 icfg mem node feature =
           let l_x = PowLoc.choose locs_lv in
           let l_y = PowLoc.choose locs_e in
           feature
-          |> ( if PowLoc.mem l_x feature.pass_to_alloc then
-               add_pass_to_alloc2 l_y
-             else id )
-          |> ( if PowLoc.mem l_y feature.return_from_alloc then
-               add_return_from_alloc2 l_x
-             else id )
-          |> ( if PowLoc.mem l_x feature.pass_to_realloc then
-               add_pass_to_realloc2 l_y
-             else id )
+          |> (if PowLoc.mem l_x feature.pass_to_alloc then
+              add_pass_to_alloc2 l_y
+             else id)
+          |> (if PowLoc.mem l_y feature.return_from_alloc then
+              add_return_from_alloc2 l_x
+             else id)
+          |> (if PowLoc.mem l_x feature.pass_to_realloc then
+              add_pass_to_realloc2 l_y
+             else id)
           |>
           if PowLoc.mem l_y feature.return_from_realloc then
             add_return_from_realloc2 l_x
           else id
-      | _ -> feature )
+      | _ -> feature)
   | _ -> feature
 
 let traverse2 global feature =
@@ -655,7 +655,7 @@ let build_copy_graph icfg mem =
                 PowLoc.choose (Access.Info.useof (accessof_eval pid e mem))
               in
               G.add_edge g rhs lhs
-          | _ -> g )
+          | _ -> g)
       | _ -> g)
     (InterCfg.nodesof icfg) G.empty
 
@@ -762,68 +762,68 @@ let weight_of l f weights =
   |> (if mem l f.mod_inside_loops then ( +. ) (getw 32) else id)
   |> (if mem l f.used_inside_loops then ( +. ) (getw 33) else id)
   (* combination rules *)
-  |> ( if
-       mem l f.lvars && mem l f.prune_by_const
-       && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+  |> (if
+      mem l f.lvars && mem l f.prune_by_const
+      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
      then ( +. ) (getw 34)
-     else id )
-  |> ( if
-       mem l f.gvars && mem l f.prune_by_const
-       && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+     else id)
+  |> (if
+      mem l f.gvars && mem l f.prune_by_const
+      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
      then ( +. ) (getw 35)
-     else id )
-  |> ( if
-       mem l f.lvars
-       && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-       && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
+     else id)
+  |> (if
+      mem l f.lvars
+      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+      && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
      then ( +. ) (getw 36)
-     else id )
-  |> ( if
-       mem l f.gvars
-       && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-       && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
+     else id)
+  |> (if
+      mem l f.gvars
+      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+      && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
      then ( +. ) (getw 37)
-     else id )
-  |> ( if
-       mem l f.lvars
-       && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-       && (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
+     else id)
+  |> (if
+      mem l f.lvars
+      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+      && (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
      then ( +. ) (getw 38)
-     else id )
-  |> ( if
-       mem l f.gvars
-       && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-       && (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
+     else id)
+  |> (if
+      mem l f.gvars
+      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+      && (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
      then ( +. ) (getw 39)
-     else id )
-  |> ( if
-       (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-       && mem l f.used_as_array_buf
+     else id)
+  |> (if
+      (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+      && mem l f.used_as_array_buf
      then ( +. ) (getw 40)
-     else id )
-  |> ( if
-       (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
-       && mem l f.used_as_array_buf
+     else id)
+  |> (if
+      (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
+      && mem l f.used_as_array_buf
      then ( +. ) (getw 41)
-     else id )
-  |> ( if
-       mem l f.lvars
-       && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
-       && mem l f.mod_inside_loops
+     else id)
+  |> (if
+      mem l f.lvars
+      && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
+      && mem l f.mod_inside_loops
      then ( +. ) (getw 42)
-     else id )
-  |> ( if
-       mem l f.gvars
-       && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
-       && mem l f.mod_inside_loops
+     else id)
+  |> (if
+      mem l f.gvars
+      && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
+      && mem l f.mod_inside_loops
      then ( +. ) (getw 43)
-     else id )
-  |> ( if
-       mem l f.lvars
-       && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
-       && not (mem l f.mod_inside_loops)
+     else id)
+  |> (if
+      mem l f.lvars
+      && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
+      && not (mem l f.mod_inside_loops)
      then ( +. ) (getw 44)
-     else id )
+     else id)
   |>
   if
     mem l f.gvars

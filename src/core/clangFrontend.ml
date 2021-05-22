@@ -166,7 +166,7 @@ let new_record_id is_struct (rdecl : C.Ast.record_decl) cursor =
       let name = "__anon" ^ kind ^ "_" ^ string_of_int !struct_id_count in
       struct_id_count := !struct_id_count + 1;
       H.add anonymous_id_table h name;
-      name )
+      name)
   else rdecl.name
 
 let new_enum_id name =
@@ -183,7 +183,7 @@ let create_new_global_variable scope name typ =
     if Scope.mem_var name scope then (
       let new_name = name ^ "___" ^ string_of_int !alpha_count in
       alpha_count := !alpha_count + 1;
-      new_name )
+      new_name)
     else name
   in
   let varinfo = Cil.makeGlobalVar new_name typ in
@@ -203,7 +203,7 @@ let create_local_variable scope fundec name typ =
     if Scope.mem_var name scope then (
       let new_name = name ^ "___" ^ string_of_int !alpha_count in
       alpha_count := !alpha_count + 1;
-      new_name )
+      new_name)
     else name
   in
   let varinfo = Cil.makeLocalVar fundec new_name typ in
@@ -215,7 +215,7 @@ let create_label scope label =
     if Scope.mem_label label scope then (
       let new_name = label ^ "___" ^ string_of_int !alpha_count in
       alpha_count := !alpha_count + 1;
-      new_name )
+      new_name)
     else label
   in
   let scope = Scope.add_label new_name scope in
@@ -403,7 +403,7 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
       with _ ->
         (* TODO: https://github.com/prosyslab/sparrow/issues/28 *)
         L.warn "WARN: type not found\n";
-        Cil.voidPtrType )
+        Cil.voidPtrType)
   | FunctionType ft -> trans_function_type scope None ft |> fst
   | Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
   | Elaborated et -> trans_type ~compinfo scope et.named_type
@@ -606,7 +606,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
                   Cil.NoOffset )
             | _ -> failwith "lval"
           in
-          (sl1 @ sl2, Some (Cil.Lval new_lval)) )
+          (sl1 @ sl2, Some (Cil.Lval new_lval)))
   | C.Ast.ConditionalOperator co ->
       trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
   | C.Ast.UnaryExpr ue ->
@@ -725,7 +725,8 @@ and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
       match (rhs_expr, rhs_sl) with
       | ( Cil.Lval _,
           [
-            ({ Cil.skind = Cil.Instr [ Cil.Call (Some _, f, el, loc) ]; _ } as s);
+            ({ Cil.skind = Cil.Instr [ Cil.Call (Some _, f, el, loc) ]; _ } as
+            s);
           ] ) ->
           let stmt =
             { s with skind = Cil.Instr [ Cil.Call (Some lval, f, el, loc) ] }
@@ -733,7 +734,7 @@ and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
           (append_stmt_list lhs_sl [ stmt ], lhs_expr)
       | _ ->
           let instr = Cil.Set (lval, rhs_expr, loc) in
-          (append_instr (rhs_sl @ lhs_sl) instr, lhs_expr) )
+          (append_instr (rhs_sl @ lhs_sl) instr, lhs_expr))
   | C.MulAssign | C.DivAssign | C.RemAssign | C.AddAssign | C.SubAssign
   | C.ShlAssign | C.ShrAssign | C.AndAssign | C.XorAssign | C.OrAssign ->
       let drop_assign = function
@@ -833,7 +834,7 @@ and trans_member scope fundec_opt loc base arrow field =
           failwith "error bexp = some e"
       | None ->
           CilHelper.s_location loc |> prerr_endline;
-          failwith "error bexp = none" )
+          failwith "error bexp = none")
   | None ->
       CilHelper.s_location loc |> prerr_endline;
       failwith "error base = none"
@@ -901,14 +902,13 @@ and trans_unary_expr scope fundec_opt loc kind argument =
   match (kind, argument) with
   | C.SizeOf, C.Ast.ArgumentExpr e -> (
       let _, exp = trans_expr scope fundec_opt loc ADrop e in
-      match exp with Some e -> ([], Some (Cil.SizeOfE e)) | None -> ([], None) )
+      match exp with Some e -> ([], Some (Cil.SizeOfE e)) | None -> ([], None))
   | C.SizeOf, C.Ast.ArgumentType t ->
       let typ = trans_type scope t in
       ([], Some (Cil.SizeOf typ))
   | C.AlignOf, C.Ast.ArgumentExpr e -> (
       let _, exp = trans_expr scope fundec_opt loc ADrop e in
-      match exp with Some e -> ([], Some (Cil.AlignOfE e)) | None -> ([], None)
-      )
+      match exp with Some e -> ([], Some (Cil.AlignOfE e)) | None -> ([], None))
   | C.AlignOf, C.Ast.ArgumentType t ->
       let typ = trans_type scope t in
       ([], Some (Cil.AlignOf typ))
@@ -976,12 +976,12 @@ class replaceGotoVisitor gotos labels =
                 try Chunk.LabelMap.find label labels
                 with Not_found ->
                   failwith
-                    ( CilHelper.s_location loc ^ ": label " ^ label
-                    ^ " not found" )
+                    (CilHelper.s_location loc ^ ": label " ^ label
+                   ^ " not found")
               in
               stmt.Cil.skind <- Cil.Goto (target, loc);
               Cil.DoChildren
-          | exception Not_found -> Cil.DoChildren )
+          | exception Not_found -> Cil.DoChildren)
       | _ -> Cil.DoChildren
   end
 
@@ -1234,14 +1234,14 @@ and mk_while_stmt arr_len loc tmp_var_expr tmp_var_lval unary_plus_expr
     Cil.mkStmt
       (Cil.Loop
          ( Cil.mkBlock
-             ( Cil.mkStmt
-                 (Cil.If
-                    ( cond_expr,
-                      Cil.mkBlock [ Cil.mkStmt (Break loc) ],
-                      Cil.mkBlock [],
-                      loc ))
-               :: var_stmts
-             @ [ unary_plus_stmt ] ),
+             (Cil.mkStmt
+                (Cil.If
+                   ( cond_expr,
+                     Cil.mkBlock [ Cil.mkStmt (Break loc) ],
+                     Cil.mkBlock [],
+                     loc ))
+              :: var_stmts
+             @ [ unary_plus_stmt ]),
            loc,
            None,
            None ));
@@ -1463,7 +1463,7 @@ and mk_init_stmt scope loc fundec action fi lv expr_list =
           (append_instr sl_expr instr, el, scope)
       | _ ->
           let instr = Cil.Set (lv, expr, loc) in
-          (append_instr sl_expr instr, el, scope) )
+          (append_instr sl_expr instr, el, scope))
   (* common *)
   | Cil.TComp (ci, _), _ ->
       (* struct in struct *)
@@ -1703,7 +1703,7 @@ and mk_array_stmt expr_list fi loc fundec action lv scope arr_type arr_exp
     tmp_var.tmp_var_stmt.skind <- Cil.Instr [ tmp_var_cond_back_patch ];
     ( first_half_stmts @ [ tmp_var.tmp_var_stmt ] @ while_stmt,
       expr_remainders,
-      scope ) )
+      scope ))
   else (var_stmts @ primitive_arr_remainders, expr_remainders, scope)
 
 and trans_var_decl_opt scope fundec loc (vdecl : C.Ast.var_decl option) =
@@ -2035,7 +2035,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
         let typ = Scope.find_type name scope in
         let prev_ci = get_compinfo typ in
         prev_ci.cfields <- compinfo.cfields;
-        (globals @ [ Cil.GCompTag (prev_ci, loc) ], scope) )
+        (globals @ [ Cil.GCompTag (prev_ci, loc) ], scope))
       else
         let typ = Cil.TComp (compinfo, []) in
         let scope = Scope.add_type name typ scope in
@@ -2107,13 +2107,13 @@ and trans_decl_attribute decl =
   let attrs = ref [] in
   ignore
     (C.visit_children (C.Ast.cursor_of_node decl) (fun c _ ->
-         ( if C.get_cursor_kind c |> C.is_attribute then
-           match C.ext_attr_get_kind c with
-           | C.NoThrow ->
-               attrs := Cil.addAttribute (Cil.Attr ("nothrow", [])) !attrs
-           | C.GNUInline ->
-               attrs := Cil.addAttribute (Cil.Attr ("gnu_inline", [])) !attrs
-           | _ -> () );
+         (if C.get_cursor_kind c |> C.is_attribute then
+          match C.ext_attr_get_kind c with
+          | C.NoThrow ->
+              attrs := Cil.addAttribute (Cil.Attr ("nothrow", [])) !attrs
+          | C.GNUInline ->
+              attrs := Cil.addAttribute (Cil.Attr ("gnu_inline", [])) !attrs
+          | _ -> ());
          C.Recurse));
   !attrs
 
@@ -2150,7 +2150,7 @@ and mk_init scope loc fitype expr_list =
         | Const c -> (
             match c with
             | CInt64 (v, _, _) -> Int64.to_int v
-            | _ -> failwith "not expected" )
+            | _ -> failwith "not expected")
         | _ -> failwith "not expected"
       in
       let final_init =
@@ -2230,7 +2230,7 @@ and mk_global_struct_init scope loc typ cfields expr_list =
               let e = Option.get expr_opt in
               let init = Cil.SingleInit e in
               loop true fl el (f :: fis) (init :: inits) ((idx + 1) :: idx_list)
-                (idx + 1) )
+                (idx + 1))
     | f :: fl, [] ->
         if union_flag then
           loop union_flag fl [] fis inits ((idx + 1) :: idx_list) (idx + 1)
@@ -2270,7 +2270,7 @@ and trans_global_init scope loc (e : C.Ast.expr) =
         | Const c -> (
             match c with
             | CInt64 (v, _, _) -> Int64.to_int v
-            | _ -> failwith "not expected" )
+            | _ -> failwith "not expected")
         | _ -> failwith "not expected"
       in
       let el =

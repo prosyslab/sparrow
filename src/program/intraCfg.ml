@@ -183,7 +183,7 @@ module GDom = struct
 
   type t = G.t
 
-  let empty = G.empty
+  let empty () = G.empty
 
   let fromG g = g
 
@@ -199,9 +199,9 @@ module GDom = struct
 
   let nb_vertex = G.nb_vertex
 
-  let add_edge _ _ _ = ()
+  let add_edge g _ _ = g
 
-  let create : ?size:int -> unit -> t = fun ?size:_ () -> empty
+  let create : ?size:int -> unit -> t = fun ?size:_ () -> empty ()
 end
 
 module Dom = Graph.Dominator.Make_graph (GDom)
@@ -279,8 +279,8 @@ let remove_node n g =
 (* should be used only after all Cil nodes are made *)
 let add_new_node n cmd s g =
   let new_node = Node.make () in
-  ( add_cmd new_node cmd >>> remove_edge n s >>> add_edge n new_node
-  >>> add_edge new_node s )
+  (add_cmd new_node cmd >>> remove_edge n s >>> add_edge n new_node
+ >>> add_edge new_node s)
     g
 
 (* TODO: optimize G.pred *)
@@ -312,7 +312,7 @@ let exitof _ = Node.EXIT
 let returnof n g =
   if is_callnode n g then (
     assert (List.length (succ n g) = 1);
-    List.hd (succ n g) )
+    List.hd (succ n g))
   else failwith "IntraCfg.returnof: given node is not a call-node"
 
 let is_inside_loop n g =
@@ -546,7 +546,7 @@ and generate_allocs_field fl lv fd entry g =
           let term, g = make_struct field comp fieldinfo.floc entry g in
           let term, g = generate_allocs_field comp.cfields field fd term g in
           generate_allocs_field t lv fd term g
-      | _ -> generate_allocs_field t lv fd entry g )
+      | _ -> generate_allocs_field t lv fd entry g)
 
 and get_base_type = function
   | TArray (t, _, _) | TPtr (t, _) -> get_base_type t
@@ -580,7 +580,7 @@ let rec generate_allocs fd vl entry g =
           let term, g = make_struct lv comp varinfo.vdecl entry g in
           let term, g = generate_allocs_field comp.cfields lv fd term g in
           generate_allocs fd t term g
-      | _ -> generate_allocs fd t entry g )
+      | _ -> generate_allocs fd t entry g)
 
 let replace_node_graph old entry exit g =
   let preds = pred old g in
@@ -602,7 +602,7 @@ let transform_string_allocs fd g =
         (Lval temp, [ (temp, s) ])
     | Lval (Mem exp, off) -> (
         let exp', l = replace_str exp in
-        match l with [] -> (e, l) | _ -> (Lval (Mem exp', off), l) )
+        match l with [] -> (e, l) | _ -> (Lval (Mem exp', off), l))
     | SizeOfStr s ->
         let tempinfo =
           Cil.makeTempVar fd (Cil.TPtr (Cil.TInt (IChar, []), []))
@@ -611,22 +611,22 @@ let transform_string_allocs fd g =
         (Lval temp, [ (temp, s) ])
     | SizeOfE exp -> (
         let exp', l = replace_str exp in
-        match l with [] -> (e, l) | _ -> (SizeOfE exp', l) )
+        match l with [] -> (e, l) | _ -> (SizeOfE exp', l))
     | AlignOfE exp -> (
         let exp', l = replace_str exp in
-        match l with [] -> (e, l) | _ -> (AlignOfE exp', l) )
+        match l with [] -> (e, l) | _ -> (AlignOfE exp', l))
     | UnOp (u, exp, t) -> (
         let exp', l = replace_str exp in
-        match l with [] -> (e, l) | _ -> (UnOp (u, exp', t), l) )
+        match l with [] -> (e, l) | _ -> (UnOp (u, exp', t), l))
     | BinOp (b, e1, e2, t) -> (
         let e1', l1 = replace_str e1 in
         let e2', l2 = replace_str e2 in
         match l1 @ l2 with
         | [] -> (e, [])
-        | _ -> (BinOp (b, e1', e2', t), l1 @ l2) )
+        | _ -> (BinOp (b, e1', e2', t), l1 @ l2))
     | CastE (t, exp) -> (
         let exp', l = replace_str exp in
-        match l with [] -> (e, l) | _ -> (CastE (t, exp'), l) )
+        match l with [] -> (e, l) | _ -> (CastE (t, exp'), l))
     | _ -> (e, [])
   in
   let generate_sallocs l loc node g =
@@ -672,7 +672,7 @@ let transform_string_allocs fd g =
               let cmd = Cmd.Cset (lv, e, loc) in
               let g = add_cmd last_node cmd g in
               let g = add_edge node last_node g in
-              replace_node_graph n empty_node last_node g )
+              replace_node_graph n empty_node last_node g)
       | Cmd.Cassume (e, b, loc) -> (
           match replace_str e with
           | _, [] -> g
@@ -683,7 +683,7 @@ let transform_string_allocs fd g =
               let cmd = Cmd.Cassume (e, b, loc) in
               let g = add_cmd last_node cmd g in
               let g = add_edge node last_node g in
-              replace_node_graph n empty_node last_node g )
+              replace_node_graph n empty_node last_node g)
       (* do not allocate memory cells for arguments of external lib calls *)
       | Cmd.Ccall (_, Cil.Lval (Cil.Var f, Cil.NoOffset), _, _)
         when f.vstorage = Cil.Extern && not (List.mem f.vname targets) ->
@@ -705,7 +705,7 @@ let transform_string_allocs fd g =
               let cmd = Cmd.Ccall (lv, f, el, loc) in
               let g = add_cmd last_node cmd g in
               let g = add_edge node last_node g in
-              replace_node_graph n empty_node last_node g )
+              replace_node_graph n empty_node last_node g)
       | Cmd.Creturn (Some e, loc) -> (
           match replace_str e with
           | _, [] -> g
@@ -716,7 +716,7 @@ let transform_string_allocs fd g =
               let cmd = Cmd.Creturn (Some e, loc) in
               let g = add_cmd last_node cmd g in
               let g = add_edge node last_node g in
-              replace_node_graph n empty_node last_node g )
+              replace_node_graph n empty_node last_node g)
       | _ -> g)
     g g
 
@@ -735,7 +735,7 @@ let transform_allocs fd g =
         | _ ->
             let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
             let g = add_cmd node cmd g in
-            (node, g) )
+            (node, g))
     | SizeOf typ | CastE (_, SizeOf typ) -> (
         let typ = Cil.unrollTypeDeep typ in
         match (lv, typ) with
@@ -753,7 +753,7 @@ let transform_allocs fd g =
         | _, _ ->
             let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
             let g = add_cmd node cmd g in
-            (node, g) )
+            (node, g))
     | SizeOfE e -> transform lv (SizeOf (Cil.typeOf e)) loc node g
     | _ ->
         let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
@@ -957,10 +957,10 @@ let init fd loc =
     let entry = Node.fromCilStmt (List.nth fd.sallstmts 0) in
     let g =
       (* add nodes *)
-      ( list_fold
-          (fun s ->
-            add_node_with_cmd (Node.fromCilStmt s) (Cmd.fromCilStmt s.skind))
-          fd.sallstmts
+      (list_fold
+         (fun s ->
+           add_node_with_cmd (Node.fromCilStmt s) (Cmd.fromCilStmt s.skind))
+         fd.sallstmts
       >>> (* add edges *)
       list_fold
         (fun stmt ->
@@ -968,7 +968,7 @@ let init fd loc =
             (fun succ ->
               add_edge (Node.fromCilStmt stmt) (Node.fromCilStmt succ))
             stmt.succs)
-        fd.sallstmts )
+        fd.sallstmts)
         g
     in
     let term, g =
@@ -1069,7 +1069,7 @@ let rec collect g n lval node_list exp_list =
           if List.length ss = 1 then
             collect g (List.hd ss) lval node_list exp_list
           else (node_list, exp_list)
-      | _ -> (node_list, exp_list) )
+      | _ -> (node_list, exp_list))
   | Cmd.Cset (l, e, _), _ when Cil.isConstant e -> (
       match Cil.removeOffsetLval l with
       | l, Cil.Index (i, Cil.NoOffset)
@@ -1079,7 +1079,7 @@ let rec collect g n lval node_list exp_list =
           if List.length ss = 1 then
             collect g (List.hd ss) lval node_list exp_list
           else (node_list, exp_list)
-      | _ -> (node_list, exp_list) )
+      | _ -> (node_list, exp_list))
   | _ -> (node_list, exp_list)
 
 let is_candidate n g =

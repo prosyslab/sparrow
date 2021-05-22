@@ -33,7 +33,7 @@ let can_strong_update mode global oct_list =
       | OctLoc.Loc lv ->
           Loc.is_gvar lv
           || (Loc.is_lvar lv && not (Global.is_rec (Loc.get_proc lv) global))
-      | _ -> true )
+      | _ -> true)
   | _ -> false
 
 let lookup pack mem = Mem.find pack mem
@@ -289,8 +289,8 @@ let sparrow_print ptrmem packconf pid exps mem loc =
              let pack = PackConf.get_pack packconf lv in
              let oct = lookup pack mem in
              prerr_endline
-               ( "sparrow_print (" ^ CilHelper.s_location loc ^ ") : "
-               ^ Octagon.to_string oct ))
+               ("sparrow_print (" ^ CilHelper.s_location loc ^ ") : "
+              ^ Octagon.to_string oct))
   | _ -> ()
 
 let model_strlen mode packconf _ pid lvo exps ptrmem (mem, global) =
@@ -530,7 +530,7 @@ let run mode spec node (mem, global) =
     prerr_endline (Node.to_string node);
     prerr_endline (IntraCfg.Cmd.to_string (InterCfg.cmdof global.icfg node));
     prerr_endline "== input ==";
-    prerr_endline (Mem.to_string mem) );
+    prerr_endline (Mem.to_string mem));
   let ptrmem = ItvDom.Table.find node spec.Spec.ptrinfo in
   let mem =
     run_cmd mode spec.Spec.locset node
@@ -539,7 +539,7 @@ let run mode spec node (mem, global) =
   in
   if !Options.oct_debug then (
     prerr_endline "== output ==";
-    prerr_endline (Mem.to_string mem) );
+    prerr_endline (Mem.to_string mem));
   (mem, global)
 
 let accessof ?(locset = PackConf.empty) global node f mem =
@@ -589,7 +589,7 @@ let check_bo pid packconf a offset idx ptrmem mem =
   let oct = Mem.find pack mem in
   if !Options.oct_debug then (
     prerr_endline (Pack.to_string pack);
-    prerr_endline (Octagon.to_string oct) );
+    prerr_endline (Octagon.to_string oct));
   exp_to_texpr pid packconf pack idx ptrmem mem
   |> List.fold_left
        (fun diff idx ->

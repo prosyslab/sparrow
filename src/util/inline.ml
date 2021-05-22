@@ -59,10 +59,11 @@ exception Recursion (* Used to signal recursion *)
 
 (* A visitor that makes a deep copy of a function body for use inside a host 
  * function, replacing duplicate labels, returns, etc. *)
-class copyBodyVisitor (host : fundec) (* The host of the 
-                                       * inlining *)
-  (inlining : varinfo) (* Function being 
-                        * inlined *) (replVar : varinfo -> varinfo)
+class copyBodyVisitor (host : fundec)
+  (* The host of the 
+   * inlining *) (inlining : varinfo)
+  (* Function being 
+   * inlined *) (replVar : varinfo -> varinfo)
   (* Maps locals of the 
    * inlined function 
    * to locals of the 
@@ -132,9 +133,9 @@ class copyBodyVisitor (host : fundec) (* The host of the
       (* There is a possibility that we did not have the statements IDed 
        * propertly. So, we change the ID even on the replaced copy so that we 
        * can index on them ! *)
-      ( match host.smaxstmtid with
+      (match host.smaxstmtid with
       | Some id -> s.sid <- 1 + id
-      | None -> s.sid <- 1 );
+      | None -> s.sid <- 1);
       (* Copy and change ID *)
       let s' = { s with sid = s.sid } in
       host.smaxstmtid <- Some s'.sid;
@@ -142,11 +143,11 @@ class copyBodyVisitor (host : fundec) (* The host of the
       IH.add stmtmap s.sid s';
       (* Remember where we copied this statement *)
       (* if we have a Goto or a Switch remember them to fixup at end *)
-      ( match s'.skind with
+      (match s'.skind with
       | Goto _ | Switch _ ->
           (* E.log "Found goto\n"; *)
           patches := s' :: !patches
-      | _ -> () );
+      | _ -> ());
 
       (* Change the returns *)
       let postProc (s' : stmt) : stmt =
@@ -160,7 +161,7 @@ class copyBodyVisitor (host : fundec) (* The host of the
             s'.labels;
 
         (* Now deal with the returns *)
-        ( match s'.skind with
+        (match s'.skind with
         | Return (ro, l) -> (
             (* Change this into an assignment followed by a Goto *)
             match (ro, retlval) with
@@ -177,8 +178,8 @@ class copyBodyVisitor (host : fundec) (* The host of the
                        [
                          mkStmt (Instr [ Set (var retvar, rv, l) ]);
                          mkStmt (Goto (ref retlab, l));
-                       ]) )
-        | _ -> () );
+                       ]))
+        | _ -> ());
         s'
       in
       (* Do the children then postprocess *)
@@ -194,8 +195,9 @@ class copyBodyVisitor (host : fundec) (* The host of the
 (** Replace a statement with the result of inlining *)
 let replaceStatement (host : fundec) (* The host *)
     (inlineWhat : varinfo -> fundec option) (* What to inline *)
-    (replLabel : string -> string) (* label 
-                                    * replacement *) (anyInlining : bool ref)
+    (replLabel : string -> string)
+    (* label 
+     * replacement *) (anyInlining : bool ref)
     (* will set this 
      * to true if we 
      * did any 
@@ -212,7 +214,7 @@ let replaceStatement (host : fundec) (* The host *)
       let emptyPrevrinstr () =
         if !prevrinstr <> [] then (
           prevrstmts := mkStmt (Instr (List.rev !prevrinstr)) :: !prevrstmts;
-          prevrinstr := [] )
+          prevrinstr := [])
       in
 
       let rec loop (rest : instr list) : unit =
@@ -229,7 +231,7 @@ let replaceStatement (host : fundec) (* The host *)
                       (warn
                          "Inliner encountered recursion in inlined function %s"
                          host.svar.vname);
-                    None )
+                    None)
                   else Some repl
               | None -> None
             in
@@ -298,26 +300,26 @@ let replaceStatement (host : fundec) (* The host *)
                   [ Label (replLabel ("Lret_" ^ repl.svar.vname), l, false) ];
                 let oldBody = repl.sbody in
                 (* Now replace the body *)
-                ( try
-                    ignore
-                      (visitCilFunction
-                         (new copyBodyVisitor
-                            host repl.svar replVar retvar replLabel ret)
-                         repl);
-                    currentLoc := l;
-                    let body' = repl.sbody in
-                    (* Replace the old body in the function to inline *)
-                    repl.sbody <- oldBody;
+                (try
+                   ignore
+                     (visitCilFunction
+                        (new copyBodyVisitor
+                           host repl.svar replVar retvar replLabel ret)
+                        repl);
+                   currentLoc := l;
+                   let body' = repl.sbody in
+                   (* Replace the old body in the function to inline *)
+                   repl.sbody <- oldBody;
 
-                    emptyPrevrinstr ();
-                    prevrstmts := ret :: mkStmt (Block body') :: !prevrstmts
-                  with Recursion ->
-                    ignore
-                      (warn "Encountered recursion in function %s"
-                         repl.svar.vname);
-                    prevrinstr := i :: !prevrinstr );
+                   emptyPrevrinstr ();
+                   prevrstmts := ret :: mkStmt (Block body') :: !prevrstmts
+                 with Recursion ->
+                   ignore
+                     (warn "Encountered recursion in function %s"
+                        repl.svar.vname);
+                   prevrinstr := i :: !prevrinstr);
 
-                loop resti )
+                loop resti)
         | i :: resti ->
             prevrinstr := i :: !prevrinstr;
             loop resti

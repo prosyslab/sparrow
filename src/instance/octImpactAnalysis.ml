@@ -60,7 +60,7 @@ let check pid v1 v2opt v2exp ptrmem mem =
 
 let inspect_aexp node aexp ptrmem mem queries =
   let pid = InterCfg.Node.get_pid node in
-  ( match aexp with
+  (match aexp with
   | ArrayExp (lv, e, loc) ->
       let v1 =
         ItvDom.Mem.lookup
@@ -245,7 +245,7 @@ let inspect_aexp node aexp ptrmem mem queries =
                      src = None;
                    },
                    status ))
-  | _ -> [] )
+  | _ -> [])
   @ queries
 
 let display_alarms title alarms_part =
@@ -263,9 +263,9 @@ let display_alarms title alarms_part =
       prerr_newline ();
       List.iter
         (fun q ->
-          ( match q.status with
+          (match q.status with
           | Proven -> prerr_string "  (O)"
-          | _ -> prerr_string "  (X)" );
+          | _ -> prerr_string "  (X)");
           prerr_string ("  " ^ AlarmExp.to_string q.exp ^ " @");
           prerr_string (InterCfg.Node.to_string q.node);
           prerr_string (":  " ^ q.desc);

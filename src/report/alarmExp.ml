@@ -81,14 +81,13 @@ let rec c_offset lv offset loc =
   | NoOffset -> []
   | Field (f, o) -> c_offset (append_field lv f) o loc
   | Index (e, o) ->
-      (ArrayExp (lv, e, loc) :: c_exp e loc)
-      @ c_offset (append_index lv e) o loc
+      ArrayExp (lv, e, loc) :: c_exp e loc @ c_offset (append_index lv e) o loc
 
 and c_lv lv loc =
   match lv with
   | Var v, offset -> c_offset (Var v, NoOffset) offset loc
   | Mem exp, offset ->
-      (DerefExp (exp, loc) :: c_exp exp loc)
+      DerefExp (exp, loc) :: c_exp exp loc
       @ c_offset (Mem exp, NoOffset) offset loc
 
 and c_exp e loc =
@@ -98,8 +97,8 @@ and c_exp e loc =
   | UnOp (_, e, _) -> c_exp e loc
   | BinOp (bop, e1, e2, _) -> (
       match bop with
-      | Div | Mod -> (DivExp (e1, e2, loc) :: c_exp e1 loc) @ c_exp e2 loc
-      | _ -> c_exp e1 loc @ c_exp e2 loc )
+      | Div | Mod -> DivExp (e1, e2, loc) :: c_exp e1 loc @ c_exp e2 loc
+      | _ -> c_exp e1 loc @ c_exp e2 loc)
   | CastE (_, e) -> c_exp e loc
   | AddrOf lv -> c_lv lv loc
   | StartOf lv -> c_lv lv loc

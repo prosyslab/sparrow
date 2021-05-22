@@ -139,7 +139,7 @@ let rec make_cond_simple cond =
       let not_e2 = UnOp (LNot, e2, t1) in
       match (make_cond_simple not_e1, make_cond_simple not_e2) with
       | Some e1', Some e2' -> Some (BinOp (not_binop op, e1', e2', t2))
-      | _, _ -> None )
+      | _, _ -> None)
   | UnOp (LNot, UnOp (LNot, e, _), _) -> make_cond_simple e
   | UnOp (LNot, Lval _, _) -> Some cond
   | Lval _ -> Some cond

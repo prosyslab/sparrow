@@ -150,9 +150,9 @@ let rec pp_lv fmt lv =
     | Cil.Var _, Cil.Field (_, _) -> F.fprintf fmt.field "%s\n" id
     | Cil.Mem e, offset ->
         pp_exp fmt e;
-        ( match offset with
+        (match offset with
         | Cil.Field (_, _) -> F.fprintf fmt.field "%s\n" id
-        | _ -> () );
+        | _ -> ());
         let e_id = Hashtbl.find exp_map e in
         F.fprintf fmt.mem "%s\t%s\n" id e_id
     | _, _ -> F.fprintf fmt.lval "%s\tOther\n" id

@@ -79,11 +79,11 @@ let dump_cfgs = function
           Printf.fprintf chan "digraph %s {\n" pid;
           Printf.fprintf chan "{\n";
           Printf.fprintf chan "node [shape=box]\n";
-          ( match cfg with
+          (match cfg with
           | `Assoc [ (_, `Assoc nodes); (_, `List edges) ] ->
               dump_nodes chan nodes;
               dump_edges chan edges
-          | _ -> raise (Failure "error") );
+          | _ -> raise (Failure "error"));
           Printf.fprintf chan "}\n";
           close_out chan;
           let _ =
@@ -108,12 +108,12 @@ let dump_cfgs_with_dug json dug =
           Printf.fprintf chan "digraph %s {\n" pid;
           Printf.fprintf chan "{\n";
           Printf.fprintf chan "node [shape=box]\n";
-          ( match cfg with
+          (match cfg with
           | `Assoc [ (_, `Assoc nodes); (_, `List edges) ] ->
               dump_nodes chan nodes;
               dump_edges chan edges;
               dump_dug chan pid nodes dug
-          | _ -> raise (Failure "error") );
+          | _ -> raise (Failure "error"));
           Printf.fprintf chan "}\n";
           close_out chan;
           let _ =
@@ -134,7 +134,7 @@ let dump_callgraph json =
   Printf.fprintf chan "digraph %s {\n" "callgraph";
   Printf.fprintf chan "{\n";
   Printf.fprintf chan "node [shape=box]\n";
-  ( match json with
+  (match json with
   | `Assoc l -> (
       match (List.assoc "nodes" l, List.assoc "edges" l) with
       | `List nodes, `List edges ->
@@ -155,8 +155,8 @@ let dump_callgraph json =
               | _ -> raise (Failure "error"))
             edges;
           Printf.fprintf chan "}\n"
-      | _ -> raise (Failure "Invalid json format") )
-  | _ -> raise (Failure "Invalid json format") );
+      | _ -> raise (Failure "Invalid json format"))
+  | _ -> raise (Failure "Invalid json format"));
   close_out chan;
   let _ =
     Unix.create_process "dot"
@@ -191,7 +191,7 @@ let gen_dug = function
                   BatMap.add (src, dst) label m
               | _ -> m)
             BatMap.empty l
-      | _ -> raise (Failure "error") )
+      | _ -> raise (Failure "error"))
   | _ -> raise (Failure "error")
 
 let dump json =

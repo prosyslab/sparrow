@@ -79,8 +79,8 @@ module Integer = struct
       if eq x MInf || BatSet.exists (fun k -> x = Int k) threshold then y else x
     else
       invalid_arg
-        ( "itv.ml: Integer.lower_narrow (x, y). y < x : " ^ to_string y ^ " < "
-        ^ to_string x )
+        ("itv.ml: Integer.lower_narrow (x, y). y < x : " ^ to_string y ^ " < "
+       ^ to_string x)
 
   let upper_narrow x y =
     if le y x then
