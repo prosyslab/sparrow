@@ -124,6 +124,7 @@ let test_suites =
           "clang/usertype-in-local2.c";
           "clang/usertype-in-local3.c";
           "clang/long0.c";
+          "clang/long1.c";
           "clang/unicode0.c";
           "clang/static0.c";
           "clang/variable-array0.c";

@@ -314,7 +314,14 @@ let trans_floating_literal decoration il =
   in
   match il with
   | C.Ast.Float f -> Cil.Const (Cil.CReal (f, fkind, None))
-  | _ -> failwith "unknown float literal"
+  | C.Ast.CXFloat cxf ->
+      let f =
+        match fkind with
+        | Cil.FFloat -> Clang__.Clang__bindings.ext_float_convert_to_float cxf
+        | Cil.FDouble | Cil.FLongDouble ->
+            Clang__.Clang__bindings.ext_float_convert_to_double cxf
+      in
+      Cil.Const (Cil.CReal (f, fkind, None))
 
 let trans_string_literal sl = Cil.Const (Cil.CStr sl.C.Ast.bytes)
 
