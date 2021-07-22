@@ -101,6 +101,8 @@ let extract_datalog_fact = ref false
 
 let extract_datalog_fact_full = ref false
 
+let extract_datalog_fact_full_no_opt = ref false
+
 (* Alarm Report *)
 let noalarm = ref false
 
@@ -192,6 +194,13 @@ let datalog_opts =
         (fun () ->
           extract_datalog_fact := true;
           extract_datalog_fact_full := true),
+      "Extract extensive datalog facts" );
+    ( "-extract_datalog_fact_full_no_opt",
+      Arg.Unit
+        (fun () ->
+          extract_datalog_fact := true;
+          extract_datalog_fact_full := true;
+          extract_datalog_fact_full_no_opt := true),
       "Extract extensive datalog facts" );
   ]
 

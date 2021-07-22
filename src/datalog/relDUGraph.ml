@@ -122,7 +122,10 @@ let optimize alarms g =
 let print analysis global dug alarms =
   let dug = G.copy dug in
   let alarms = Report.get alarms Report.UnProven in
-  let dug = optimize alarms dug in
+  let dug =
+    if !Options.extract_datalog_fact_full_no_opt then dug
+    else optimize alarms dug
+  in
   let true_branch, false_branch =
     InterCfg.fold_cfgs
       (fun pid cfg (true_branch, false_branch) ->
@@ -157,6 +160,7 @@ let print analysis global dug alarms =
   let fmt_loophead = Format.formatter_of_out_channel oc_loophead in
   G.iter_edges
     (fun src dst ->
+      L.info "%a, %a\n" Node.pp src Node.pp dst;
       if
         BatSet.mem dst (G.loopheads dug)
         && Node.get_cfgnode dst |> IntraCfg.is_entry |> not
@@ -170,6 +174,9 @@ let print analysis global dug alarms =
         F.fprintf fmt_fb "%a\t%a\n" Node.pp src Node.pp dst)
       else F.fprintf fmt_edge "%a\t%a\n" Node.pp src Node.pp dst)
     dug;
+  List.iter
+    (fun x -> F.pp_print_flush x ())
+    [ fmt_edge; fmt_tc; fmt_tb; fmt_fc; fmt_fb; fmt_loophead ];
   close_out oc_edge;
   close_out oc_tc;
   close_out oc_tb;
