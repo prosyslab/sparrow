@@ -31,9 +31,13 @@ module EnvData = struct
 end
 
 module BlockEnv = struct
-  type t = { var : (string, EnvData.t) H.t; typ : (string, Cil.typ) H.t }
+  type t = {
+    var : (string, EnvData.t) H.t;
+    typ : (string, Cil.typ) H.t;
+    comp : (string, Cil.typ) H.t;
+  }
 
-  let create () = { var = H.create 64; typ = H.create 64 }
+  let create () = { var = H.create 64; typ = H.create 64; comp = H.create 64 }
 
   let add_var name vi env =
     H.add env.var name vi;
@@ -43,13 +47,21 @@ module BlockEnv = struct
     H.add env.typ name typ;
     env
 
+  let add_comp name comp env =
+    H.add env.comp name comp;
+    env
+
   let mem_var name env = H.mem env.var name
 
   let mem_typ name env = H.mem env.typ name
 
+  let mem_comp name env = H.mem env.comp name
+
   let find_var name env = H.find env.var name
 
   let find_typ name env = H.find env.typ name
+
+  let find_comp name env = H.find env.comp name
 end
 
 module LabelEnv = struct
@@ -95,6 +107,12 @@ module Scope = struct
         l
     | [], _ -> failwith "empty block scope"
 
+  let add_comp name comp = function
+    | (h :: _, _) as l ->
+        ignore (BlockEnv.add_comp name comp h);
+        l
+    | [], _ -> failwith "empty block scope"
+
   let add_label name = function
     | (_, h :: _) as l ->
         ignore (LabelEnv.add_label name h);
@@ -109,6 +127,11 @@ module Scope = struct
   let rec mem_typ name = function
     | h :: t, fs ->
         if BlockEnv.mem_typ name h then true else mem_typ name (t, fs)
+    | [], _ -> false
+
+  let rec mem_comp name = function
+    | h :: t, fs ->
+        if BlockEnv.mem_comp name h then true else mem_comp name (t, fs)
     | [], _ -> false
 
   let rec mem_label name = function
@@ -129,6 +152,18 @@ module Scope = struct
     | h :: t, fs ->
         if BlockEnv.mem_typ name h then BlockEnv.find_typ name h
         else find_type ~compinfo name (t, fs)
+    | [], _ when name = "__builtin_va_list" || name = "__va_list_tag" ->
+        Cil.TBuiltin_va_list []
+    | [], _ when compinfo <> None ->
+        let compinfo = Option.get compinfo in
+        if compinfo.Cil.cname = name then Cil.TComp (compinfo, [])
+        else failwith ("type of " ^ name ^ " not found (case 1)")
+    | _ -> failwith ("type of " ^ name ^ " not found (case 2)")
+
+  let rec find_comp ?(compinfo = None) name = function
+    | h :: t, fs ->
+        if BlockEnv.mem_comp name h then BlockEnv.find_comp name h
+        else find_comp ~compinfo name (t, fs)
     | [], _ when name = "__builtin_va_list" || name = "__va_list_tag" ->
         Cil.TBuiltin_va_list []
     | [], _ when compinfo <> None ->
@@ -428,7 +463,7 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
           new_record_id is_struct rdecl cursor
         else name
       in
-      Scope.find_type ~compinfo name scope
+      Scope.find_comp ~compinfo name scope
   | Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
   | InvalidType ->
       L.warn "WARN: invalid type (use int instead)\n";
@@ -2044,14 +2079,14 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       in
       let compinfo = Cil.mkCompInfo is_struct name callback [] in
       compinfo.cdefined <- true;
-      if Scope.mem_typ name scope then (
-        let typ = Scope.find_type name scope in
+      if Scope.mem_comp name scope then (
+        let typ = Scope.find_comp name scope in
         let prev_ci = get_compinfo typ in
         prev_ci.cfields <- compinfo.cfields;
         (globals @ [ Cil.GCompTag (prev_ci, loc) ], scope))
       else
         let typ = Cil.TComp (compinfo, []) in
-        let scope = Scope.add_type name typ scope in
+        let scope = Scope.add_comp name typ scope in
         (globals @ [ Cil.GCompTag (compinfo, loc) ], scope)
   | C.Ast.RecordDecl rdecl ->
       let is_struct = rdecl.keyword = C.Struct in
@@ -2059,15 +2094,15 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       let name =
         if new_name = "" then new_record_id is_struct rdecl cursor else new_name
       in
-      if Scope.mem_typ name scope then
-        let typ = Scope.find_type name scope in
+      if Scope.mem_comp name scope then
+        let typ = Scope.find_comp name scope in
         let prev_ci = get_compinfo typ in
         ([ Cil.GCompTagDecl (prev_ci, loc) ], scope)
       else
         let callback _ = [] in
         let compinfo = Cil.mkCompInfo is_struct name callback [] in
         let typ = Cil.TComp (compinfo, []) in
-        let scope = Scope.add_type rdecl.name typ scope in
+        let scope = Scope.add_comp rdecl.name typ scope in
         ([ Cil.GCompTagDecl (compinfo, loc) ], scope)
   | TypedefDecl tdecl ->
       let ttype = trans_type scope tdecl.underlying_type in
