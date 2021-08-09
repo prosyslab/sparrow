@@ -148,29 +148,23 @@ module Scope = struct
         EnvData.EnvVar (Cil.makeGlobalVar name ftype)
     | _ -> failwith ("variable " ^ name ^ " not found")
 
-  let rec find_type ?(compinfo = None) name = function
+  let rec find_type name = function
     | h :: t, fs ->
         if BlockEnv.mem_typ name h then BlockEnv.find_typ name h
-        else find_type ~compinfo name (t, fs)
+        else find_type name (t, fs)
     | [], _ when name = "__builtin_va_list" || name = "__va_list_tag" ->
         Cil.TBuiltin_va_list []
-    | [], _ when compinfo <> None ->
-        let compinfo = Option.get compinfo in
-        if compinfo.Cil.cname = name then Cil.TComp (compinfo, [])
-        else failwith ("type of " ^ name ^ " not found (case 1)")
-    | _ -> failwith ("type of " ^ name ^ " not found (case 2)")
+    | _ -> failwith ("type of " ^ name ^ " not found")
 
   let rec find_comp ?(compinfo = None) name = function
     | h :: t, fs ->
         if BlockEnv.mem_comp name h then BlockEnv.find_comp name h
         else find_comp ~compinfo name (t, fs)
-    | [], _ when name = "__builtin_va_list" || name = "__va_list_tag" ->
-        Cil.TBuiltin_va_list []
     | [], _ when compinfo <> None ->
         let compinfo = Option.get compinfo in
         if compinfo.Cil.cname = name then Cil.TComp (compinfo, [])
-        else failwith ("type of " ^ name ^ " not found (case 1)")
-    | _ -> failwith ("type of " ^ name ^ " not found (case 2)")
+        else failwith ("comp type of " ^ name ^ " not found (case 1)")
+    | _ -> failwith ("comp type of " ^ name ^ " not found (case 2)")
 
   let pp fmt scope =
     List.iter
@@ -447,7 +441,7 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
         L.warn "WARN: type not found\n";
         Cil.voidPtrType)
   | FunctionType ft -> trans_function_type scope None ft |> fst
-  | Typedef td -> Scope.find_type ~compinfo (name_of_ident_ref td) scope
+  | Typedef td -> Scope.find_type (name_of_ident_ref td) scope
   | Elaborated et -> trans_type ~compinfo scope et.named_type
   | Record rt ->
       let name = name_of_ident_ref rt in
@@ -464,7 +458,7 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
         else name
       in
       Scope.find_comp ~compinfo name scope
-  | Enum et -> Scope.find_type ~compinfo (name_of_ident_ref et) scope
+  | Enum et -> Scope.find_type (name_of_ident_ref et) scope
   | InvalidType ->
       L.warn "WARN: invalid type (use int instead)\n";
       Cil.intType
