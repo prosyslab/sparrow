@@ -609,13 +609,19 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
   | C.Ast.Call call ->
       trans_call scope skip_lhs fundec_opt loc call.callee call.args
   | C.Ast.Cast cast ->
-      let sl, expr_opt =
-        trans_expr ~allow_undef scope fundec_opt loc action cast.operand
-      in
-      let e = Option.get expr_opt in
       let typ = trans_type scope cast.qual_type in
-      if should_ignore_implicit_cast expr cast.qual_type e typ then (sl, Some e)
-      else (sl, Some (Cil.CastE (typ, e)))
+      let is_void = match typ with Cil.TVoid _ -> true | _ -> false in
+      let sl, expr_opt =
+        (* skip_lhs is true if casting to void i.e. don't mind the variable or return value *)
+        trans_expr ~allow_undef ~skip_lhs:is_void scope fundec_opt loc action
+          cast.operand
+      in
+      if is_void then (sl, None)
+      else
+        let e = Option.get expr_opt in
+        if should_ignore_implicit_cast expr cast.qual_type e typ then
+          (sl, Some e)
+        else (sl, Some (Cil.CastE (typ, e)))
   | C.Ast.Member mem ->
       ([], Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field))
   | C.Ast.ArraySubscript arr -> (
@@ -1108,7 +1114,7 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       in
       ({ Chunk.empty with stmts; user_typs }, scope)
   | Expr e ->
-      (* skip_lhs is true only here: a function is called at the top-most level
+      (* skip_lhs is true here: a function is called at the top-most level
        * without a return variable *)
       let stmts, _ =
         trans_expr ~skip_lhs:true scope (Some fundec) loc ADrop e
