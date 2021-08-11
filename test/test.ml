@@ -145,6 +145,8 @@ let test_suites =
           "clang/type2.c";
           "clang/param0.c";
           "clang/predef-macro.c";
+          "clang/cast0.c";
+          "clang/cast1.c";
         ];
     };
   ]
