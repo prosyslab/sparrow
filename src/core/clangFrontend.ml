@@ -512,7 +512,14 @@ and trans_builtin_type ?(compinfo = None) scope t =
         |> C.Type.of_cxtype |> trans_type ~compinfo scope
       in
       Cil.TArray (elem_type, None, attr)
-  | Invalid | Unexposed | Char16 | Char32 -> failwith "type 1"
+  | Unexposed ->
+      let canonical_typ = C.get_canonical_type t.cxtype in
+      L.warn "Unexposed type -> canonical type: %s\n"
+        (canonical_typ |> C.get_type_spelling);
+      canonical_typ |> C.Type.of_cxtype |> trans_type ~compinfo scope
+  | Invalid -> failwith "type Invalid"
+  | Char16 -> failwith "type Char16"
+  | Char32 -> failwith "type Char32"
   | UInt128 | WChar | Int128 | NullPtr | Overload | Dependent | ObjCId ->
       failwith "9"
   | ObjCClass -> failwith "objc class"
