@@ -147,6 +147,7 @@ let test_suites =
           "clang/predef-macro.c";
           "clang/cast0.c";
           "clang/cast1.c";
+          "clang/unexposed.c";
         ];
     };
   ]
