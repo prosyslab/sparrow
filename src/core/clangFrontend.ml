@@ -514,9 +514,11 @@ and trans_builtin_type ?(compinfo = None) scope t =
       Cil.TArray (elem_type, None, attr)
   | Unexposed ->
       let canonical_typ = C.get_canonical_type t.cxtype in
-      L.warn "Unexposed type -> canonical type: %s\n"
-        (canonical_typ |> C.get_type_spelling);
-      canonical_typ |> C.Type.of_cxtype |> trans_type ~compinfo scope
+      let canonical_typ_kind = canonical_typ |> C.get_type_kind in
+      if canonical_typ_kind = C.Unexposed then (
+        L.warn "WARN: Found Unexposed type recursively: translating to int\n";
+        Cil.TInt (trans_int_kind k, attr))
+      else canonical_typ |> C.Type.of_cxtype |> trans_type ~compinfo scope
   | Invalid -> failwith "type Invalid"
   | Char16 -> failwith "type Char16"
   | Char32 -> failwith "type Char32"
