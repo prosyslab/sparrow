@@ -2333,12 +2333,13 @@ and trans_global_init scope loc (e : C.Ast.expr) =
       let el =
         if List.length el > arr_len then BatList.take arr_len el else el
       in
-      let init_list, _ =
+      let init_list =
         List.fold_left
           (fun (r, o) i ->
             let init = trans_global_init scope loc i in
-            (r @ [ (Cil.Index (Cil.integer o, Cil.NoOffset), init) ], o + 1))
+            ((Cil.Index (Cil.integer o, Cil.NoOffset), init) :: r, o + 1))
           ([], 0) el
+        |> fst |> List.rev
       in
       Cil.CompoundInit (typ, init_list)
   | C.Ast.InitList el, Cil.TComp (ci, _) ->
