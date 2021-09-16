@@ -77,7 +77,7 @@ let init file =
     table = ItvDom.Table.bot;
     relations = RelSemantics.Set.empty;
   }
-  |> remove_unreachable_nodes
+  |> if !Options.keep_unreachable then id else remove_unreachable_nodes
 
 let is_undef pid global = InterCfg.is_undef pid global.icfg
 

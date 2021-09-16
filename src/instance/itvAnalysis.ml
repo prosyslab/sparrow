@@ -480,6 +480,7 @@ let do_analysis global =
   stat locset;
   let dug = Analysis.generate_dug spec global in
   (if !Options.marshal_in then marshal_in global
+  else if !Options.dug_slice_target <> "" then DugSlicer.run global dug
   else Analysis.perform spec global dug)
   |> opt !Options.marshal_out marshal_out
   |> post_process spec

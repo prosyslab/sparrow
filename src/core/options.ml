@@ -31,6 +31,8 @@ let dug = ref false
 
 let optil = ref true
 
+let keep_unreachable = ref false
+
 (* Context & Flow Sensitivity *)
 let inline = ref []
 
@@ -139,6 +141,9 @@ let marshal_in = ref false
 
 let marshal_out = ref false
 
+(* DUG slice *)
+let dug_slice_target = ref ""
+
 (* Debug *)
 let debug = ref false
 
@@ -213,6 +218,9 @@ let opts =
     ("-il", Arg.Set il, "Show the input program in IL");
     ("-cfg", Arg.Set cfg, "Print Cfg");
     ("-dug", Arg.Set dug, "Print Def-Use graph");
+    ( "-dug_slice",
+      Arg.Set_string dug_slice_target,
+      "Slice DUG w.r.t a given target" );
     ("-noalarm", Arg.Set noalarm, "Do not print alarms");
     ("-verbose", Arg.Set_int verbose, "Verbose level (default: 1)");
     ("-debug", Arg.Set debug, "Print debug information");
@@ -299,6 +307,7 @@ let opts =
       "Filter alarms from recursive call cycles" );
     ("-optil", Arg.Set optil, "Optimize IL (default)");
     ("-no_optil", Arg.Clear optil, "Do not optimize IL");
+    ("-keep_unreachable", Arg.Set keep_unreachable, "Keep unreachable functions");
     ( "-marshal_in",
       Arg.Set marshal_in,
       "Read analysis results from marshaled data" );

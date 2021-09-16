@@ -72,4 +72,5 @@ let perform global =
   let mem, global = fixpt nodes 1 (Mem.bot, global) in
   L.info ~level:1 "mem size : %d\n\n" (Mem.cardinal mem);
   { global with mem } |> draw_call_edges nodes mem |> draw_callgraph nodes mem
-  |> Global.remove_unreachable_functions
+  |>
+  if !Options.keep_unreachable then id else Global.remove_unreachable_functions

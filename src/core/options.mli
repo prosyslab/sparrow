@@ -32,6 +32,8 @@ val dug : bool ref
 
 val optil : bool ref
 
+val keep_unreachable : bool ref
+
 (** {2 Context Sensitivity } *)
 
 val inline : string list ref
@@ -149,6 +151,10 @@ val outdir : string ref
 val marshal_in : bool ref
 
 val marshal_out : bool ref
+
+(* {2 DUG slice } *)
+
+val dug_slice_target : string ref
 
 (** {2 Options lists } *)
 
