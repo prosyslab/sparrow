@@ -55,6 +55,8 @@ module Cmd : sig
 
   val fromCilStmt : Cil.stmtkind -> t
 
+  val location_of : t -> Cil.location
+
   val to_string : t -> string
 end
 

@@ -1017,21 +1017,21 @@ let generate_global_proc globals fd =
       (entry, empty fd)
       globals
   in
-  let main_dec, main_loc =
+  let add_call_main g =
     match get_main_dec globals with
-    | Some (d, l) -> (d, l)
-    | _ ->
-        prerr_endline "Error: main not Found";
-        exit 1
+    | Some (main_dec, main_loc) ->
+        let call_node = Node.make () in
+        let call_cmd =
+          Cmd.Ccall (None, Lval (Var main_dec.svar, NoOffset), [], main_loc)
+        in
+        g |> add_cmd call_node call_cmd |> add_edge term call_node
+        |> add_edge call_node Node.EXIT
+    | None ->
+        prerr_endline "Warning: main not Found";
+        g
   in
-  let call_node = Node.make () in
-  let call_cmd =
-    Cmd.Ccall (None, Lval (Var main_dec.svar, NoOffset), [], main_loc)
-  in
-  g |> add_cmd call_node call_cmd |> add_edge term call_node
-  |> add_edge call_node Node.EXIT
-  |> generate_assumes |> flatten_instructions |> remove_if_loop
-  |> transform_string_allocs fd
+  g |> add_call_main |> generate_assumes |> flatten_instructions
+  |> remove_if_loop |> transform_string_allocs fd
   (* generate salloc (string alloc) cmds *)
   |> remove_empty_nodes
   |> insert_return_nodes
