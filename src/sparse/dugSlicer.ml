@@ -8,13 +8,16 @@ module PowNode = InterCfg.NodeSet
 let location_of_node global node =
   InterCfg.cmdof global.Global.icfg node |> IntraCfg.Cmd.location_of
 
+let string_of_node global node =
+  let loc = location_of_node global node in
+  loc.Cil.file ^ ":" ^ string_of_int loc.Cil.line
+
 let find_target_node global dug =
   DUGraph.fold_node
     (fun node res ->
       if Option.is_none res then
-        let loc = location_of_node global node in
-        if CilHelper.s_location loc = !Options.dug_slice_target then Some node
-        else None
+        let loc = string_of_node global node in
+        if loc = !Options.dug_slice_target then Some node else None
       else res)
     dug None
   |> function
@@ -51,7 +54,8 @@ let run global dug =
   let oc = open_out (Filename.concat !Options.outdir "slice.txt") in
   PowNode.iter
     (fun node ->
-      let loc = location_of_node global node |> CilHelper.s_location in
+      let loc = string_of_node global node in
       output_string oc (loc ^ "\n"))
     slice;
+  close_out oc;
   exit 0
