@@ -969,6 +969,12 @@ and trans_unary_expr scope fundec_opt loc kind argument =
   | C.AlignOf, C.Ast.ArgumentType t ->
       let typ = trans_type scope t in
       ([], Some (Cil.AlignOf typ))
+  | C.VecStep, C.Ast.ArgumentExpr e -> (
+      let _, exp = trans_expr scope fundec_opt loc ADrop e in
+      match exp with Some e -> ([], Some (Cil.AlignOfE e)) | None -> ([], None))  
+  | C.VecStep, C.Ast.ArgumentType t ->
+      let typ = trans_type scope t in
+      ([], Some (Cil.AlignOf typ))
   | _, _ -> ([], None)
 
 let get_opt msg = function Some x -> x | None -> failwith msg
