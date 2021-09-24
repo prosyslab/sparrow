@@ -897,6 +897,7 @@ and trans_member scope fundec_opt loc base arrow field =
       failwith "error base = none"
 
 and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
+  let scope = Scope.enter_block scope in
   let cond_sl, cond_expr = trans_expr scope fundec_opt loc AExp cond in
   let then_sl, then_expr =
     match then_branch with
