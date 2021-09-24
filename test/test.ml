@@ -148,8 +148,8 @@ let test_suites =
           "clang/cast0.c";
           "clang/cast1.c";
           "clang/unexposed.c";
-		  "clang/alignof0.c";
-		  "clang/alignof1.c";
+          "clang/alignof0.c";
+          "clang/alignof1.c";
         ];
     };
   ]
