@@ -2370,7 +2370,9 @@ let parse fname =
   let options = { C.Ast.Options.default with ignore_implicit_cast = false } in
   L.debug "Loading %s\n" fname;
   if !Options.debug then L.flush_all ();
-  let tu = C.Ast.parse_file ~options fname in
+  let tu : C.Ast.translation_unit =
+    StepManager.stepf false "Parsing" (C.Ast.parse_file ~options) fname
+  in
   let scope = initialize_builtins (Scope.create ()) in
   let globals =
     List.fold_left
