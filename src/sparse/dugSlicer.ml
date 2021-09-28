@@ -4,6 +4,7 @@ module Spec = Analysis.Spec
 module DUGraph = Analysis.DUGraph
 module Node = InterCfg.Node
 module PowNode = InterCfg.NodeSet
+module SS = Set.Make (String)
 
 let location_of_node global node =
   InterCfg.cmdof global.Global.icfg node |> IntraCfg.Cmd.location_of
@@ -39,6 +40,33 @@ let rec compute_slice dug workset slice =
     in
     compute_slice dug workset slice
 
+let count_sliced_lines global slice =
+  List.rev_map
+    (fun node -> string_of_node global node)
+    (List.rev (PowNode.elements slice))
+  |> List.fold_left (fun line_set elem -> SS.add elem line_set) SS.empty
+  |> SS.cardinal
+
+let count_DUG_lines global dug =
+  DUGraph.fold_node
+    (fun node line_set ->
+      let loc = string_of_node global node in
+      SS.add loc line_set)
+    dug SS.empty
+  |> SS.cardinal
+
+let print_sliced_lines global slice =
+  let oc = open_out (Filename.concat !Options.outdir "slice_line.txt") in
+  let line_list =
+    List.rev_map
+      (fun node -> string_of_node global node)
+      (List.rev (PowNode.elements slice))
+    |> List.fold_left (fun line_set elem -> SS.add elem line_set) SS.empty
+    |> SS.elements
+  in
+  List.iter (fun str -> output_string oc (str ^ "\n")) line_list;
+  close_out oc
+
 let run global dug =
   let target_node = find_target_node global dug in
   let t0 = Sys.time () in
@@ -49,8 +77,12 @@ let run global dug =
   Logging.info ~to_consol:true "== Slicing report ==\n";
   Logging.info ~to_consol:true " - # Total nodes  : %d\n" (DUGraph.nb_node dug);
   Logging.info ~to_consol:true " - # Total edges  : %d\n" (DUGraph.nb_edge dug);
+  Logging.info ~to_consol:true " - # Total lines  : %d\n"
+    (count_DUG_lines global dug);
   Logging.info ~to_consol:true " - # Sliced nodes : %d\n"
     (PowNode.cardinal slice);
+  Logging.info ~to_consol:true " - # Sliced lines : %d\n"
+    (count_sliced_lines global slice);
   let oc = open_out (Filename.concat !Options.outdir "slice.txt") in
   PowNode.iter
     (fun node ->
@@ -58,4 +90,5 @@ let run global dug =
       output_string oc (loc ^ "\n"))
     slice;
   close_out oc;
+  print_sliced_lines global slice;
   exit 0
