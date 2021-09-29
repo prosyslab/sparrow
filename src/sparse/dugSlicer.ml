@@ -27,6 +27,20 @@ let find_target_node global dug =
       prerr_endline "Error: target not found";
       exit 1
 
+let find_target_node_set global dug =
+  let target_node_set =
+    DUGraph.fold_node
+      (fun node target_set ->
+        let loc = string_of_node global node in
+        if loc = !Options.dug_slice_target then PowNode.add node target_set
+        else target_set)
+      dug PowNode.empty
+  in
+  if PowNode.is_empty target_node_set then (
+    prerr_endline "Error: target not found";
+    exit 1)
+  else target_node_set
+
 let rec compute_slice dug workset slice =
   if PowNode.is_empty workset then slice
   else
@@ -68,10 +82,10 @@ let print_sliced_lines global slice =
   close_out oc
 
 let run global dug =
-  let target_node = find_target_node global dug in
+  let target_node_set = find_target_node_set global dug in
   let t0 = Sys.time () in
   Logging.info ~to_consol:true "Slicing begins\n";
-  let slice = compute_slice dug (PowNode.singleton target_node) PowNode.empty in
+  let slice = compute_slice dug target_node_set target_node_set in
   let t1 = Sys.time () in
   Logging.info ~to_consol:true "Slicing completes: %f sec\n" (t1 -. t0);
   Logging.info ~to_consol:true "== Slicing report ==\n";
