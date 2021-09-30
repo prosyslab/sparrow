@@ -154,6 +154,8 @@ module Scope = struct
         else find_type name (t, fs)
     | [], _ when name = "__builtin_va_list" || name = "__va_list_tag" ->
         Cil.TBuiltin_va_list []
+    | [], _ when name = "__int128_t" -> Cil.TInt (Cil.ILongLong, [])
+    | [], _ when name = "__uint128_t" -> Cil.TInt (Cil.IULongLong, [])
     | _ -> failwith ("type of " ^ name ^ " not found")
 
   let rec find_comp ?(compinfo = None) name = function
