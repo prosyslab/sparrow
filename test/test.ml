@@ -152,6 +152,8 @@ let test_suites =
           "clang/alignof0.c";
           "clang/alignof1.c";
           "clang/attr-stmt0.c";
+          "clang/__int128_t0.c";
+          "clang/__uint128_t0.c";
         ];
     };
   ]
