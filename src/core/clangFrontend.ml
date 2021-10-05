@@ -1073,7 +1073,7 @@ let trans_storage decl =
 let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   let loc = trans_location stmt in
   match stmt.C.Ast.desc with
-  | Null ->
+  | Null | AttributedStmt _ ->
       ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr []) ] }, scope)
   | Compound sl ->
       (* CIL does not need to have local blocks because all variables have unique names *)
@@ -1136,9 +1136,6 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       in
       ({ Chunk.empty with stmts }, scope)
   | Try _ -> failwith ("Unsupported syntax (Try): " ^ CilHelper.s_location loc)
-  | AttributedStmt _ ->
-      failwith
-        ("Unsupported syntax (AttributedStmt)): " ^ CilHelper.s_location loc)
   | UnknownStmt (_, _) ->
       (*       C.Ast.pp_stmt F.err_formatter stmt ; *)
       let stmts = [ Cil.dummyStmt ] in

@@ -151,6 +151,7 @@ let test_suites =
           "clang/unexposed.c";
           "clang/alignof0.c";
           "clang/alignof1.c";
+          "clang/attr-stmt0.c";
         ];
     };
   ]
