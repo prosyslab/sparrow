@@ -1117,14 +1117,19 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   | Return None ->
       let stmts = [ Cil.mkStmt (Cil.Return (None, loc)) ] in
       ({ Chunk.empty with stmts }, scope)
-  | Return (Some e) ->
+  | Return (Some e) -> (
       let sl, expr_opt = trans_expr scope (Some fundec) loc AExp e in
-      let expr = get_opt "return" expr_opt in
-      let stmts =
-        if List.length sl = 0 then [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
-        else sl @ [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
-      in
-      ({ Chunk.empty with stmts }, scope)
+      match expr_opt with
+      | None ->
+          ( { Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr []) ] },
+            scope )
+      | Some expr ->
+          let stmts =
+            if List.length sl = 0 then
+              [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
+            else sl @ [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
+          in
+          ({ Chunk.empty with stmts }, scope))
   | Decl dl ->
       let stmts, user_typs, scope =
         trans_var_decl_list scope fundec loc AExp dl
