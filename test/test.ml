@@ -94,6 +94,7 @@ let test_suites =
           "clang/attribute1.c";
           "clang/return0.c";
           "clang/return1.c";
+          "clang/return2.c";
           "clang/block0.c";
           "clang/function0.c";
           "clang/if0.c";
