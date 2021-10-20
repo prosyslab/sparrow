@@ -1,6 +1,7 @@
 open Vocab
 module H = Hashtbl
 module C = Clang
+module LC = Clang.Lazy
 module F = Format
 module L = Logging
 
@@ -183,13 +184,13 @@ let empty_block = { Cil.battrs = []; bstmts = [] }
 
 let struct_id_count = ref 0
 
-let is_init_list (expr : C.Ast.expr) =
-  match expr.C.Ast.desc with C.Ast.InitList _ -> true | _ -> false
+let is_init_list (expr : LC.Ast.expr) =
+  match expr.LC.Ast.desc with (lazy (LC.Ast.InitList _)) -> true | _ -> false
 
 let anonymous_id_table = H.create 1024
 
-let new_record_id is_struct (rdecl : C.Ast.record_decl) cursor =
-  if rdecl.C.Ast.name = "" then (
+let new_record_id is_struct (rdecl : LC.Ast.record_decl) cursor =
+  if rdecl.LC.Ast.name = "" then (
     let h = C.hash_cursor cursor in
     if H.mem anonymous_id_table h then H.find anonymous_id_table h
     else
@@ -254,7 +255,8 @@ let create_label scope label =
 
 let trans_location node =
   let location =
-    C.Ast.location_of_node node |> C.Ast.concrete_of_source_location C.Presumed
+    LC.Ast.location_of_node node
+    |> LC.Ast.concrete_of_source_location C.Presumed
   in
   { Cil.file = location.filename; line = location.line; byte = location.column }
 
@@ -263,7 +265,7 @@ let get_compinfo typ =
   | Cil.TComp (ci, _) -> ci
   | _ -> failwith ("invalid type: " ^ CilHelper.s_type typ)
 
-let trans_int_kind : C.Ast.builtin_type -> Cil.ikind = function
+let trans_int_kind : LC.Ast.builtin_type -> Cil.ikind = function
   | C.Int | C.Bool -> Cil.IInt
   | C.Char_U | C.UChar -> Cil.IUChar
   | C.UShort -> Cil.IUShort
@@ -277,7 +279,7 @@ let trans_int_kind : C.Ast.builtin_type -> Cil.ikind = function
   | C.LongLong -> Cil.ILongLong
   | _ -> invalid_arg "int kind"
 
-let trans_float_kind : C.Ast.builtin_type -> Cil.fkind = function
+let trans_float_kind : LC.Ast.builtin_type -> Cil.fkind = function
   | C.Float -> Cil.FFloat
   | C.Double -> Cil.FDouble
   | C.LongDouble -> Cil.FLongDouble
@@ -312,40 +314,41 @@ let trans_binop lhs rhs = function
 
 let string_of_declaration_name name =
   match name with
-  | C.Ast.IdentifierName s -> s
+  | LC.Ast.IdentifierName s -> s
   | _ -> failwith "name_of_ident_ref"
 
-let name_of_ident_ref idref = string_of_declaration_name idref.C.Ast.name
+let name_of_ident_ref idref = string_of_declaration_name idref.LC.Ast.name
 
 let trans_attribute typ =
-  if typ.C.Ast.const then [ Cil.Attr ("const", []) ] else []
+  if typ.LC.Ast.const then [ Cil.Attr ("const", []) ] else []
 
-let failwith_decl (decl : C.Ast.decl) =
-  match decl.C.Ast.desc with
-  | C.Ast.RecordDecl _ -> failwith "record decl"
+let failwith_decl (decl : LC.Ast.decl) =
+  match decl.LC.Ast.desc with
+  | (lazy (LC.Ast.RecordDecl _)) -> failwith "record decl"
   | _ -> failwith "unknown decl"
 
 let trans_integer_literal decoration il =
   let ikind =
     match decoration with
-    | C.Ast.Cursor c -> C.get_cursor_type c |> C.get_type_kind |> trans_int_kind
+    | LC.Ast.Cursor c ->
+        C.get_cursor_type c |> C.get_type_kind |> trans_int_kind
     | _ -> failwith "Invalid cursor for integer literal"
   in
   match il with
-  | C.Ast.Int i -> Cil.kinteger ikind i
-  | C.Ast.CXInt cxi ->
+  | LC.Ast.Int i -> Cil.kinteger ikind i
+  | LC.Ast.CXInt cxi ->
       Cil.kinteger ikind (Clang__.Clang__bindings.ext_int_get_sext_value cxi)
 
 let trans_floating_literal decoration il =
   let fkind =
     match decoration with
-    | C.Ast.Cursor c ->
+    | LC.Ast.Cursor c ->
         C.get_cursor_type c |> C.get_type_kind |> trans_float_kind
     | _ -> failwith "Invalid cursor for float literal"
   in
   match il with
-  | C.Ast.Float f -> Cil.Const (Cil.CReal (f, fkind, None))
-  | C.Ast.CXFloat cxf ->
+  | LC.Ast.Float f -> Cil.Const (Cil.CReal (f, fkind, None))
+  | LC.Ast.CXFloat cxf ->
       let f =
         match fkind with
         | Cil.FFloat -> Clang__.Clang__bindings.ext_float_convert_to_float cxf
@@ -354,14 +357,14 @@ let trans_floating_literal decoration il =
       in
       Cil.Const (Cil.CReal (f, fkind, None))
 
-let trans_string_literal sl = Cil.Const (Cil.CStr sl.C.Ast.bytes)
+let trans_string_literal sl = Cil.Const (Cil.CStr sl.LC.Ast.bytes)
 
 let type_of_decoration decoration =
   match decoration with
-  | C.Ast.Cursor c -> C.get_cursor_type c
+  | LC.Ast.Cursor c -> C.get_cursor_type c
   | _ -> failwith "Invalid cursor for type"
 
-let type_of_expr expr = C.Type.of_node expr
+let type_of_expr expr = LC.Type.of_node expr
 
 let trans_decl_ref scope allow_undef idref =
   let name = name_of_ident_ref idref in
@@ -372,20 +375,20 @@ let trans_decl_ref scope allow_undef idref =
   | EnvEnum enum -> ([], Some enum)
   | _ -> failwith "no found"
 
-let grab_matching_field cfields f (expr : C.Ast.expr) =
+let grab_matching_field cfields f (expr : LC.Ast.expr) =
   List.fold_left
     (fun (fi', find, idx) fi ->
       let fi'', find, idx =
-        match expr.C.Ast.desc with
-        | C.Ast.DesignatedInit d ->
+        match expr.LC.Ast.desc with
+        | (lazy (LC.Ast.DesignatedInit d)) ->
             List.fold_left
               (fun (fi', find, idx) designator ->
                 match designator with
-                | C.Ast.FieldDesignator f ->
+                | LC.Ast.FieldDesignator f ->
                     if f = fi.Cil.fname then ([ fi ], idx, idx)
                     else (fi', find, idx)
-                | C.Ast.ArrayDesignator _ -> (fi', find, idx)
-                | C.Ast.ArrayRangeDesignator (_, _) -> (fi', find, idx))
+                | LC.Ast.ArrayDesignator _ -> (fi', find, idx)
+                | LC.Ast.ArrayRangeDesignator (_, _) -> (fi', find, idx))
               (fi', find, idx) d.designators
         | _ ->
             if List.length fi' <> 0 then (fi', find, idx)
@@ -407,9 +410,9 @@ let should_ignore_implicit_cast expr qual_type e typ =
     && Cil.typeOf e |> Cil.unrollType |> Cil.isIntegralType
   then false
   else
-    let expr_kind = C.Ast.cursor_of_node expr |> C.ext_get_cursor_kind in
+    let expr_kind = LC.Ast.cursor_of_node expr |> C.ext_get_cursor_kind in
     let type_kind =
-      C.get_pointee_type qual_type.C.Ast.cxtype |> C.ext_type_get_kind
+      C.get_pointee_type qual_type.LC.Ast.cxtype |> C.ext_type_get_kind
     in
     (* ignore FunctionToPointerDecay and BuiltinFnToFnPtr *)
     expr_kind = C.ImplicitCastExpr
@@ -434,52 +437,53 @@ let rec append_stmt_list sl1 sl2 =
   | [], _ -> sl2
   | h1 :: t1, _ -> h1 :: append_stmt_list t1 sl2
 
-let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
-  match typ.C.Ast.desc with
-  | Pointer pt -> (
+let rec trans_type ?(compinfo = None) scope (typ : LC.Type.t) =
+  match typ.LC.Ast.desc with
+  | (lazy (LC.Ast.Pointer pt)) -> (
       try Cil.TPtr (trans_type ~compinfo scope pt, trans_attribute typ)
       with _ ->
         (* TODO: https://github.com/prosyslab/sparrow/issues/28 *)
         L.warn ~to_consol:false "WARN: type not found\n";
         Cil.voidPtrType)
-  | FunctionType ft -> trans_function_type scope None ft |> fst
-  | Typedef td -> Scope.find_type (name_of_ident_ref td) scope
-  | Elaborated et -> trans_type ~compinfo scope et.named_type
-  | Record rt ->
+  | (lazy (FunctionType ft)) -> trans_function_type scope None ft |> fst
+  | (lazy (Typedef td)) -> Scope.find_type (name_of_ident_ref td) scope
+  | (lazy (Elaborated et)) -> trans_type ~compinfo scope et.named_type
+  | (lazy (Record rt)) ->
       let name = name_of_ident_ref rt in
       let name =
         if name = "" then
-          let decl = C.Type.get_declaration typ in
+          let decl = LC.Type.get_declaration typ in
           let rdecl, is_struct =
-            match decl.C.Ast.desc with
-            | C.Ast.RecordDecl rdecl -> (rdecl, rdecl.C.Ast.keyword = C.Struct)
+            match decl.LC.Ast.desc with
+            | (lazy (LC.Ast.RecordDecl rdecl)) ->
+                (rdecl, rdecl.LC.Ast.keyword = C.Struct)
             | _ -> failwith "Invalid type"
           in
-          let cursor = C.Ast.cursor_of_decoration decl.decoration in
+          let cursor = LC.Ast.cursor_of_decoration decl.decoration in
           new_record_id is_struct rdecl cursor
         else name
       in
       Scope.find_comp ~compinfo name scope
-  | Enum et -> Scope.find_type (name_of_ident_ref et) scope
-  | InvalidType ->
+  | (lazy (Enum et)) -> Scope.find_type (name_of_ident_ref et) scope
+  | (lazy InvalidType) ->
       L.warn ~to_consol:false "WARN: invalid type (use int instead)\n";
       Cil.intType
-  | Vector vt ->
+  | (lazy (Vector vt)) ->
       let size = Cil.integer vt.size in
       let elem_type = trans_type ~compinfo scope vt.element in
       let attr = trans_attribute typ in
       Cil.TArray (elem_type, Some size, attr)
-  | BuiltinType _ -> trans_builtin_type ~compinfo scope typ
-  | ConstantArray ca ->
+  | (lazy (BuiltinType _)) -> trans_builtin_type ~compinfo scope typ
+  | (lazy (ConstantArray ca)) ->
       let size = Cil.integer ca.size in
       let elem_type = trans_type ~compinfo scope ca.element in
       let attr = trans_attribute typ in
       Cil.TArray (elem_type, Some size, attr)
-  | IncompleteArray ia_type ->
+  | (lazy (IncompleteArray ia_type)) ->
       let elem_type = trans_type ~compinfo scope ia_type in
       let attr = trans_attribute typ in
       Cil.TArray (elem_type, None, attr)
-  | VariableArray va ->
+  | (lazy (VariableArray va)) ->
       let _, size = trans_expr scope None Cil.locUnknown AExp va.size in
       let elem_type = trans_type ~compinfo scope va.element in
       let attr = trans_attribute typ in
@@ -487,14 +491,14 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
   | _ -> trans_builtin_type ~compinfo scope typ
 
 and trans_builtin_type ?(compinfo = None) scope t =
-  let k = C.get_type_kind t.C.Ast.cxtype in
+  let k = C.get_type_kind t.LC.Ast.cxtype in
   let attr = trans_attribute t in
   match k with
   | C.Void -> Cil.TVoid attr
   (* integer types *)
   | C.Int | C.Bool | C.Char_U | C.UChar | C.UShort | C.UInt | C.ULong
   | C.ULongLong | C.Char_S | C.SChar | C.Short | C.Long | C.LongLong ->
-      Cil.TInt (trans_int_kind (k : C.Ast.builtin_type), attr)
+      Cil.TInt (trans_int_kind (k : LC.Ast.builtin_type), attr)
   | C.Float | C.Double | C.LongDouble -> Cil.TFloat (trans_float_kind k, attr)
   | C.Pointer -> failwith "pointer"
   | C.Enum -> failwith "enum"
@@ -505,13 +509,13 @@ and trans_builtin_type ?(compinfo = None) scope t =
       let size = C.get_array_size t.cxtype |> Cil.integer in
       let elem_type =
         C.get_array_element_type t.cxtype
-        |> C.Type.of_cxtype |> trans_type ~compinfo scope
+        |> LC.Type.of_cxtype |> trans_type ~compinfo scope
       in
       Cil.TArray (elem_type, Some size, attr)
   | C.VariableArray | C.IncompleteArray ->
       let elem_type =
         C.get_array_element_type t.cxtype
-        |> C.Type.of_cxtype |> trans_type ~compinfo scope
+        |> LC.Type.of_cxtype |> trans_type ~compinfo scope
       in
       Cil.TArray (elem_type, None, attr)
   | Unexposed ->
@@ -521,7 +525,7 @@ and trans_builtin_type ?(compinfo = None) scope t =
         L.warn ~to_consol:false
           "WARN: Found Unexposed type recursively: translating to int\n";
         Cil.TInt (trans_int_kind k, attr))
-      else canonical_typ |> C.Type.of_cxtype |> trans_type ~compinfo scope
+      else canonical_typ |> LC.Type.of_cxtype |> trans_type ~compinfo scope
   | Invalid -> failwith "type Invalid"
   | Char16 -> failwith "type Char16"
   | Char32 -> failwith "type Char32"
@@ -545,9 +549,9 @@ and trans_builtin_type ?(compinfo = None) scope t =
       failwith "trans_builtin_type"
 
 and trans_function_type scope fundec_opt typ =
-  let return_typ = trans_type scope typ.C.Ast.result in
+  let return_typ = trans_type scope typ.LC.Ast.result in
   let param_types, var_arg, scope =
-    trans_parameter_types scope fundec_opt typ.C.Ast.parameters
+    trans_parameter_types scope fundec_opt typ.LC.Ast.parameters
   in
   (Cil.TFun (return_typ, param_types, var_arg, []), scope)
 
@@ -555,28 +559,29 @@ and trans_parameter_types scope fundec_opt = function
   | Some params ->
       let scope, formals =
         List.fold_left
-          (fun (scope, formals) (param : C.Ast.parameter) ->
-            let param_typ = trans_type scope param.desc.qual_type in
-            let result = (param.desc.name, param_typ, []) in
-            if param.desc.name = "" then (scope, formals @ [ result ])
+          (fun (scope, formals) (param : LC.Ast.parameter) ->
+            let desc = Lazy.force param.desc in
+            let param_typ = trans_type scope desc.qual_type in
+            let result = (desc.name, param_typ, []) in
+            if desc.name = "" then (scope, formals @ [ result ])
             else
               let make_var =
                 match fundec_opt with
                 | Some fundec -> fun n t -> Cil.makeFormalVar fundec n t
                 | None -> fun n t -> Cil.makeVarinfo false n t
               in
-              let vi = make_var param.desc.name param_typ in
-              let scope = Scope.add param.desc.name (EnvData.EnvVar vi) scope in
+              let vi = make_var desc.name param_typ in
+              let scope = Scope.add desc.name (EnvData.EnvVar vi) scope in
               (scope, formals @ [ result ]))
-          (scope, []) params.C.Ast.non_variadic
+          (scope, []) params.LC.Ast.non_variadic
       in
-      (Some formals, params.C.Ast.variadic, scope)
+      (Some formals, params.LC.Ast.variadic, scope)
   | None -> (None, false, scope)
 
-and trans_field_decl scope compinfo (field : C.Ast.decl) =
+and trans_field_decl scope compinfo (field : LC.Ast.decl) =
   let floc = trans_location field in
-  match field.C.Ast.desc with
-  | C.Ast.Field fdecl ->
+  match field.LC.Ast.desc with
+  | (lazy (LC.Ast.Field fdecl)) ->
       let typ = trans_type ~compinfo:(Some compinfo) scope fdecl.qual_type in
       (fdecl.name, typ, None, [], floc)
   | _ -> failwith_decl field
@@ -585,42 +590,42 @@ and trans_params scope args fundec =
   match args with
   | Some l ->
       List.fold_left
-        (fun scope (param : C.Ast.parameter) ->
+        (fun scope (param : LC.Ast.parameter) ->
+          let desc = Lazy.force param.desc in
           let vi =
-            Cil.makeFormalVar fundec param.desc.name
-              (trans_type scope param.desc.qual_type)
+            Cil.makeFormalVar fundec desc.name (trans_type scope desc.qual_type)
           in
-          Scope.add param.desc.name (EnvData.EnvVar vi) scope)
-        scope l.C.Ast.non_variadic
+          Scope.add desc.name (EnvData.EnvVar vi) scope)
+        scope l.LC.Ast.non_variadic
   | None -> scope
 
 and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
-    action (expr : C.Ast.expr) =
-  match expr.C.Ast.desc with
-  | C.Ast.IntegerLiteral il ->
+    action (expr : LC.Ast.expr) =
+  match expr.LC.Ast.desc with
+  | (lazy (LC.Ast.IntegerLiteral il)) ->
       ([], Some (trans_integer_literal expr.decoration il))
-  | C.Ast.FloatingLiteral fl ->
+  | (lazy (LC.Ast.FloatingLiteral fl)) ->
       ([], Some (trans_floating_literal expr.decoration fl))
-  | C.Ast.StringLiteral sl -> ([], Some (trans_string_literal sl))
-  | C.Ast.CharacterLiteral cl ->
+  | (lazy (LC.Ast.StringLiteral sl)) -> ([], Some (trans_string_literal sl))
+  | (lazy (LC.Ast.CharacterLiteral cl)) ->
       if cl.value > 255 then ([], Some (Cil.kinteger Cil.IUInt cl.value))
       else ([], Some (Cil.Const (Cil.CChr (char_of_int cl.value))))
-  | C.Ast.UnaryOperator uo ->
+  | (lazy (LC.Ast.UnaryOperator uo)) ->
       let typ = type_of_expr expr |> trans_type scope in
       let il, exp =
         trans_unary_operator scope fundec_opt loc action typ uo.kind uo.operand
       in
       (il, Some exp)
-  | C.Ast.BinaryOperator bo ->
+  | (lazy (LC.Ast.BinaryOperator bo)) ->
       let typ = type_of_expr expr |> trans_type scope in
       let il, exp =
         trans_binary_operator scope fundec_opt loc typ bo.kind bo.lhs bo.rhs
       in
       (il, Some exp)
-  | C.Ast.DeclRef idref -> trans_decl_ref scope allow_undef idref
-  | C.Ast.Call call ->
+  | (lazy (LC.Ast.DeclRef idref)) -> trans_decl_ref scope allow_undef idref
+  | (lazy (LC.Ast.Call call)) ->
       trans_call scope skip_lhs fundec_opt loc call.callee call.args
-  | C.Ast.Cast cast ->
+  | (lazy (LC.Ast.Cast cast)) ->
       let typ = trans_type scope cast.qual_type in
       let is_void = match typ with Cil.TVoid _ -> true | _ -> false in
       let sl, expr_opt =
@@ -634,9 +639,9 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
         if should_ignore_implicit_cast expr cast.qual_type e typ then
           (sl, Some e)
         else (sl, Some (Cil.CastE (typ, e)))
-  | C.Ast.Member mem ->
+  | (lazy (LC.Ast.Member mem)) ->
       ([], Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field))
-  | C.Ast.ArraySubscript arr -> (
+  | (lazy (LC.Ast.ArraySubscript arr)) -> (
       let sl1, base = trans_expr scope fundec_opt loc action arr.base in
       let sl2, idx = trans_expr scope fundec_opt loc action arr.index in
       let base = Option.get base in
@@ -661,27 +666,31 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
             | _ -> failwith "lval"
           in
           (sl1 @ sl2, Some (Cil.Lval new_lval)))
-  | C.Ast.ConditionalOperator co ->
+  | (lazy (LC.Ast.ConditionalOperator co)) ->
       trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
-  | C.Ast.UnaryExpr ue ->
+  | (lazy (LC.Ast.UnaryExpr ue)) ->
       trans_unary_expr scope fundec_opt loc ue.kind ue.argument
-  | C.Ast.UnexposedExpr _ ->
+  | (lazy (LC.Ast.UnexposedExpr _)) ->
       L.warn ~to_consol:false "UnexposedExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
-  | C.Ast.InitList _ ->
+  | (lazy (LC.Ast.InitList _)) ->
       (* TODO: https://github.com/prosyslab/sparrow/issues/27 *)
-      L.warn "Warning: init list @ %s\n" (CilHelper.s_location loc);
+      L.warn ~to_consol:false "Warning: init list @ %s\n"
+        (CilHelper.s_location loc);
       ([], Some Cil.zero)
-  | C.Ast.ImaginaryLiteral _ -> failwith "Unsupported syntax (ImaginaryLiteral)"
-  | C.Ast.BoolLiteral _ -> failwith "Unsupported syntax (BoolLiteral)"
-  | C.Ast.NullPtrLiteral -> failwith "Unsupported syntax (NullPtrLiteral)"
-  | C.Ast.UnknownExpr (C.StmtExpr, C.StmtExpr) ->
+  | (lazy (LC.Ast.ImaginaryLiteral _)) ->
+      failwith "Unsupported syntax (ImaginaryLiteral)"
+  | (lazy (LC.Ast.BoolLiteral _)) -> failwith "Unsupported syntax (BoolLiteral)"
+  | (lazy LC.Ast.NullPtrLiteral) ->
+      failwith "Unsupported syntax (NullPtrLiteral)"
+  | (lazy (LC.Ast.UnknownExpr (C.StmtExpr, C.StmtExpr))) ->
       (* StmtExpr is not supported yet *)
       L.warn ~to_consol:false "StmtExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
-  | C.Ast.DesignatedInit d -> trans_expr scope fundec_opt loc action d.init
-  | C.Ast.UnknownExpr (_, _) -> ([], Some Cil.zero)
-  | C.Ast.Predefined pre ->
+  | (lazy (LC.Ast.DesignatedInit d)) ->
+      trans_expr scope fundec_opt loc action d.init
+  | (lazy (LC.Ast.UnknownExpr (_, _))) -> ([], Some Cil.zero)
+  | (lazy (LC.Ast.Predefined pre)) ->
       let cstr = Cil.CStr pre.function_name in
       let const = Cil.Const cstr in
       ([], Some const)
@@ -866,7 +875,7 @@ and trans_member scope fundec_opt loc base arrow field =
             | Cil.TPtr (TComp (comp, _), _) ->
                 let name =
                   match field with
-                  | C.Ast.FieldName f -> name_of_ident_ref f.desc
+                  | LC.Ast.FieldName f -> name_of_ident_ref (Lazy.force f.desc)
                   | _ -> "unknown"
                 in
                 List.find (fun f -> f.Cil.fname = name) comp.Cil.cfields
@@ -881,7 +890,7 @@ and trans_member scope fundec_opt loc base arrow field =
             | Cil.TComp (comp, _) ->
                 let name =
                   match field with
-                  | C.Ast.FieldName f -> name_of_ident_ref f.desc
+                  | LC.Ast.FieldName f -> name_of_ident_ref (Lazy.force f.desc)
                   | _ -> "unknown"
                 in
                 List.find (fun f -> f.Cil.fname = name) comp.Cil.cfields
@@ -961,22 +970,22 @@ and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
 
 and trans_unary_expr scope fundec_opt loc kind argument =
   match (kind, argument) with
-  | C.SizeOf, C.Ast.ArgumentExpr e -> (
+  | C.SizeOf, LC.Ast.ArgumentExpr e -> (
       let _, exp = trans_expr scope fundec_opt loc ADrop e in
       match exp with Some e -> ([], Some (Cil.SizeOfE e)) | None -> ([], None))
-  | C.SizeOf, C.Ast.ArgumentType t ->
+  | C.SizeOf, LC.Ast.ArgumentType t ->
       let typ = trans_type scope t in
       ([], Some (Cil.SizeOf typ))
-  | C.AlignOf, C.Ast.ArgumentExpr e
-  | C.VecStep, C.Ast.ArgumentExpr e
-  | C.OpenMPRequiredSimdAlign, C.Ast.ArgumentExpr e
-  | C.PreferredAlignOf, C.Ast.ArgumentExpr e -> (
+  | C.AlignOf, LC.Ast.ArgumentExpr e
+  | C.VecStep, LC.Ast.ArgumentExpr e
+  | C.OpenMPRequiredSimdAlign, LC.Ast.ArgumentExpr e
+  | C.PreferredAlignOf, LC.Ast.ArgumentExpr e -> (
       let _, exp = trans_expr scope fundec_opt loc ADrop e in
       match exp with Some e -> ([], Some (Cil.AlignOfE e)) | None -> ([], None))
-  | C.AlignOf, C.Ast.ArgumentType t
-  | C.VecStep, C.Ast.ArgumentType t
-  | C.OpenMPRequiredSimdAlign, C.Ast.ArgumentType t
-  | C.PreferredAlignOf, C.Ast.ArgumentType t ->
+  | C.AlignOf, LC.Ast.ArgumentType t
+  | C.VecStep, LC.Ast.ArgumentType t
+  | C.OpenMPRequiredSimdAlign, LC.Ast.ArgumentType t
+  | C.PreferredAlignOf, LC.Ast.ArgumentType t ->
       let typ = trans_type scope t in
       ([], Some (Cil.AlignOf typ))
 
@@ -1067,58 +1076,59 @@ let append_label chunk label loc in_origin =
       }
 
 let trans_storage decl =
-  match C.Ast.cursor_of_node decl |> C.cursor_get_storage_class with
+  match LC.Ast.cursor_of_node decl |> C.cursor_get_storage_class with
   | C.Extern -> Cil.Extern
   | C.Register -> Cil.Register
   | C.Static -> Cil.Static
   | _ -> Cil.NoStorage
 
-let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
+let rec trans_stmt scope fundec (stmt : LC.Ast.stmt) : Chunk.t * Scope.t =
   let loc = trans_location stmt in
-  match stmt.C.Ast.desc with
-  | Null | AttributedStmt _ ->
+  match stmt.LC.Ast.desc with
+  | (lazy Null) | (lazy (AttributedStmt _)) ->
       ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr []) ] }, scope)
-  | Compound sl ->
+  | (lazy (Compound sl)) ->
       (* CIL does not need to have local blocks because all variables have unique names *)
       (trans_compound scope fundec sl, scope)
-  | For fdesc ->
+  | (lazy (For fdesc)) ->
       ( trans_for scope fundec loc fdesc.init fdesc.condition_variable
           fdesc.cond fdesc.inc fdesc.body,
         scope )
-  | ForRange _ -> failwith ("Unsupported syntax : " ^ CilHelper.s_location loc)
-  | If desc ->
+  | (lazy (ForRange _)) ->
+      failwith ("Unsupported syntax : " ^ CilHelper.s_location loc)
+  | (lazy (If desc)) ->
       ( trans_if scope fundec loc desc.init desc.condition_variable desc.cond
           desc.then_branch desc.else_branch,
         scope )
-  | Switch desc ->
+  | (lazy (Switch desc)) ->
       ( trans_switch scope fundec loc desc.init desc.condition_variable
           desc.cond desc.body,
         scope )
-  | Case desc -> (trans_case scope fundec loc desc.lhs desc.body, scope)
-  | Default stmt -> (trans_default scope fundec loc stmt, scope)
-  | While desc ->
+  | (lazy (Case desc)) -> (trans_case scope fundec loc desc.lhs desc.body, scope)
+  | (lazy (Default stmt)) -> (trans_default scope fundec loc stmt, scope)
+  | (lazy (While desc)) ->
       ( trans_while scope fundec loc desc.condition_variable desc.cond desc.body,
         scope )
-  | Do desc -> (trans_do scope fundec loc desc.body desc.cond, scope)
-  | Label desc -> trans_label scope fundec loc desc.label desc.body
-  | Goto label -> (trans_goto loc label, scope)
-  | IndirectGoto _ ->
+  | (lazy (Do desc)) -> (trans_do scope fundec loc desc.body desc.cond, scope)
+  | (lazy (Label desc)) -> trans_label scope fundec loc desc.label desc.body
+  | (lazy (Goto label)) -> (trans_goto loc label, scope)
+  | (lazy (IndirectGoto _)) ->
       failwith ("Unsupported syntax (IndirectGoto): " ^ CilHelper.s_location loc)
-  | Continue ->
+  | (lazy Continue) ->
       ( { Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Continue loc) ] },
         scope )
-  | Break ->
+  | (lazy Break) ->
       ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Break loc) ] }, scope)
-  | Asm desc ->
+  | (lazy (Asm desc)) ->
       let instr =
         Cil.Asm ([], [ desc.asm_string ], [], [], [], Cil.locUnknown)
       in
       ( { Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr [ instr ]) ] },
         scope )
-  | Return None ->
+  | (lazy (Return None)) ->
       let stmts = [ Cil.mkStmt (Cil.Return (None, loc)) ] in
       ({ Chunk.empty with stmts }, scope)
-  | Return (Some e) -> (
+  | (lazy (Return (Some e))) -> (
       let sl, expr_opt = trans_expr scope (Some fundec) loc AExp e in
       match expr_opt with
       | None ->
@@ -1131,21 +1141,22 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
             else sl @ [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
           in
           ({ Chunk.empty with stmts }, scope))
-  | Decl dl ->
+  | (lazy (Decl dl)) ->
       let stmts, user_typs, scope =
         trans_var_decl_list scope fundec loc AExp dl
       in
       ({ Chunk.empty with stmts; user_typs }, scope)
-  | Expr e ->
+  | (lazy (Expr e)) ->
       (* skip_lhs is true here: a function is called at the top-most level
        * without a return variable *)
       let stmts, _ =
         trans_expr ~skip_lhs:true scope (Some fundec) loc ADrop e
       in
       ({ Chunk.empty with stmts }, scope)
-  | Try _ -> failwith ("Unsupported syntax (Try): " ^ CilHelper.s_location loc)
-  | UnknownStmt (_, _) ->
-      (*       C.Ast.pp_stmt F.err_formatter stmt ; *)
+  | (lazy (Try _)) ->
+      failwith ("Unsupported syntax (Try): " ^ CilHelper.s_location loc)
+  | (lazy (UnknownStmt (_, _))) ->
+      (*      LC.Ast.pp_stmt F.err_formatter stmt ; *)
       let stmts = [ Cil.dummyStmt ] in
       ({ Chunk.empty with stmts }, scope)
 
@@ -1158,64 +1169,80 @@ and trans_compound scope fundec sl =
     (Chunk.empty, scope) sl
   |> fst
 
-and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
+and trans_var_decl_list scope fundec loc action (dl : LC.Ast.decl list) =
   List.fold_left
-    (fun (sl, user_typs, scope) (d : C.Ast.decl) ->
-      match d.C.Ast.desc with
-      | C.Ast.Var desc ->
+    (fun (sl, user_typs, scope) (d : LC.Ast.decl) ->
+      match d.LC.Ast.desc with
+      | (lazy (LC.Ast.Var desc)) ->
           let storage = trans_storage d in
           let decl_stmts, scope =
             trans_var_decl ~storage scope fundec loc action desc
           in
           (sl @ decl_stmts, user_typs, scope)
-      | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
+      | (lazy (LC.Ast.RecordDecl rdecl)) when rdecl.LC.Ast.complete_definition
+        ->
           let is_struct = rdecl.keyword = C.Struct in
-          let cursor = C.Ast.cursor_of_decoration d.decoration in
+          let cursor = LC.Ast.cursor_of_decoration d.decoration in
           let globals, scope =
             trans_global_decl
               ~new_name:(new_record_id is_struct rdecl cursor)
               scope d
           in
           (sl, user_typs @ globals, scope)
-      | C.Ast.RecordDecl rdecl ->
+      | (lazy (LC.Ast.RecordDecl rdecl)) ->
           let is_struct = rdecl.keyword = C.Struct in
-          let cursor = C.Ast.cursor_of_decoration d.decoration in
+          let cursor = LC.Ast.cursor_of_decoration d.decoration in
           let name = new_record_id is_struct rdecl cursor in
           if Scope.mem_typ name scope then (sl, user_typs, scope)
           else
             let globals, scope = trans_global_decl ~new_name:name scope d in
             (sl, user_typs @ globals, scope)
-      | TypedefDecl tdecl ->
+      | (lazy (TypedefDecl tdecl)) ->
           let ttype = trans_type scope tdecl.underlying_type in
           let tinfo = { Cil.tname = tdecl.name; ttype; treferenced = false } in
           let scope =
             Scope.add_type tdecl.name (Cil.TNamed (tinfo, [])) scope
           in
           (sl, user_typs @ [ Cil.GType (tinfo, loc) ], scope)
-      | EnumDecl edecl ->
+      | (lazy (EnumDecl edecl)) ->
           let globals, scope =
             trans_global_decl ~new_name:(new_enum_id edecl.name) scope d
           in
           (sl, user_typs @ globals, scope)
-      | Function _ ->
+      | (lazy (Function _)) ->
           (* if the program is valid, there must be the corresponding def somewhere *)
           (sl, user_typs, scope)
-      | Field _ | EmptyDecl | AccessSpecifier _ | Namespace _ | UsingDirective _
-      | UsingDeclaration _ | Constructor _ | Destructor _ | LinkageSpec _
-      | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
-      | StaticAssert _ | TypeAlias _ | Decomposition _
-      | UnknownDecl (_, _) ->
+      | (lazy (Field _))
+      | (lazy EmptyDecl)
+      | (lazy (AccessSpecifier _))
+      | (lazy (Namespace _))
+      | (lazy (UsingDirective _))
+      | (lazy (UsingDeclaration _))
+      | (lazy (Constructor _))
+      | (lazy (Destructor _))
+      | (lazy (LinkageSpec _))
+      | (lazy (TemplateTemplateParameter _))
+      | (lazy (Friend _))
+      | (lazy (NamespaceAlias _))
+      | (lazy (Directive _))
+      | (lazy (StaticAssert _))
+      | (lazy (TypeAlias _))
+      | (lazy (Decomposition _))
+      | (lazy (UnknownDecl (_, _))) ->
           L.warn ~to_consol:false "Unknown var decl %s\n"
             (CilHelper.s_location loc);
           (sl, [], scope)
-      | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
+      | (lazy (TemplateDecl _))
+      | (lazy (TemplatePartialSpecialization _))
+      | (lazy (CXXMethod _)) ->
           failwith "Unsupported C++ features"
-      | Concept _ | Export _ -> failwith "new cases: Concept | Export")
+      | (lazy (Concept _)) | (lazy (Export _)) ->
+          failwith "new cases: Concept | Export")
     ([], [], scope) dl
 
 and trans_var_decl ?(storage = Cil.NoStorage) (scope : Scope.t) fundec loc
-    action (desc : C.Ast.var_decl_desc) =
-  let typ = trans_type scope desc.C.Ast.var_type in
+    action (desc : LC.Ast.var_decl_desc) =
+  let typ = trans_type scope desc.LC.Ast.var_type in
   let varinfo, scope = create_local_variable scope fundec desc.var_name typ in
   varinfo.vstorage <- storage;
   match desc.var_init with
@@ -1224,20 +1251,21 @@ and trans_var_decl ?(storage = Cil.NoStorage) (scope : Scope.t) fundec loc
       handle_stmt_init scope typ fundec loc action lv e
   | _ -> ([], scope)
 
-and handle_stmt_init scope typ fundec loc action lv (e : C.Ast.expr) =
+and handle_stmt_init scope typ fundec loc action lv (e : LC.Ast.expr) =
   let is_primitive_typ typ =
     match Cil.unrollType typ with Cil.TComp (_, _) -> false | _ -> true
   in
   let is_struct_typ typ = not (is_primitive_typ typ) in
-  match (e.C.Ast.desc, Cil.unrollType typ) with
-  | C.Ast.InitList _, Cil.TArray (_, None, _) | C.Ast.InitList _, Cil.TPtr _ ->
+  match (e.LC.Ast.desc, Cil.unrollType typ) with
+  | (lazy (LC.Ast.InitList _)), Cil.TArray (_, None, _)
+  | (lazy (LC.Ast.InitList _)), Cil.TPtr _ ->
       ([], scope)
   (* primitive array *)
-  | C.Ast.InitList el, Cil.TArray (arr_typ, Some arr_exp, _)
+  | (lazy (LC.Ast.InitList el)), Cil.TArray (arr_typ, Some arr_exp, _)
     when is_primitive_typ arr_typ ->
       mk_arr_stmt scope fundec loc action lv arr_exp el
   (* struct array *)
-  | C.Ast.InitList el, Cil.TArray (arr_typ, Some arr_exp, _)
+  | (lazy (LC.Ast.InitList el)), Cil.TArray (arr_typ, Some arr_exp, _)
     when is_struct_typ arr_typ ->
       let ci =
         match Cil.unrollType arr_typ with
@@ -1267,13 +1295,13 @@ and handle_stmt_init scope typ fundec loc action lv (e : C.Ast.expr) =
       in
       (stmts, scope)
   (* struct *)
-  | C.Ast.InitList el, Cil.TComp (ci, _) ->
+  | (lazy (LC.Ast.InitList el)), Cil.TComp (ci, _) ->
       let stmts, _, scope =
         mk_local_struct_init scope ci.cfields fundec action loc lv el
       in
       (stmts, scope)
   (* primitive init list (contains only one element) *)
-  | C.Ast.InitList el, _ ->
+  | (lazy (LC.Ast.InitList el)), _ ->
       let e =
         if List.length el <> 1 then
           failwith "primitive literal init list should be only one element"
@@ -1775,9 +1803,9 @@ and mk_array_stmt expr_list fi loc fundec action lv scope arr_type arr_exp
       scope ))
   else (var_stmts @ primitive_arr_remainders, expr_remainders, scope)
 
-and trans_var_decl_opt scope fundec loc (vdecl : C.Ast.var_decl option) =
+and trans_var_decl_opt scope fundec loc (vdecl : LC.Ast.var_decl option) =
   match vdecl with
-  | Some v -> trans_var_decl scope fundec loc AExp v.C.Ast.desc
+  | Some v -> trans_var_decl scope fundec loc AExp (Lazy.force v.LC.Ast.desc)
   | None -> ([], scope)
 
 and trans_for scope fundec loc init cond_var cond inc body =
@@ -1946,8 +1974,8 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
   }
 
 and trans_block scope fundec body =
-  match body.C.Ast.desc with
-  | C.Ast.Compound l -> trans_compound scope fundec l
+  match body.LC.Ast.desc with
+  | (lazy (LC.Ast.Compound l)) -> trans_compound scope fundec l
   | _ -> trans_stmt scope fundec body |> fst
 
 and trans_switch scope fundec loc init cond_var cond body =
@@ -2027,49 +2055,49 @@ and trans_stmt_opt scope fundec = function
   | Some s -> trans_stmt scope fundec s
   | None -> (Chunk.empty, scope)
 
-and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
+and trans_global_decl ?(new_name = "") scope (decl : LC.Ast.decl) =
   let loc = trans_location decl in
   let storage = trans_storage decl in
   match decl.desc with
-  | C.Ast.Function fdecl when fdecl.body = None ->
+  | (lazy (LC.Ast.Function fdecl)) when fdecl.body = None ->
       let name = string_of_declaration_name fdecl.name in
       let typ = Cil.TFun (Cil.voidType, None, false, []) in
       let svar, scope = find_global_variable scope name typ in
       let scope = Scope.enter_function scope in
       let typ, scope =
-        trans_function_type scope None fdecl.C.Ast.function_type
+        trans_function_type scope None fdecl.LC.Ast.function_type
       in
       svar.vtype <- typ;
       svar.vstorage <- storage;
       svar.vattr <- trans_decl_attribute decl;
       let scope = Scope.exit_function scope in
       ([ Cil.GVarDecl (svar, loc) ], scope)
-  | C.Ast.Function fdecl ->
+  | (lazy (LC.Ast.Function fdecl)) ->
       let name = string_of_declaration_name fdecl.name in
       let fundec = Cil.emptyFunction name in
       let typ = Cil.TFun (Cil.voidType, None, false, []) in
       let svar, scope = find_global_variable scope name typ in
       let scope = Scope.enter_function scope in
       let typ, scope =
-        trans_function_type scope (Some fundec) fdecl.C.Ast.function_type
+        trans_function_type scope (Some fundec) fdecl.LC.Ast.function_type
       in
       fundec.svar <- svar;
       fundec.svar.vtype <- typ;
       fundec.svar.vstorage <- storage;
       fundec.svar.vattr <- trans_decl_attribute decl;
       fundec.svar.vinline <-
-        C.Ast.cursor_of_node decl |> C.cursor_is_function_inlined;
+        LC.Ast.cursor_of_node decl |> C.cursor_is_function_inlined;
       let fun_body = trans_function_body scope fundec (Option.get fdecl.body) in
       fundec.sbody <- fst fun_body;
       let scope = Scope.exit_function scope in
       CilHelper.insert_missing_return fundec;
       (snd fun_body @ [ Cil.GFun (fundec, loc) ], scope)
-  | C.Ast.Var vdecl when vdecl.var_init = None ->
+  | (lazy (LC.Ast.Var vdecl)) when vdecl.var_init = None ->
       let typ = trans_type scope vdecl.var_type in
       let vi, scope = find_global_variable scope vdecl.var_name typ in
       vi.vstorage <- storage;
       ([ Cil.GVarDecl (vi, loc) ], scope)
-  | C.Ast.Var vdecl ->
+  | (lazy (LC.Ast.Var vdecl)) ->
       let typ = trans_type scope vdecl.var_type in
       let vi, scope = find_global_variable scope vdecl.var_name typ in
       vi.vstorage <- storage;
@@ -2077,7 +2105,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       let init = Some (trans_global_init scope loc e) in
       vi.vinit.init <- init;
       ([ Cil.GVar (vi, { Cil.init }, loc) ], scope)
-  | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
+  | (lazy (LC.Ast.RecordDecl rdecl)) when rdecl.LC.Ast.complete_definition ->
       let is_struct = rdecl.keyword = C.Struct in
       let globals, scope =
         List.fold_left
@@ -2088,13 +2116,14 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       in
       let callback compinfo =
         List.fold_left
-          (fun fl (decl : C.Ast.decl) ->
-            match decl.C.Ast.desc with
-            | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+          (fun fl (decl : LC.Ast.decl) ->
+            match decl.LC.Ast.desc with
+            | (lazy (LC.Ast.Field _)) ->
+                fl @ [ trans_field_decl scope compinfo decl ]
             | _ -> fl)
           [] rdecl.fields
       in
-      let cursor = C.Ast.cursor_of_decoration decl.decoration in
+      let cursor = LC.Ast.cursor_of_decoration decl.decoration in
       let name =
         if new_name = "" then new_record_id is_struct rdecl cursor else new_name
       in
@@ -2109,9 +2138,9 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
         let typ = Cil.TComp (compinfo, []) in
         let scope = Scope.add_comp name typ scope in
         (globals @ [ Cil.GCompTag (compinfo, loc) ], scope)
-  | C.Ast.RecordDecl rdecl ->
+  | (lazy (LC.Ast.RecordDecl rdecl)) ->
       let is_struct = rdecl.keyword = C.Struct in
-      let cursor = C.Ast.cursor_of_decoration decl.decoration in
+      let cursor = LC.Ast.cursor_of_decoration decl.decoration in
       let name =
         if new_name = "" then new_record_id is_struct rdecl cursor else new_name
       in
@@ -2125,20 +2154,21 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
         let typ = Cil.TComp (compinfo, []) in
         let scope = Scope.add_comp rdecl.name typ scope in
         ([ Cil.GCompTagDecl (compinfo, loc) ], scope)
-  | TypedefDecl tdecl ->
+  | (lazy (LC.Ast.TypedefDecl tdecl)) ->
       let ttype = trans_type scope tdecl.underlying_type in
       let tinfo = { Cil.tname = tdecl.name; ttype; treferenced = false } in
       let scope = Scope.add_type tdecl.name (Cil.TNamed (tinfo, [])) scope in
       ([ Cil.GType (tinfo, loc) ], scope)
-  | EnumDecl edecl ->
+  | (lazy (EnumDecl edecl)) ->
       let eitems, scope, _ =
         List.fold_left
-          (fun (eitems, scope, next) (c : C.Ast.enum_constant) ->
-            let value = C.Enum_constant.get_value c |> Cil.integer in
+          (fun (eitems, scope, next) (c : LC.Ast.enum_constant) ->
+            let value = LC.Enum_constant.get_value c |> Cil.integer in
+            let desc = Lazy.force c.desc in
             let scope =
-              Scope.add c.desc.constant_name (EnvData.EnvEnum value) scope
+              Scope.add desc.constant_name (EnvData.EnvEnum value) scope
             in
-            (eitems @ [ (c.desc.constant_name, value, loc) ], scope, next))
+            (eitems @ [ (desc.constant_name, value, loc) ], scope, next))
           ([], scope, Cil.zero) edecl.constants
       in
       let name = if new_name = "" then edecl.name else new_name in
@@ -2153,15 +2183,30 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       in
       let scope = Scope.add_type edecl.name (Cil.TEnum (einfo, [])) scope in
       ([ Cil.GEnumTag (einfo, loc) ], scope)
-  | Field _ | EmptyDecl | AccessSpecifier _ | Namespace _ | UsingDirective _
-  | UsingDeclaration _ | Constructor _ | Destructor _ | LinkageSpec _
-  | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
-  | StaticAssert _ | TypeAlias _ | Decomposition _
-  | UnknownDecl (_, _) ->
+  | (lazy (Field _))
+  | (lazy EmptyDecl)
+  | (lazy (AccessSpecifier _))
+  | (lazy (Namespace _))
+  | (lazy (UsingDirective _))
+  | (lazy (UsingDeclaration _))
+  | (lazy (Constructor _))
+  | (lazy (Destructor _))
+  | (lazy (LinkageSpec _))
+  | (lazy (TemplateTemplateParameter _))
+  | (lazy (Friend _))
+  | (lazy (NamespaceAlias _))
+  | (lazy (Directive _))
+  | (lazy (StaticAssert _))
+  | (lazy (TypeAlias _))
+  | (lazy (Decomposition _))
+  | (lazy (UnknownDecl (_, _))) ->
       ([], scope)
-  | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
+  | (lazy (TemplateDecl _))
+  | (lazy (TemplatePartialSpecialization _))
+  | (lazy (CXXMethod _)) ->
       failwith "Unsupported C++ features"
-  | Concept _ | Export _ -> failwith "new cases: Concept | Export"
+  | (lazy (Concept _)) | (lazy (Export _)) ->
+      failwith "new cases: Concept | Export"
 
 and trans_function_body scope fundec body =
   let chunk = trans_block scope fundec body in
@@ -2175,7 +2220,7 @@ and trans_function_body scope fundec body =
 and trans_decl_attribute decl =
   let attrs = ref [] in
   ignore
-    (C.visit_children (C.Ast.cursor_of_node decl) (fun c _ ->
+    (C.visit_children (LC.Ast.cursor_of_node decl) (fun c _ ->
          (if C.get_cursor_kind c |> C.is_attribute then
           match C.ext_attr_get_kind c with
           | C.NoThrow ->
@@ -2329,10 +2374,10 @@ and mk_global_struct_init scope loc typ cfields expr_list =
   in
   (Cil.CompoundInit (typ, inits), expr_list)
 
-and trans_global_init scope loc (e : C.Ast.expr) =
+and trans_global_init scope loc (e : LC.Ast.expr) =
   let typ = type_of_expr e |> trans_type scope in
-  match (e.C.Ast.desc, Cil.unrollType typ) with
-  | C.Ast.InitList el, Cil.TArray (_, arr_exp, _) ->
+  match (e.LC.Ast.desc, Cil.unrollType typ) with
+  | (lazy (LC.Ast.InitList el)), Cil.TArray (_, arr_exp, _) ->
       let len_exp = Option.get arr_exp in
       let arr_len =
         match len_exp with
@@ -2354,9 +2399,9 @@ and trans_global_init scope loc (e : C.Ast.expr) =
         |> fst |> List.rev
       in
       Cil.CompoundInit (typ, init_list)
-  | C.Ast.InitList el, Cil.TComp (ci, _) ->
+  | (lazy (LC.Ast.InitList el)), Cil.TComp (ci, _) ->
       mk_global_struct_init scope loc typ ci.cfields el |> fst
-  | C.Ast.InitList el, _ ->
+  | (lazy (LC.Ast.InitList el)), _ ->
       (*accept only first scalar and ignore reminader*)
       List.hd el |> trans_expr scope None loc ADrop |> snd |> Option.get
       |> fun x -> Cil.SingleInit x
@@ -2373,21 +2418,22 @@ let initialize_builtins scope =
     Cil.builtinFunctions scope
 
 let parse fname =
-  let options = { C.Ast.Options.default with ignore_implicit_cast = false } in
+  let options = { LC.Ast.Options.default with ignore_implicit_cast = false } in
   L.debug "Loading %s\n" fname;
   if !Options.debug then L.flush_all ();
-  let tu : C.Ast.translation_unit =
+  let tu : LC.Ast.translation_unit =
     StepManager.stepf ~to_consol:false false ("Parsing " ^ fname)
-      (C.Ast.parse_file ~options)
+      (LC.Ast.parse_file ~options)
       fname
   in
   let scope = initialize_builtins (Scope.create ()) in
+  let desc = Lazy.force tu.desc in
   let globals =
     List.fold_left
-      (fun (globals, scope) decl ->
+      (fun (globals, scope) (decl : LC.Ast.decl) ->
         let new_globals, scope = trans_global_decl scope decl in
         (globals @ new_globals, scope))
-      ([], scope) tu.desc.items
+      ([], scope) desc.items
     |> fst
   in
   {
