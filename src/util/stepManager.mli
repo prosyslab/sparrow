@@ -10,9 +10,9 @@
 (***********************************************************************)
 (** Pretty printer for each step *)
 
-val step : bool -> string -> 'a -> ('a -> 'b) -> 'b
+val step : ?to_consol:bool -> bool -> string -> 'a -> ('a -> 'b) -> 'b
 
-val stepf : bool -> string -> ('a -> 'b) -> 'a -> 'b
+val stepf : ?to_consol:bool -> bool -> string -> ('a -> 'b) -> 'a -> 'b
 
 val stepf_opt : bool -> bool -> string -> ('a -> 'a) -> 'a -> 'a
 

@@ -440,7 +440,7 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
       try Cil.TPtr (trans_type ~compinfo scope pt, trans_attribute typ)
       with _ ->
         (* TODO: https://github.com/prosyslab/sparrow/issues/28 *)
-        L.warn "WARN: type not found\n";
+        L.warn ~to_consol:false "WARN: type not found\n";
         Cil.voidPtrType)
   | FunctionType ft -> trans_function_type scope None ft |> fst
   | Typedef td -> Scope.find_type (name_of_ident_ref td) scope
@@ -462,7 +462,7 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
       Scope.find_comp ~compinfo name scope
   | Enum et -> Scope.find_type (name_of_ident_ref et) scope
   | InvalidType ->
-      L.warn "WARN: invalid type (use int instead)\n";
+      L.warn ~to_consol:false "WARN: invalid type (use int instead)\n";
       Cil.intType
   | Vector vt ->
       let size = Cil.integer vt.size in
@@ -518,7 +518,8 @@ and trans_builtin_type ?(compinfo = None) scope t =
       let canonical_typ = C.get_canonical_type t.cxtype in
       let canonical_typ_kind = canonical_typ |> C.get_type_kind in
       if canonical_typ_kind = C.Unexposed then (
-        L.warn "WARN: Found Unexposed type recursively: translating to int\n";
+        L.warn ~to_consol:false
+          "WARN: Found Unexposed type recursively: translating to int\n";
         Cil.TInt (trans_int_kind k, attr))
       else canonical_typ |> C.Type.of_cxtype |> trans_type ~compinfo scope
   | Invalid -> failwith "type Invalid"
@@ -665,7 +666,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
   | C.Ast.UnaryExpr ue ->
       trans_unary_expr scope fundec_opt loc ue.kind ue.argument
   | C.Ast.UnexposedExpr _ ->
-      L.warn "UnexposedExpr at %s\n" (CilHelper.s_location loc);
+      L.warn ~to_consol:false "UnexposedExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
   | C.Ast.InitList _ ->
       (* TODO: https://github.com/prosyslab/sparrow/issues/27 *)
@@ -676,7 +677,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
   | C.Ast.NullPtrLiteral -> failwith "Unsupported syntax (NullPtrLiteral)"
   | C.Ast.UnknownExpr (C.StmtExpr, C.StmtExpr) ->
       (* StmtExpr is not supported yet *)
-      L.warn "StmtExpr at %s\n" (CilHelper.s_location loc);
+      L.warn ~to_consol:false "StmtExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
   | C.Ast.DesignatedInit d -> trans_expr scope fundec_opt loc action d.init
   | C.Ast.UnknownExpr (_, _) -> ([], Some Cil.zero)
@@ -685,7 +686,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
       let const = Cil.Const cstr in
       ([], Some const)
   | _ ->
-      L.warn "Unknown at %s\n" (CilHelper.s_location loc);
+      L.warn ~to_consol:false "Unknown at %s\n" (CilHelper.s_location loc);
       failwith "unknown trans_expr"
 
 and trans_unary_operator scope fundec_opt loc action typ kind expr =
@@ -760,14 +761,14 @@ and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
     match lhs_opt with
     | Some x -> x
     | None ->
-        L.warn "Invalid lhs at %s\n" (CilHelper.s_location loc);
+        L.warn ~to_consol:false "Invalid lhs at %s\n" (CilHelper.s_location loc);
         Cil.zero
   in
   let rhs_expr =
     match rhs_opt with
     | Some x -> x
     | None ->
-        L.warn "Invalid rhs at %s\n" (CilHelper.s_location loc);
+        L.warn ~to_consol:false "Invalid rhs at %s\n" (CilHelper.s_location loc);
         Cil.zero
   in
   match kind with
@@ -1204,7 +1205,8 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
       | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
       | StaticAssert _ | TypeAlias _ | Decomposition _
       | UnknownDecl (_, _) ->
-          L.warn "Unknown var decl %s\n" (CilHelper.s_location loc);
+          L.warn ~to_consol:false "Unknown var decl %s\n"
+            (CilHelper.s_location loc);
           (sl, [], scope)
       | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
           failwith "Unsupported C++ features"
@@ -2375,7 +2377,9 @@ let parse fname =
   L.debug "Loading %s\n" fname;
   if !Options.debug then L.flush_all ();
   let tu : C.Ast.translation_unit =
-    StepManager.stepf false "Parsing" (C.Ast.parse_file ~options) fname
+    StepManager.stepf ~to_consol:false false ("Parsing " ^ fname)
+      (C.Ast.parse_file ~options)
+      fname
   in
   let scope = initialize_builtins (Scope.create ()) in
   let globals =

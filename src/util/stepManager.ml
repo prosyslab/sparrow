@@ -11,9 +11,8 @@
 
 let line = String.make 80 '-'
 
-let step s stg i fn =
+let step ?(to_consol = true) s stg i fn =
   let t0 = Sys.time () in
-  let to_consol = true in
   if s then Logging.info ~to_consol "\n\n\n%s\n%s begins...\n%s\n" line stg line
   else Logging.info ~to_consol "%s begins...\n" stg;
   Logging.flush_all ();
@@ -23,7 +22,8 @@ let step s stg i fn =
   Logging.flush_all ();
   v
 
-let stepf s stg fn i = if !Options.verbose >= 1 then step s stg i fn else fn i
+let stepf ?(to_consol = true) s stg fn i =
+  if !Options.verbose >= 1 then step ~to_consol s stg i fn else fn i
 
 let stepf_opt b s stg fn i =
   if b && !Options.verbose >= 1 then step s stg i fn else if b then fn i else i
