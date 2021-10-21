@@ -155,6 +155,7 @@ let test_suites =
           "clang/attr-stmt0.c";
           "clang/__int128_t0.c";
           "clang/__uint128_t0.c";
+          "clang/vaarg0.c";
         ];
     };
   ]

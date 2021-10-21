@@ -599,8 +599,9 @@ and trans_params scope args fundec =
         scope l.LC.Ast.non_variadic
   | None -> scope
 
-and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
-    action (expr : LC.Ast.expr) =
+(* In case of failure, produce 0 if default_ptr is false, a temp var if true *)
+and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
+    scope fundec_opt loc action (expr : LC.Ast.expr) =
   match expr.LC.Ast.desc with
   | (lazy (LC.Ast.IntegerLiteral il)) ->
       ([], Some (trans_integer_literal expr.decoration il))
@@ -672,7 +673,15 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
       trans_unary_expr scope fundec_opt loc ue.kind ue.argument
   | (lazy (LC.Ast.UnexposedExpr _)) ->
       L.warn ~to_consol:false "UnexposedExpr at %s\n" (CilHelper.s_location loc);
-      ([], Some Cil.zero)
+      if default_ptr then
+        match fundec_opt with
+        | Some fundec ->
+            let temp =
+              (Cil.Var (Cil.makeTempVar fundec Cil.intPtrType), Cil.NoOffset)
+            in
+            ([], Some (Cil.Lval temp))
+        | None -> ([], Some Cil.zero)
+      else ([], Some Cil.zero)
   | (lazy (LC.Ast.InitList _)) ->
       (* TODO: https://github.com/prosyslab/sparrow/issues/27 *)
       L.warn ~to_consol:false "Warning: init list @ %s\n"
@@ -700,7 +709,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) scope fundec_opt loc
 
 and trans_unary_operator scope fundec_opt loc action typ kind expr =
   let sl, var_opt = trans_expr scope fundec_opt loc action expr in
-  let var =
+  let get_var var_opt =
     match var_opt with
     | Some x -> x
     | None ->
@@ -712,6 +721,8 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
   in
   match kind with
   | C.PostInc ->
+      let sl, var_opt = trans_expr scope fundec_opt loc action expr in
+      let var = get_var var_opt in
       let op =
         if Cil.typeOf var |> Cil.isPointerType then Cil.PlusPI else Cil.PlusA
       in
@@ -725,6 +736,8 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
         let instr1 = Cil.Set (temp, var, loc) in
         (sl @ [ Cil.mkStmt (Cil.Instr [ instr1; instr2 ]) ], Cil.Lval temp)
   | C.PostDec ->
+      let sl, var_opt = trans_expr scope fundec_opt loc action expr in
+      let var = get_var var_opt in
       let op =
         if Cil.typeOf var |> Cil.isPointerType then Cil.MinusPI else Cil.MinusA
       in
@@ -735,6 +748,8 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       let instr2 = Cil.Set (lval_of_expr var, exp, loc) in
       (sl @ [ Cil.mkStmt (Cil.Instr [ instr1; instr2 ]) ], Cil.Lval temp)
   | C.PreInc ->
+      let sl, var_opt = trans_expr scope fundec_opt loc action expr in
+      let var = get_var var_opt in
       let op =
         if Cil.typeOf var |> Cil.isPointerType then Cil.PlusPI else Cil.PlusA
       in
@@ -742,25 +757,51 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       let instr = Cil.Set (lval_of_expr var, exp, loc) in
       (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], var)
   | C.PreDec ->
+      let sl, var_opt = trans_expr scope fundec_opt loc action expr in
+      let var = get_var var_opt in
       let op =
         if Cil.typeOf var |> Cil.isPointerType then Cil.MinusPI else Cil.MinusA
       in
       let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr = Cil.Set (lval_of_expr var, exp, loc) in
       (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], var)
-  | C.AddrOf -> (sl, Cil.AddrOf (lval_of_expr var))
+  | C.AddrOf ->
+      let sl, var_opt = trans_expr scope fundec_opt loc action expr in
+      let var = get_var var_opt in
+      (sl, Cil.AddrOf (lval_of_expr var))
   | C.Deref ->
+      let sl, var_opt =
+        trans_expr ~default_ptr:true scope fundec_opt loc action expr
+      in
+      let var = get_var var_opt in
       if Cil.typeOf var |> Cil.isArrayType then
         let base = lval_of_expr var in
         ( sl,
           Cil.Lval (Cil.addOffsetLval (Cil.Index (Cil.zero, Cil.NoOffset)) base)
         )
       else (sl, Cil.Lval (Cil.Mem var, Cil.NoOffset))
-  | C.Plus -> (sl, var)
-  | C.Minus -> (sl, Cil.UnOp (Cil.Neg, var, typ))
-  | C.Not -> (sl, Cil.UnOp (Cil.BNot, var, typ))
-  | C.LNot -> (sl, Cil.UnOp (Cil.LNot, var, typ))
-  | C.Extension -> (sl, var)
+  | C.Plus ->
+      let sl, var_opt = trans_expr scope fundec_opt loc action expr in
+      let var = get_var var_opt in
+      (sl, var)
+  | C.Minus ->
+      let sl, var_opt = trans_expr scope fundec_opt loc action expr in
+      let var = get_var var_opt in
+      (sl, Cil.UnOp (Cil.Neg, var, typ))
+  | C.Not ->
+      let sl, var_opt = trans_expr scope fundec_opt loc action expr in
+      let var = get_var var_opt in
+
+      (sl, Cil.UnOp (Cil.BNot, var, typ))
+  | C.LNot ->
+      let sl, var_opt = trans_expr scope fundec_opt loc action expr in
+      let var = get_var var_opt in
+
+      (sl, Cil.UnOp (Cil.LNot, var, typ))
+  | C.Extension ->
+      let sl, var_opt = trans_expr scope fundec_opt loc action expr in
+      let var = get_var var_opt in
+      (sl, var)
   | _ -> failwith ("unary_operator at " ^ CilHelper.s_location loc)
 
 and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
