@@ -133,6 +133,7 @@ let test_suites =
           "clang/variable-array1.c";
           "clang/duplicated-label0.c";
           "clang/array-subscript0.c";
+          "clang/array-subscript1.c";
           "clang/array-init0.c";
           "clang/incomplete-array0.c";
           "clang/designated-init0.c";

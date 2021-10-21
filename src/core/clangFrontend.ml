@@ -658,6 +658,15 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
             | _ -> failwith "lval"
           in
           (sl1 @ sl2, Some (Cil.Lval new_lval))
+      | Cil.BinOp (_, _, _, Cil.TArray (t, _, _)) ->
+          let new_lval =
+            match idx with
+            | Some x ->
+                ( Cil.Mem (Cil.BinOp (Cil.PlusPI, base, x, Cil.TPtr (t, []))),
+                  Cil.NoOffset )
+            | _ -> failwith "lval"
+          in
+          (sl1 @ sl2, Some (Cil.Lval new_lval))
       | _ ->
           let new_lval =
             match idx with
