@@ -708,7 +708,6 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       failwith "unknown trans_expr"
 
 and trans_unary_operator scope fundec_opt loc action typ kind expr =
-  let sl, var_opt = trans_expr scope fundec_opt loc action expr in
   let get_var var_opt =
     match var_opt with
     | Some x -> x

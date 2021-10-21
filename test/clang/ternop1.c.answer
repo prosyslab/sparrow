@@ -10,7 +10,7 @@ __inline extern  __attribute__((__nothrow__)) int tolower(int __c )  __attribute
 #line 7 "clang/ternop1.c"
 __inline extern int tolower(int __c ) 
 { 
-  __int32_t **__cil_tmp3 ;
+  __int32_t **__cil_tmp2 ;
   __int32_t tmp ;
 
   {
@@ -18,9 +18,9 @@ __inline extern int tolower(int __c )
   if (__c >= -128 && __c < 256) {
     {
 #line 8
-    __cil_tmp3 = __ctype_tolower_loc();
+    __cil_tmp2 = __ctype_tolower_loc();
 #line 8
-    tmp = *(*__cil_tmp3 + __c);
+    tmp = *(*__cil_tmp2 + __c);
     }
   } else {
 #line 8
