@@ -783,10 +783,17 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       in
       let var = get_var var_opt in
       if Cil.typeOf var |> Cil.isArrayType then
-        let base = lval_of_expr var in
-        ( sl,
-          Cil.Lval (Cil.addOffsetLval (Cil.Index (Cil.zero, Cil.NoOffset)) base)
-        )
+        match var with
+        | Cil.Lval base ->
+            ( sl,
+              Cil.Lval
+                (Cil.addOffsetLval (Cil.Index (Cil.zero, Cil.NoOffset)) base) )
+        | Cil.BinOp (bop, e1, e2, Cil.TArray (t, _, _)) ->
+            ( sl,
+              Cil.Lval
+                ( Cil.Mem (Cil.BinOp (bop, e1, e2, Cil.TPtr (t, []))),
+                  Cil.NoOffset ) )
+        | _ -> (sl, Cil.Lval (Cil.Mem var, Cil.NoOffset))
       else (sl, Cil.Lval (Cil.Mem var, Cil.NoOffset))
   | C.Plus ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
