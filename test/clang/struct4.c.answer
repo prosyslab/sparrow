@@ -3,6 +3,10 @@
 
 #line 1 "clang/struct4.c"
 struct A ;
+#line 8 "clang/struct4.c"
+struct A {
+   int f ;
+};
 #line 3 "clang/struct4.c"
 int f(void) 
 { 
@@ -15,10 +19,6 @@ int f(void)
   return (0);
 }
 }
-#line 8 "clang/struct4.c"
-struct A {
-   int f ;
-};
 #line 12 "clang/struct4.c"
 int g(void) 
 { 

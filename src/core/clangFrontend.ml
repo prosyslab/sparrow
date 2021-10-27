@@ -2473,6 +2473,15 @@ let initialize_builtins scope =
       |> snd)
     Cil.builtinFunctions scope
 
+let split_decl (items : LC.Ast.decl list) =
+  List.partition
+    (fun (decl : LC.Ast.decl) ->
+      match decl.LC.Ast.desc with
+      | (lazy (LC.Ast.Function _)) -> false
+      | (lazy (LC.Ast.Var _)) -> false
+      | _ -> true)
+    items
+
 let parse fname =
   let options = { LC.Ast.Options.default with ignore_implicit_cast = false } in
   L.debug "Loading %s\n" fname;
@@ -2484,12 +2493,14 @@ let parse fname =
   in
   let scope = initialize_builtins (Scope.create ()) in
   let desc = Lazy.force tu.desc in
+  (* to make it consistent with CIL, translate types first, vars next *)
+  let types, vars = split_decl desc.items in
   let globals =
     List.fold_left
       (fun (globals, scope) (decl : LC.Ast.decl) ->
         let new_globals, scope = trans_global_decl scope decl in
         (globals @ new_globals, scope))
-      ([], scope) desc.items
+      ([], scope) (types @ vars)
     |> fst
   in
   {
