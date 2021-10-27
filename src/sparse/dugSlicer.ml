@@ -5,6 +5,12 @@ module DUGraph = Analysis.DUGraph
 module Node = InterCfg.Node
 module PowNode = InterCfg.NodeSet
 module SS = Set.Make (String)
+module PowLoc = BasicDom.PowLoc
+module Access = DUGraph.Access
+
+module ReachDef = BatSet.Make (struct
+  type t = Node.t * BasicDom.Loc.t [@@deriving compare]
+end)
 
 let location_of_node global node =
   InterCfg.cmdof global.Global.icfg node |> IntraCfg.Cmd.location_of
@@ -41,18 +47,29 @@ let find_target_node_set global dug =
     exit 1)
   else target_node_set
 
-let rec compute_slice dug workset slice =
-  if PowNode.is_empty workset then slice
+let rec compute_slice global dug workset slice =
+  if ReachDef.is_empty workset then slice
   else
-    let node, workset = PowNode.pop workset in
+    let (node, use), workset = ReachDef.pop workset in
+    let access = DUGraph.access dug in
     let workset, slice =
       DUGraph.fold_pred
         (fun p (workset, slice) ->
-          if PowNode.mem p slice then (workset, slice)
-          else (PowNode.add p workset, PowNode.add p slice))
+          let locs_on_edge = DUGraph.get_abslocs p node dug in
+          if PowLoc.mem use locs_on_edge then
+            if ReachDef.mem (p, use) slice then (workset, slice)
+            else
+              let access = Access.find_node p access in
+              let defs_pred = Access.Info.defof access in
+              if PowLoc.mem use defs_pred then
+                let uses_pred = Access.Info.useof access in
+                ( PowLoc.fold (fun u -> ReachDef.add (p, u)) uses_pred workset,
+                  ReachDef.add (p, use) slice )
+              else (ReachDef.add (p, use) workset, ReachDef.add (p, use) slice)
+          else (workset, slice))
         dug node (workset, slice)
     in
-    compute_slice dug workset slice
+    compute_slice global dug workset slice
 
 let count_sliced_lines global slice =
   List.rev_map
@@ -83,9 +100,23 @@ let print_sliced_lines global slice =
 
 let run global dug =
   let target_node_set = find_target_node_set global dug in
+  let works =
+    PowNode.fold
+      (fun n works ->
+        let locs =
+          Access.find_node n (DUGraph.access dug) |> Access.Info.useof
+        in
+        PowLoc.fold (fun x -> ReachDef.add (n, x)) locs works)
+      target_node_set ReachDef.empty
+  in
   let t0 = Sys.time () in
   Logging.info ~to_consol:true "Slicing begins\n";
-  let slice = compute_slice dug target_node_set target_node_set in
+  let sliced_reaching_def = compute_slice global dug works works in
+  let slice =
+    ReachDef.fold
+      (fun x -> PowNode.add (fst x))
+      sliced_reaching_def PowNode.empty
+  in
   let t1 = Sys.time () in
   Logging.info ~to_consol:true "Slicing completes: %f sec\n" (t1 -. t0);
   Logging.info ~to_consol:true "== Slicing report ==\n";
