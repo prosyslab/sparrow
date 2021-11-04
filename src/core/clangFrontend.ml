@@ -611,16 +611,10 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       else ([], Some (Cil.Const (Cil.CChr (char_of_int cl.value))))
   | C.Ast.UnaryOperator uo ->
       let typ = type_of_expr expr |> trans_type scope in
-      let il, exp =
-        trans_unary_operator scope fundec_opt loc action typ uo.kind uo.operand
-      in
-      (il, Some exp)
+      trans_unary_operator scope fundec_opt loc action typ uo.kind uo.operand
   | C.Ast.BinaryOperator bo ->
       let typ = type_of_expr expr |> trans_type scope in
-      let il, exp =
-        trans_binary_operator scope fundec_opt loc typ bo.kind bo.lhs bo.rhs
-      in
-      (il, Some exp)
+      trans_binary_operator scope fundec_opt loc typ bo.kind bo.lhs bo.rhs
   | C.Ast.DeclRef idref -> trans_decl_ref scope allow_undef idref
   | C.Ast.Call call ->
       trans_call scope skip_lhs fundec_opt loc call.callee call.args
@@ -733,10 +727,12 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       let temp = (Cil.Var (Cil.makeTempVar fundec typ), Cil.NoOffset) in
       let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr2 = Cil.Set (lval_of_expr var, exp, loc) in
-      if action = ADrop then (sl @ [ Cil.mkStmt (Cil.Instr [ instr2 ]) ], var)
+      if action = ADrop then
+        (sl @ [ Cil.mkStmt (Cil.Instr [ instr2 ]) ], Some var)
       else
         let instr1 = Cil.Set (temp, var, loc) in
-        (sl @ [ Cil.mkStmt (Cil.Instr [ instr1; instr2 ]) ], Cil.Lval temp)
+        ( sl @ [ Cil.mkStmt (Cil.Instr [ instr1; instr2 ]) ],
+          Some (Cil.Lval temp) )
   | C.PostDec ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
@@ -748,7 +744,7 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       let instr1 = Cil.Set (temp, var, loc) in
       let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr2 = Cil.Set (lval_of_expr var, exp, loc) in
-      (sl @ [ Cil.mkStmt (Cil.Instr [ instr1; instr2 ]) ], Cil.Lval temp)
+      (sl @ [ Cil.mkStmt (Cil.Instr [ instr1; instr2 ]) ], Some (Cil.Lval temp))
   | C.PreInc ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
@@ -757,7 +753,7 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       in
       let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr = Cil.Set (lval_of_expr var, exp, loc) in
-      (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], var)
+      (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], Some var)
   | C.PreDec ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
@@ -766,11 +762,11 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       in
       let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr = Cil.Set (lval_of_expr var, exp, loc) in
-      (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], var)
+      (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], Some var)
   | C.AddrOf ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
-      (sl, Cil.AddrOf (lval_of_expr var))
+      (sl, Some (Cil.AddrOf (lval_of_expr var)))
   | C.Deref ->
       let sl, var_opt =
         trans_expr ~default_ptr:true scope fundec_opt loc action expr
@@ -780,37 +776,39 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
         match var with
         | Cil.Lval base ->
             ( sl,
-              Cil.Lval
-                (Cil.addOffsetLval (Cil.Index (Cil.zero, Cil.NoOffset)) base) )
+              Some
+                (Cil.Lval
+                   (Cil.addOffsetLval (Cil.Index (Cil.zero, Cil.NoOffset)) base))
+            )
         | Cil.BinOp (bop, e1, e2, Cil.TArray (t, _, _)) ->
             ( sl,
-              Cil.Lval
-                ( Cil.Mem (Cil.BinOp (bop, e1, e2, Cil.TPtr (t, []))),
-                  Cil.NoOffset ) )
-        | _ -> (sl, Cil.Lval (Cil.Mem var, Cil.NoOffset))
-      else (sl, Cil.Lval (Cil.Mem var, Cil.NoOffset))
+              Some
+                (Cil.Lval
+                   ( Cil.Mem (Cil.BinOp (bop, e1, e2, Cil.TPtr (t, []))),
+                     Cil.NoOffset )) )
+        | _ -> (sl, Some (Cil.Lval (Cil.Mem var, Cil.NoOffset)))
+      else (sl, Some (Cil.Lval (Cil.Mem var, Cil.NoOffset)))
   | C.Plus ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
-      (sl, var)
+      (sl, Some var)
   | C.Minus ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
-      (sl, Cil.UnOp (Cil.Neg, var, typ))
+      (sl, Some (Cil.UnOp (Cil.Neg, var, typ)))
   | C.Not ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
 
-      (sl, Cil.UnOp (Cil.BNot, var, typ))
+      (sl, Some (Cil.UnOp (Cil.BNot, var, typ)))
   | C.LNot ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
-
-      (sl, Cil.UnOp (Cil.LNot, var, typ))
+      (sl, Some (Cil.UnOp (Cil.LNot, var, typ)))
   | C.Extension ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
-      (sl, var)
+      (sl, Some var)
   | _ -> failwith ("unary_operator at " ^ CilHelper.s_location loc)
 
 and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
@@ -836,7 +834,8 @@ and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
       ( rhs_sl @ lhs_sl,
         Cil.constFoldBinOp false
           (trans_binop lhs_expr rhs_expr kind)
-          lhs_expr rhs_expr typ )
+          lhs_expr rhs_expr typ
+        |> Option.some )
   | C.Assign -> (
       let lval =
         match lhs_expr with Cil.Lval l -> l | _ -> failwith "invalid lhs"
@@ -850,10 +849,10 @@ and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
           let stmt =
             { s with skind = Cil.Instr [ Cil.Call (Some lval, f, el, loc) ] }
           in
-          (append_stmt_list lhs_sl [ stmt ], lhs_expr)
+          (append_stmt_list lhs_sl [ stmt ], Some lhs_expr)
       | _ ->
           let instr = Cil.Set (lval, rhs_expr, loc) in
-          (append_instr (rhs_sl @ lhs_sl) instr, lhs_expr))
+          (append_instr (rhs_sl @ lhs_sl) instr, Some lhs_expr))
   | C.MulAssign | C.DivAssign | C.RemAssign | C.AddAssign | C.SubAssign
   | C.ShlAssign | C.ShrAssign | C.AndAssign | C.XorAssign | C.OrAssign ->
       let drop_assign = function
@@ -877,8 +876,8 @@ and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
         Cil.BinOp (trans_binop lhs_expr rhs_expr bop, lhs_expr, rhs_expr, typ)
       in
       let stmt = Cil.mkStmt (Cil.Instr [ Cil.Set (lval, rhs, loc) ]) in
-      (rhs_sl @ lhs_sl @ [ stmt ], lhs_expr)
-  | C.Comma -> (rhs_sl @ lhs_sl, rhs_expr)
+      (rhs_sl @ lhs_sl @ [ stmt ], Some lhs_expr)
+  | C.Comma -> (rhs_sl @ lhs_sl, Some rhs_expr)
   | C.Cmp | C.PtrMemD | C.PtrMemI | C.InvalidBinaryOperator ->
       failwith "unsupported expr"
 
@@ -1062,9 +1061,9 @@ module Chunk = struct
   end
 
   type t = {
-    stmts : Cil.stmt list;
+    mutable stmts : Cil.stmt list;
     cases : Cil.stmt list;
-    labels : Cil.stmt ref LabelMap.t;
+    mutable labels : Cil.stmt ref LabelMap.t;
     gotos : string GotoMap.t;
     user_typs : Cil.global list;
   }
@@ -1115,15 +1114,14 @@ let append_label chunk label loc in_origin =
   match chunk.Chunk.stmts with
   | h :: _ ->
       h.labels <- h.labels @ [ l ];
-      { chunk with labels = Chunk.LabelMap.add label (ref h) chunk.labels }
+      chunk.labels <- Chunk.LabelMap.add label (ref h) chunk.labels;
+      chunk
   | [] ->
       let h = Cil.mkStmt (Cil.Instr []) in
       h.labels <- [ l ];
-      {
-        chunk with
-        stmts = [ h ];
-        labels = Chunk.LabelMap.add label (ref h) chunk.labels;
-      }
+      chunk.stmts <- [ h ];
+      chunk.labels <- Chunk.LabelMap.add label (ref h) chunk.labels;
+      chunk
 
 let trans_storage decl =
   match C.Ast.cursor_of_node decl |> C.cursor_get_storage_class with
@@ -1132,6 +1130,25 @@ let trans_storage decl =
   | C.Static -> Cil.Static
   | _ -> Cil.NoStorage
 
+let trans_goto loc label =
+  let dummy_instr =
+    Cil.Asm
+      ( [],
+        [ "dummy goto target " ^ string_of_int !goto_count ],
+        [],
+        [],
+        [],
+        Cil.locUnknown )
+  in
+  goto_count := !goto_count + 1;
+  let placeholder = Cil.mkStmt (Cil.Instr [ dummy_instr ]) in
+  let reference = ref placeholder in
+  {
+    Chunk.empty with
+    stmts = [ Cil.mkStmt (Cil.Goto (reference, loc)) ];
+    gotos = Chunk.GotoMap.add reference label Chunk.GotoMap.empty;
+  }
+
 let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   let loc = trans_location stmt in
   match stmt.C.Ast.desc with
@@ -1139,26 +1156,22 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       ({ Chunk.empty with Chunk.stmts = [ Cil.mkStmt (Cil.Instr []) ] }, scope)
   | Compound sl ->
       (* CIL does not need to have local blocks because all variables have unique names *)
-      (trans_compound scope fundec sl, scope)
+      trans_compound scope fundec sl
   | For fdesc ->
-      ( trans_for scope fundec loc fdesc.init fdesc.condition_variable
-          fdesc.cond fdesc.inc fdesc.body,
-        scope )
+      trans_for scope fundec loc fdesc.init fdesc.condition_variable fdesc.cond
+        fdesc.inc fdesc.body
   | ForRange _ -> failwith ("Unsupported syntax : " ^ CilHelper.s_location loc)
   | If desc ->
-      ( trans_if scope fundec loc desc.init desc.condition_variable desc.cond
-          desc.then_branch desc.else_branch,
-        scope )
+      trans_if scope fundec loc desc.init desc.condition_variable desc.cond
+        desc.then_branch desc.else_branch
   | Switch desc ->
-      ( trans_switch scope fundec loc desc.init desc.condition_variable
-          desc.cond desc.body,
-        scope )
-  | Case desc -> (trans_case scope fundec loc desc.lhs desc.body, scope)
-  | Default stmt -> (trans_default scope fundec loc stmt, scope)
+      trans_switch scope fundec loc desc.init desc.condition_variable desc.cond
+        desc.body
+  | Case desc -> trans_case scope fundec loc desc.lhs desc.body
+  | Default stmt -> trans_default scope fundec loc stmt
   | While desc ->
-      ( trans_while scope fundec loc desc.condition_variable desc.cond desc.body,
-        scope )
-  | Do desc -> (trans_do scope fundec loc desc.body desc.cond, scope)
+      trans_while scope fundec loc desc.condition_variable desc.cond desc.body
+  | Do desc -> trans_do scope fundec loc desc.body desc.cond
   | Label desc -> trans_label scope fundec loc desc.label desc.body
   | Goto label -> (trans_goto loc label, scope)
   | IndirectGoto _ ->
@@ -1209,12 +1222,13 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
 
 and trans_compound scope fundec sl =
   let scope = Scope.enter_block scope in
-  List.fold_left
-    (fun (l, scope) s ->
-      let chunk, scope = trans_stmt scope fundec s in
-      (Chunk.append l chunk, scope))
-    (Chunk.empty, scope) sl
-  |> fst
+  ( List.fold_left
+      (fun (l, scope) s ->
+        let chunk, scope = trans_stmt scope fundec s in
+        (Chunk.append l chunk, scope))
+      (Chunk.empty, scope) sl
+    |> fst,
+    scope )
 
 and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
   List.fold_left
@@ -1848,13 +1862,14 @@ and trans_for scope fundec loc init cond_var cond inc body =
     @ inc_stmt.Chunk.stmts
   in
   let cases = init_stmt.cases @ body_stmt.cases @ inc_stmt.cases in
-  {
-    Chunk.stmts;
-    cases;
-    labels = body_stmt.labels;
-    gotos = body_stmt.gotos;
-    user_typs = body_stmt.user_typs;
-  }
+  ( {
+      Chunk.stmts;
+      cases;
+      labels = body_stmt.labels;
+      gotos = body_stmt.gotos;
+      user_typs = body_stmt.user_typs;
+    },
+    scope )
 
 and trans_while scope fundec loc condition_variable cond body =
   let decl_stmt, scope =
@@ -1874,13 +1889,14 @@ and trans_while scope fundec loc condition_variable cond body =
   in
   let block = { Cil.battrs = []; bstmts } in
   let stmts = decl_stmt @ [ Cil.mkStmt (Cil.Loop (block, loc, None, None)) ] in
-  {
-    Chunk.stmts;
-    cases = body_stmt.cases;
-    labels = body_stmt.labels;
-    gotos = body_stmt.gotos;
-    user_typs = body_stmt.user_typs;
-  }
+  ( {
+      Chunk.stmts;
+      cases = body_stmt.cases;
+      labels = body_stmt.labels;
+      gotos = body_stmt.gotos;
+      user_typs = body_stmt.user_typs;
+    },
+    scope )
 
 and trans_do scope fundec loc body cond =
   let cond_expr =
@@ -1901,13 +1917,14 @@ and trans_do scope fundec loc body cond =
 
   let block = { Cil.battrs = []; bstmts } in
   let stmts = [ Cil.mkStmt (Cil.Loop (block, loc, None, None)) ] in
-  {
-    Chunk.stmts;
-    cases = body_stmt.cases;
-    labels = body_stmt.labels;
-    gotos = body_stmt.gotos;
-    user_typs = body_stmt.user_typs;
-  }
+  ( {
+      Chunk.stmts;
+      cases = body_stmt.cases;
+      labels = body_stmt.labels;
+      gotos = body_stmt.gotos;
+      user_typs = body_stmt.user_typs;
+    },
+    scope )
 
 and trans_if scope fundec loc init cond_var cond then_branch else_branch =
   let init_stmt = trans_stmt_opt scope fundec init |> fst in
@@ -1981,17 +1998,18 @@ and trans_if scope fundec loc init cond_var cond then_branch else_branch =
   in
   let stmts = decl_stmt @ init_stmt.stmts @ cond_sl @ if_chunk.Chunk.stmts in
   let cases = init_stmt.cases @ then_stmt.cases @ else_stmt.cases in
-  {
-    Chunk.stmts;
-    cases;
-    labels = if_chunk.labels;
-    gotos = if_chunk.gotos;
-    user_typs = init_stmt.user_typs;
-  }
+  ( {
+      Chunk.stmts;
+      cases;
+      labels = if_chunk.labels;
+      gotos = if_chunk.gotos;
+      user_typs = init_stmt.user_typs;
+    },
+    scope )
 
 and trans_block scope fundec body =
   match body.C.Ast.desc with
-  | C.Ast.Compound l -> trans_compound scope fundec l
+  | C.Ast.Compound l -> trans_compound scope fundec l |> fst
   | _ -> trans_stmt scope fundec body |> fst
 
 and trans_switch scope fundec loc init cond_var cond body =
@@ -2012,13 +2030,14 @@ and trans_switch scope fundec loc init cond_var cond body =
     init.Chunk.stmts @ decl_sl @ cond_sl
     @ [ Cil.mkStmt (Cil.Switch (cond_expr, body, cases, loc)) ]
   in
-  {
-    Chunk.stmts;
-    cases = body_stmt.cases;
-    labels = body_stmt.labels;
-    gotos = body_stmt.gotos;
-    user_typs = body_stmt.user_typs;
-  }
+  ( {
+      Chunk.stmts;
+      cases = body_stmt.cases;
+      labels = body_stmt.labels;
+      gotos = body_stmt.gotos;
+      user_typs = body_stmt.user_typs;
+    },
+    scope )
 
 and trans_case scope fundec loc lhs body =
   let lhs_expr = trans_expr scope (Some fundec) loc ADrop lhs |> snd in
@@ -2027,8 +2046,8 @@ and trans_case scope fundec loc lhs body =
   match chunk.Chunk.stmts with
   | h :: _ ->
       h.labels <- h.labels @ [ label ];
-      { chunk with cases = h :: chunk.cases }
-  | [] -> chunk
+      ({ chunk with cases = h :: chunk.cases }, scope)
+  | [] -> (chunk, scope)
 
 and trans_default scope fundec loc stmt =
   let chunk = trans_stmt scope fundec stmt |> fst in
@@ -2036,8 +2055,8 @@ and trans_default scope fundec loc stmt =
   match chunk.Chunk.stmts with
   | h :: _ ->
       h.labels <- label :: h.labels;
-      { chunk with cases = chunk.cases @ [ h ] }
-  | [] -> chunk
+      ({ chunk with cases = chunk.cases @ [ h ] }, scope)
+  | [] -> (chunk, scope)
 
 and trans_label scope fundec loc label body =
   (* Clang frontend guarantees the uniqueness of label names,
@@ -2047,25 +2066,6 @@ and trans_label scope fundec loc label body =
   let scope = Scope.add_label label scope in
   let chunk = trans_stmt scope fundec body |> fst in
   (append_label chunk label loc true, scope)
-
-and trans_goto loc label =
-  let dummy_instr =
-    Cil.Asm
-      ( [],
-        [ "dummy goto target " ^ string_of_int !goto_count ],
-        [],
-        [],
-        [],
-        Cil.locUnknown )
-  in
-  goto_count := !goto_count + 1;
-  let placeholder = Cil.mkStmt (Cil.Instr [ dummy_instr ]) in
-  let reference = ref placeholder in
-  {
-    Chunk.empty with
-    stmts = [ Cil.mkStmt (Cil.Goto (reference, loc)) ];
-    gotos = Chunk.GotoMap.add reference label Chunk.GotoMap.empty;
-  }
 
 and trans_stmt_opt scope fundec = function
   | Some s -> trans_stmt scope fundec s
