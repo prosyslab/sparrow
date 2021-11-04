@@ -14,11 +14,11 @@ type tmp_var_info = {
 }
 
 type flags = {
-  tmp_var_cond_update : int;
-  skip_while : bool;
-  while_flag : bool;
-  total_initialized_items_len : int;
-  terminate_flag : bool;
+  mutable tmp_var_cond_update : int;
+  mutable skip_while : bool;
+  mutable while_flag : bool;
+  mutable total_initialized_items_len : int;
+  mutable terminate_flag : bool;
 }
 
 module EnvData = struct
@@ -417,22 +417,27 @@ let should_ignore_implicit_cast expr qual_type e typ =
     (* ignore LValueToRValue *)
     || CilHelper.eq_typ (Cil.typeOf e) typ
 
-let rec append_instr sl instr =
+let rec append_instr_internal sl instr result =
   match sl with
   | [ ({ Cil.skind = Cil.Instr l; _ } as h) ] ->
-      [ { h with skind = Cil.Instr (l @ [ instr ]) } ]
-  | [] -> [ Cil.mkStmt (Cil.Instr [ instr ]) ]
-  | h :: t -> h :: append_instr t instr
+      h.skind <- Cil.Instr (l @ [ instr ]);
+      h :: result
+  | [] -> Cil.mkStmt (Cil.Instr [ instr ]) :: result
+  | h :: t -> append_instr_internal t instr (h :: result)
 
-let rec append_stmt_list sl1 sl2 =
+let append_instr sl instr = append_instr_internal sl instr [] |> List.rev
+
+let rec append_stmt_list_internal sl1 sl2 result =
   match (sl1, sl2) with
   | ( [ ({ Cil.skind = Cil.Instr l1; _ } as h1) ],
       ({ Cil.skind = Cil.Instr l2; _ } as h2) :: t2 )
   (* merging statements with labels may break goto targets *)
     when h1.labels = [] && h2.labels = [] ->
-      { h1 with skind = Cil.Instr (l1 @ l2) } :: t2
-  | [], _ -> sl2
-  | h1 :: t1, _ -> h1 :: append_stmt_list t1 sl2
+      List.rev_append ({ h1 with skind = Cil.Instr (l1 @ l2) } :: t2) result
+  | [], _ -> List.rev_append sl2 result
+  | h1 :: t1, _ -> append_stmt_list_internal t1 sl2 (h1 :: result)
+
+let append_stmt_list sl1 sl2 = append_stmt_list_internal sl1 sl2 [] |> List.rev
 
 let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
   match typ.C.Ast.desc with
@@ -1623,20 +1628,19 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci fi fundec action
       in
       let flags =
         if expr_list <> [] && List.length expr_remainders <> 0 then
-          {
-            flags with
-            total_initialized_items_len =
-              max flags.total_initialized_items_len (List.length stmts');
-          }
+          let _ =
+            flags.total_initialized_items_len <-
+              max flags.total_initialized_items_len (List.length stmts')
+          in
+          flags
         else flags
       in
       (stmts', expr_remainders', tmp_var, flags, scope)
     else
-      let flags =
-        if o = 0 then { flags with skip_while = true }
-        else { flags with while_flag = true }
+      let _ =
+        if o = 0 then flags.skip_while <- true else flags.while_flag <- true
       in
-      if not flags.skip_while then
+      if not flags.skip_while then (
         let tmp_var_lval, tmp_var_expr, tmp_var_stmt, unary_plus_expr, scope =
           mk_tmp_var fundec loc (List.length expr_list) scope
         in
@@ -1650,21 +1654,14 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci fi fundec action
               lv
           else Cil.addOffsetLval (Cil.Index (tmp_var_expr, Cil.NoOffset)) lv
         in
-        let flags =
-          { flags with tmp_var_cond_update = flags.tmp_var_cond_update + 1 }
-        in
+        flags.tmp_var_cond_update <- flags.tmp_var_cond_update + 1;
         let stmts', expr_remainders', scope =
           mk_local_struct_init scope ci.cfields fundec action loc lv
             expr_remainders
         in
-        let flags =
-          {
-            flags with
-            total_initialized_items_len =
-              max flags.total_initialized_items_len (List.length stmts');
-          }
-        in
-        (stmts', expr_remainders', tmp_var, flags, scope)
+        flags.total_initialized_items_len <-
+          max flags.total_initialized_items_len (List.length stmts');
+        (stmts', expr_remainders', tmp_var, flags, scope))
       else
         let lv =
           if attach_flag then
@@ -1679,9 +1676,7 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci fi fundec action
         in
         (stmts', expr_remainders', tmp_var, flags, scope)
   in
-  let flags =
-    { flags with terminate_flag = List.length expr_remainders' = 0 }
-  in
+  flags.terminate_flag <- List.length expr_remainders' = 0;
   ( stmts @ stmts',
     primitive_arr_remainders,
     expr_remainders',
@@ -1702,13 +1697,9 @@ and mk_primitive_array_stmt stmts expr_list expr_remainders o arr_type arr_len
           lv
       in
       let instr = Cil.Set (lv1, Cil.CastE (arr_type, expr), loc) in
-      let flags =
-        {
-          flags with
-          total_initialized_items_len = max flags.total_initialized_items_len 1;
-        }
-      in
-      if arr_len > o + 1 && remainders = [] then
+      flags.total_initialized_items_len <-
+        max flags.total_initialized_items_len 1;
+      if arr_len > o + 1 && remainders = [] then (
         let tmp_var_lval, tmp_var_expr, tmp_var_stmt, unary_plus_expr, scope =
           mk_tmp_var fundec loc (o + 1) scope
         in
@@ -1723,13 +1714,14 @@ and mk_primitive_array_stmt stmts expr_list expr_remainders o arr_type arr_len
           mk_while_stmt arr_len loc tmp_var_expr tmp_var_lval unary_plus_expr
             stmt_remainder
         in
+        flags.terminate_flag <- true;
         ( stmts @ append_instr [] instr,
-          [ tmp_var_stmt ] @ while_stmt,
+          tmp_var_stmt :: while_stmt,
           remainders,
           scope,
           tmp_var,
-          { flags with terminate_flag = true },
-          o + 1 )
+          flags,
+          o + 1 ))
       else
         ( stmts @ append_instr [] instr,
           primitive_arr_remainders,
