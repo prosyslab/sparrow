@@ -140,18 +140,17 @@ module Scope = struct
     | _, [] -> false
 
   let rec find_var_enum ?(allow_undef = false) name = function
-    | h :: t, fs ->
-        if BlockEnv.mem_var name h then BlockEnv.find_var name h
-        else find_var_enum ~allow_undef name (t, fs)
+    | h :: t, fs -> (
+        try BlockEnv.find_var name h
+        with Not_found -> find_var_enum ~allow_undef name (t, fs))
     | [], _ when allow_undef ->
         let ftype = Cil.TFun (Cil.intType, None, false, []) in
         EnvData.EnvVar (Cil.makeGlobalVar name ftype)
     | _ -> failwith ("variable " ^ name ^ " not found")
 
   let rec find_type name = function
-    | h :: t, fs ->
-        if BlockEnv.mem_typ name h then BlockEnv.find_typ name h
-        else find_type name (t, fs)
+    | h :: t, fs -> (
+        try BlockEnv.find_typ name h with Not_found -> find_type name (t, fs))
     | [], _ when name = "__builtin_va_list" || name = "__va_list_tag" ->
         Cil.TBuiltin_va_list []
     | [], _ when name = "__int128_t" -> Cil.TInt (Cil.ILongLong, [])
@@ -159,9 +158,9 @@ module Scope = struct
     | _ -> failwith ("type of " ^ name ^ " not found")
 
   let rec find_comp ?(compinfo = None) name = function
-    | h :: t, fs ->
-        if BlockEnv.mem_comp name h then BlockEnv.find_comp name h
-        else find_comp ~compinfo name (t, fs)
+    | h :: t, fs -> (
+        try BlockEnv.find_comp name h
+        with Not_found -> find_comp ~compinfo name (t, fs))
     | [], _ when compinfo <> None ->
         let compinfo = Option.get compinfo in
         if compinfo.Cil.cname = name then Cil.TComp (compinfo, [])
@@ -317,8 +316,9 @@ let string_of_declaration_name name =
 
 let name_of_ident_ref idref = string_of_declaration_name idref.C.Ast.name
 
-let trans_attribute typ =
-  if typ.C.Ast.const then [ Cil.Attr ("const", []) ] else []
+let const_attribute = [ Cil.Attr ("const", []) ]
+
+let trans_attribute typ = if typ.C.Ast.const then const_attribute else []
 
 let failwith_decl (decl : C.Ast.decl) =
   match decl.C.Ast.desc with
@@ -387,9 +387,7 @@ let grab_matching_field cfields f (expr : C.Ast.expr) =
                 | C.Ast.ArrayDesignator _ -> (fi', find, idx)
                 | C.Ast.ArrayRangeDesignator (_, _) -> (fi', find, idx))
               (fi', find, idx) d.designators
-        | _ ->
-            if List.length fi' <> 0 then (fi', find, idx)
-            else ([ f ], find, -10000)
+        | _ -> if fi' <> [] then (fi', find, idx) else ([ f ], find, -10000)
       in
       (fi'', find, idx + 1))
     ([], 0, 0) cfields
@@ -563,7 +561,7 @@ and trans_parameter_types scope fundec_opt = function
           (fun (scope, formals) (param : C.Ast.parameter) ->
             let param_typ = trans_type scope param.desc.qual_type in
             let result = (param.desc.name, param_typ, []) in
-            if param.desc.name = "" then (scope, formals @ [ result ])
+            if param.desc.name = "" then (scope, result :: formals)
             else
               let make_var =
                 match fundec_opt with
@@ -572,10 +570,10 @@ and trans_parameter_types scope fundec_opt = function
               in
               let vi = make_var param.desc.name param_typ in
               let scope = Scope.add param.desc.name (EnvData.EnvVar vi) scope in
-              (scope, formals @ [ result ]))
+              (scope, result :: formals))
           (scope, []) params.C.Ast.non_variadic
       in
-      (Some formals, params.C.Ast.variadic, scope)
+      (List.rev formals |> Option.some, params.C.Ast.variadic, scope)
   | None -> (None, false, scope)
 
 and trans_field_decl scope compinfo (field : C.Ast.decl) =
@@ -895,7 +893,7 @@ and trans_call scope skip_lhs fundec_opt loc callee args =
       (fun (args_insts, args_exprs) arg ->
         let insts, expr_opt = trans_expr scope fundec_opt loc AExp arg in
         let expr = match expr_opt with Some x -> x | None -> failwith "arg" in
-        (args_insts @ insts, args_exprs @ [ expr ]))
+        (args_insts @ insts, expr :: args_exprs))
       ([], []) args
   in
   let rec make_retvar t =
@@ -912,7 +910,7 @@ and trans_call scope skip_lhs fundec_opt loc callee args =
   let retvar_exp =
     match retvar with Some x -> Some (Cil.Lval x) | _ -> None
   in
-  let instr = Cil.Call (retvar, callee, args_exprs, loc) in
+  let instr = Cil.Call (retvar, callee, List.rev args_exprs, loc) in
   (append_instr (callee_insts @ args_insts) instr, retvar_exp)
 
 and trans_member scope fundec_opt loc base arrow field =
@@ -1187,8 +1185,7 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
             scope )
       | Some expr ->
           let stmts =
-            if List.length sl = 0 then
-              [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
+            if sl = [] then [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
             else sl @ [ Cil.mkStmt (Cil.Return (Some expr, loc)) ]
           in
           ({ Chunk.empty with stmts }, scope))
@@ -1613,8 +1610,7 @@ and mk_init_stmt scope loc fundec action fi lv expr_list =
 and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci fi fundec action
     loc tmp_var lv flags primitive_arr_remainders scope attach_flag =
   let stmts', expr_remainders', tmp_var, flags, scope =
-    if (expr_list <> [] && List.length expr_remainders <> 0) || flags.skip_while
-    then
+    if (expr_list <> [] && expr_remainders <> []) || flags.skip_while then
       let lv =
         if attach_flag then
           Cil.addOffsetLval
@@ -1627,7 +1623,7 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci fi fundec action
           expr_remainders
       in
       let flags =
-        if expr_list <> [] && List.length expr_remainders <> 0 then
+        if expr_list <> [] && expr_remainders <> [] then
           let _ =
             flags.total_initialized_items_len <-
               max flags.total_initialized_items_len (List.length stmts')
@@ -1676,7 +1672,7 @@ and mk_tcomp_array_stmt stmts expr_list expr_remainders o ci fi fundec action
         in
         (stmts', expr_remainders', tmp_var, flags, scope)
   in
-  flags.terminate_flag <- List.length expr_remainders' = 0;
+  flags.terminate_flag <- expr_remainders' = [];
   ( stmts @ stmts',
     primitive_arr_remainders,
     expr_remainders',
@@ -2286,7 +2282,7 @@ and mk_init scope loc fitype expr_list =
                      in
                      (init_with_idx :: inits, expr_remainders', o + 1)
                  | _ ->
-                     if expr_list <> [] && List.length expr_remainders <> 0 then
+                     if expr_list <> [] && expr_remainders <> [] then
                        let e = List.hd expr_remainders in
                        let _, expr_opt = trans_expr scope None loc ADrop e in
                        let e = Option.get expr_opt in
