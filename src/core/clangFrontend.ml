@@ -1149,6 +1149,19 @@ let trans_goto loc label =
     gotos = Chunk.GotoMap.add reference label Chunk.GotoMap.empty;
   }
 
+let att_nothrow = Cil.Attr ("nothrow", [])
+
+let att_gnu_inline = Cil.Attr ("gnu_inline", [])
+
+let trans_decl_attribute attrs =
+  List.fold_left
+    (fun attrs (attr : C.Ast.attribute_desc C.Ast.node) ->
+      match attr.C.Ast.desc with
+      | GNUInline _ -> att_gnu_inline :: attrs
+      | NoThrow _ -> att_nothrow :: attrs
+      | _ -> attrs)
+    [] attrs
+
 let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   let loc = trans_location stmt in
   match stmt.C.Ast.desc with
@@ -2085,7 +2098,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       in
       svar.vtype <- typ;
       svar.vstorage <- storage;
-      svar.vattr <- trans_decl_attribute decl;
+      svar.vattr <- trans_decl_attribute fdecl.attributes;
       let scope = Scope.exit_function scope in
       ([ Cil.GVarDecl (svar, loc) ], scope)
   | C.Ast.Function fdecl ->
@@ -2100,7 +2113,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       fundec.svar <- svar;
       fundec.svar.vtype <- typ;
       fundec.svar.vstorage <- storage;
-      fundec.svar.vattr <- trans_decl_attribute decl;
+      fundec.svar.vattr <- trans_decl_attribute fdecl.attributes;
       fundec.svar.vinline <-
         C.Ast.cursor_of_node decl |> C.cursor_is_function_inlined;
       let fun_body = trans_function_body scope fundec (Option.get fdecl.body) in
@@ -2215,20 +2228,6 @@ and trans_function_body scope fundec body =
       bstmts = List.map (Cil.visitCilStmt vis) chunk.Chunk.stmts;
     },
     chunk.user_typs )
-
-and trans_decl_attribute decl =
-  let attrs = ref [] in
-  ignore
-    (C.visit_children (C.Ast.cursor_of_node decl) (fun c _ ->
-         (if C.get_cursor_kind c |> C.is_attribute then
-          match C.ext_attr_get_kind c with
-          | C.NoThrow ->
-              attrs := Cil.addAttribute (Cil.Attr ("nothrow", [])) !attrs
-          | C.GNUInline ->
-              attrs := Cil.addAttribute (Cil.Attr ("gnu_inline", [])) !attrs
-          | _ -> ());
-         C.Recurse));
-  !attrs
 
 and mk_init scope loc fitype expr_list =
   (* for uninitaiized *)
