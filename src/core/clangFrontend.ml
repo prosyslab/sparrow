@@ -31,37 +31,39 @@ module EnvData = struct
 end
 
 module BlockEnv = struct
+  module H = Map.Make (String)
+
   type t = {
-    var : (string, EnvData.t) H.t;
-    typ : (string, Cil.typ) H.t;
-    comp : (string, Cil.typ) H.t;
+    mutable var : EnvData.t H.t;
+    mutable typ : Cil.typ H.t;
+    mutable comp : Cil.typ H.t;
   }
 
-  let create () = { var = H.create 64; typ = H.create 64; comp = H.create 64 }
+  let create () = { var = H.empty; typ = H.empty; comp = H.empty }
 
   let add_var name vi env =
-    H.add env.var name vi;
+    env.var <- H.add name vi env.var;
     env
 
   let add_typ name typ env =
-    H.add env.typ name typ;
+    env.typ <- H.add name typ env.typ;
     env
 
   let add_comp name comp env =
-    H.add env.comp name comp;
+    env.comp <- H.add name comp env.comp;
     env
 
-  let mem_var name env = H.mem env.var name
+  let mem_var name env = H.mem name env.var
 
-  let mem_typ name env = H.mem env.typ name
+  let mem_typ name env = H.mem name env.typ
 
-  let mem_comp name env = H.mem env.comp name
+  let mem_comp name env = H.mem name env.comp
 
-  let find_var name env = H.find env.var name
+  let find_var name env = H.find name env.var
 
-  let find_typ name env = H.find env.typ name
+  let find_typ name env = H.find name env.typ
 
-  let find_comp name env = H.find env.comp name
+  let find_comp name env = H.find name env.comp
 end
 
 module LabelEnv = struct
@@ -2441,9 +2443,9 @@ let parse fname =
     List.fold_left
       (fun (globals, scope) decl ->
         let new_globals, scope = trans_global_decl scope decl in
-        (globals @ new_globals, scope))
+        (List.rev_append new_globals globals, scope))
       ([], scope) (types @ vars)
-    |> fst
+    |> fst |> List.rev
   in
   {
     Cil.fileName = fname;
