@@ -181,14 +181,36 @@ let byteSizeOf typ =
       prerr_endline ("warn: Cil.bitsSizeOf (" ^ s_type typ ^ ")");
     raise e
 
-let eq_typ t1 t2 =
-  try Cil.typeSig t1 = Cil.typeSig t2
-  with _ ->
-    (* Cil.typeSig may raise an exception if it is a variable array type.
-     * See https://github.com/KihongHeo/cil/blob/6dde2a7922489437f46e6bd994b639351b55bb00/src/cil.ml#L5998
-     * Conservatively return false.
-     *)
-    false
+let rec eq_typ t1 t2 =
+  match (t1, t2) with
+  | Cil.TVoid _, Cil.TVoid _ -> true
+  | Cil.TInt (ik1, att1), Cil.TInt (ik2, att2) -> ik1 = ik2 && att1 = att2
+  | Cil.TFloat (fk1, att1), Cil.TFloat (fk2, att2) -> fk1 = fk2 && att1 = att2
+  | Cil.TPtr (typ1, att1), Cil.TPtr (typ2, att2) ->
+      eq_typ typ1 typ2 && att1 = att2
+  | Cil.TArray (typ1, None, att1), Cil.TArray (typ2, None, att2) ->
+      eq_typ typ1 typ2 && att1 = att2
+  | Cil.TFun (typ1, None, varg1, att1), Cil.TFun (typ2, None, varg2, att2) ->
+      eq_typ typ1 typ2 && varg1 = varg2 && att1 = att2
+  | ( Cil.TFun (typ1, Some al1, varg1, att1),
+      Cil.TFun (typ2, Some al2, varg2, att2) ) ->
+      eq_typ typ1 typ2
+      && (try
+            List.fold_left2
+              (fun r (_, t1, _) (_, t2, _) -> r && eq_typ t1 t2)
+              true al1 al2
+          with _ -> false)
+      && varg1 = varg2 && att1 = att2
+  | Cil.TNamed (ti1, att1), Cil.TNamed (ti2, att2) ->
+      eq_typ ti1.ttype ti2.ttype && att1 = att2
+  | Cil.TNamed (ti1, _), _ -> eq_typ ti1.ttype t2
+  | _, Cil.TNamed (ti2, _) -> eq_typ t1 ti2.ttype
+  | Cil.TComp (ci1, att1), Cil.TComp (ci2, att2) ->
+      ci1.ckey = ci2.ckey && att1 = att2
+  | Cil.TEnum (ei1, att1), Cil.TEnum (ei2, att2) ->
+      ei1.ename = ei2.ename && att1 = att2
+  | Cil.TBuiltin_va_list att1, Cil.TBuiltin_va_list att2 -> att1 = att2
+  | _ -> false
 
 let add_field_offset offset fi =
   Cil.addOffset (Cil.Field (fi, Cil.NoOffset)) offset

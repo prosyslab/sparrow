@@ -363,8 +363,6 @@ let type_of_decoration decoration =
   | C.Ast.Cursor c -> C.get_cursor_type c
   | _ -> failwith "Invalid cursor for type"
 
-let type_of_expr expr = C.Type.of_node expr
-
 let trans_decl_ref scope allow_undef idref =
   let name = name_of_ident_ref idref in
   match Scope.find_var_enum ~allow_undef name scope with
@@ -612,11 +610,9 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       if cl.value > 255 then ([], Some (Cil.kinteger Cil.IUInt cl.value))
       else ([], Some (Cil.Const (Cil.CChr (char_of_int cl.value))))
   | C.Ast.UnaryOperator uo ->
-      let typ = type_of_expr expr |> trans_type scope in
-      trans_unary_operator scope fundec_opt loc action typ uo.kind uo.operand
+      trans_unary_operator scope fundec_opt loc action uo.kind uo.operand
   | C.Ast.BinaryOperator bo ->
-      let typ = type_of_expr expr |> trans_type scope in
-      trans_binary_operator scope fundec_opt loc typ bo.kind bo.lhs bo.rhs
+      trans_binary_operator scope fundec_opt loc bo.kind bo.lhs bo.rhs
   | C.Ast.DeclRef idref -> trans_decl_ref scope allow_undef idref
   | C.Ast.Call call ->
       trans_call scope skip_lhs fundec_opt loc call.callee call.args
@@ -706,7 +702,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       L.warn ~to_consol:false "Unknown at %s\n" (CilHelper.s_location loc);
       failwith "unknown trans_expr"
 
-and trans_unary_operator scope fundec_opt loc action typ kind expr =
+and trans_unary_operator scope fundec_opt loc action kind expr =
   let get_var var_opt =
     match var_opt with
     | Some x -> x
@@ -726,6 +722,7 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       in
       let fundec = Option.get fundec_opt in
       (* i++ ==> temp = i; i = i + 1; temp *)
+      let typ = Cil.typeOf var in
       let temp = (Cil.Var (Cil.makeTempVar fundec typ), Cil.NoOffset) in
       let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr2 = Cil.Set (lval_of_expr var, exp, loc) in
@@ -742,6 +739,7 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
         if Cil.typeOf var |> Cil.isPointerType then Cil.MinusPI else Cil.MinusA
       in
       let fundec = Option.get fundec_opt in
+      let typ = Cil.typeOf var in
       let temp = (Cil.Var (Cil.makeTempVar fundec typ), Cil.NoOffset) in
       let instr1 = Cil.Set (temp, var, loc) in
       let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
@@ -797,15 +795,17 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
   | C.Minus ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
+      let typ = Cil.typeOf var in
       (sl, Some (Cil.UnOp (Cil.Neg, var, typ)))
   | C.Not ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
-
+      let typ = Cil.typeOf var in
       (sl, Some (Cil.UnOp (Cil.BNot, var, typ)))
   | C.LNot ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
+      let typ = Cil.typeOf var in
       (sl, Some (Cil.UnOp (Cil.LNot, var, typ)))
   | C.Extension ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
@@ -813,7 +813,7 @@ and trans_unary_operator scope fundec_opt loc action typ kind expr =
       (sl, Some var)
   | _ -> failwith ("unary_operator at " ^ CilHelper.s_location loc)
 
-and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
+and trans_binary_operator scope fundec_opt loc kind lhs rhs =
   let lhs_sl, lhs_opt = trans_expr scope fundec_opt loc AExp lhs in
   let rhs_sl, rhs_opt = trans_expr scope fundec_opt loc AExp rhs in
   let lhs_expr =
@@ -833,6 +833,7 @@ and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
   match kind with
   | C.Mul | C.Div | C.Rem | C.Add | C.Sub | C.Shl | C.Shr | C.LT | C.GT | C.LE
   | C.GE | C.EQ | C.NE | C.And | C.Xor | C.Or | C.LAnd | C.LOr ->
+      let typ = Cil.typeOf lhs_expr in
       ( rhs_sl @ lhs_sl,
         Cil.constFoldBinOp false
           (trans_binop lhs_expr rhs_expr kind)
@@ -874,6 +875,7 @@ and trans_binary_operator scope fundec_opt loc typ kind lhs rhs =
         match lhs_expr with Cil.Lval l -> l | _ -> failwith "invalid lhs"
       in
       let bop = drop_assign kind in
+      let typ = Cil.typeOfLval lval in
       let rhs =
         Cil.BinOp (trans_binop lhs_expr rhs_expr bop, lhs_expr, rhs_expr, typ)
       in
@@ -1333,11 +1335,10 @@ and handle_stmt_init scope typ fundec loc action lv (e : C.Ast.expr) =
       in
       let unroll_nested_init scope idx e =
         if is_init_list e then
-          let typ = type_of_expr e |> trans_type scope in
           let lv =
             Cil.addOffsetLval (Cil.Index (Cil.integer idx, Cil.NoOffset)) lv
           in
-          handle_stmt_init scope typ fundec loc action lv e
+          handle_stmt_init scope arr_typ fundec loc action lv e
         else
           let stmts, _, scope =
             mk_array_stmt el (List.hd ci.cfields) loc fundec action lv scope
@@ -2133,7 +2134,7 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       let vi, scope = find_global_variable scope vdecl.var_name typ in
       vi.vstorage <- storage;
       let e = Option.get vdecl.var_init in
-      let init = Some (trans_global_init scope loc e) in
+      let init = Some (trans_global_init scope loc typ e) in
       vi.vinit.init <- init;
       ([ Cil.GVar (vi, { Cil.init }, loc) ], scope)
   | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
@@ -2315,13 +2316,13 @@ and mk_global_struct_init scope loc typ cfields expr_list =
   let origin_cfields = cfields in
   let rec loop union_flag cfields expr_list fis inits idx_list idx =
     match (cfields, expr_list) with
-    | f :: fl, e :: el -> (
+    | f :: fl, e :: el ->
         if union_flag then
           loop union_flag fl expr_list fis inits ((idx + 1) :: idx_list)
             (idx + 1)
         else if f.Cil.fcomp.cstruct then
           if is_init_list e then
-            let init = trans_global_init scope loc e in
+            let init = trans_global_init scope loc f.ftype e in
             loop union_flag fl el (f :: fis) (init :: inits)
               ((idx + 1) :: idx_list) (idx + 1)
           else
@@ -2333,18 +2334,16 @@ and mk_global_struct_init scope loc typ cfields expr_list =
             in
             loop union_flag fl expr_remainders (f :: fis) (init :: inits)
               (i :: idx_list) (idx + 1)
+        else if is_init_list e then
+          let init = trans_global_init scope loc f.ftype e in
+          loop true fl el (f :: fis) (init :: inits) ((idx + 1) :: idx_list)
+            (idx + 1)
         else
-          match is_init_list e with
-          | true ->
-              let init = trans_global_init scope loc e in
-              loop true fl el (f :: fis) (init :: inits) ((idx + 1) :: idx_list)
-                (idx + 1)
-          | false ->
-              let _, expr_opt = trans_expr scope None loc ADrop e in
-              let e = Option.get expr_opt in
-              let init = Cil.SingleInit e in
-              loop true fl el (f :: fis) (init :: inits) ((idx + 1) :: idx_list)
-                (idx + 1))
+          let _, expr_opt = trans_expr scope None loc ADrop e in
+          let e = Option.get expr_opt in
+          let init = Cil.SingleInit e in
+          loop true fl el (f :: fis) (init :: inits) ((idx + 1) :: idx_list)
+            (idx + 1)
     | f :: fl, [] ->
         if union_flag then
           loop union_flag fl [] fis inits ((idx + 1) :: idx_list) (idx + 1)
@@ -2374,10 +2373,9 @@ and mk_global_struct_init scope loc typ cfields expr_list =
   in
   (Cil.CompoundInit (typ, inits), expr_list)
 
-and trans_global_init scope loc (e : C.Ast.expr) =
-  let typ = type_of_expr e |> trans_type scope in
+and trans_global_init scope loc typ (e : C.Ast.expr) =
   match (e.C.Ast.desc, Cil.unrollType typ) with
-  | C.Ast.InitList el, Cil.TArray (_, arr_exp, _) ->
+  | C.Ast.InitList el, Cil.TArray (elt_typ, arr_exp, _) ->
       let len_exp = Option.get arr_exp in
       let arr_len =
         match len_exp with
@@ -2393,7 +2391,7 @@ and trans_global_init scope loc (e : C.Ast.expr) =
       let init_list =
         List.fold_left
           (fun (r, o) i ->
-            let init = trans_global_init scope loc i in
+            let init = trans_global_init scope loc elt_typ i in
             ((Cil.Index (Cil.integer o, Cil.NoOffset), init) :: r, o + 1))
           ([], 0) el
         |> fst |> List.rev
