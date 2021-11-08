@@ -2411,8 +2411,8 @@ and trans_global_init scope loc typ (e : C.Ast.expr) =
       Cil.CompoundInit (typ, init_list)
   | C.Ast.InitList el, Cil.TComp (ci, _) ->
       mk_global_struct_init scope loc typ ci.cfields el |> fst
-  | C.Ast.InitList el, _ ->
-      (*accept only first scalar and ignore reminader*)
+  | C.Ast.InitList el, _ when el <> [] ->
+      (* accept only first scalar and ignore remainder *)
       List.hd el |> trans_expr scope None loc ADrop |> snd |> Option.get
       |> fun x -> Cil.SingleInit x
   | _ ->
