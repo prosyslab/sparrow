@@ -299,3 +299,6 @@ let api_map =
   |> ApiMap.add "ctime" { arg_typs = [ Skip ]; ret_typ = int_arr }
   |> ApiMap.add "gmtime" { arg_typs = [ v_src ]; ret_typ = AllocStruct }
   |> ApiMap.add "timegm" { arg_typs = [ arr_src ]; ret_typ = TopWithSrcTaint }
+  (* libssh *)
+  |> ApiMap.add "_ssh_buffer_unpack"
+       { arg_typs = [ arr_src; Skip; Skip; dst_va ]; ret_typ = int_v }

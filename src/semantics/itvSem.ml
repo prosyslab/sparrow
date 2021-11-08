@@ -1037,7 +1037,8 @@ let run mode spec node (mem, global) =
       (* for inspection *)
       (prune mode spec global pid e mem, global)
   | IntraCfg.Cmd.Ccall (lvo, Cil.Lval (Cil.Var f, Cil.NoOffset), arg_exps, loc)
-    when Global.is_undef f.vname global ->
+    when Global.is_undef f.vname global
+         || ApiSem.ApiMap.mem f.vname ApiSem.api_map ->
       (* undefined library functions *)
       if
         BatSet.mem
