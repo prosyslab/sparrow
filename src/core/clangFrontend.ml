@@ -773,7 +773,7 @@ and trans_unary_operator scope fundec_opt loc action kind expr =
       in
       let var = get_var var_opt in
       if Cil.typeOf var |> Cil.isArrayType then
-        match var with
+        match CilHelper.remove_cast var with
         | Cil.Lval base ->
             ( sl,
               Some
@@ -833,7 +833,13 @@ and trans_binary_operator scope fundec_opt loc kind lhs rhs =
   match kind with
   | C.Mul | C.Div | C.Rem | C.Add | C.Sub | C.Shl | C.Shr | C.LT | C.GT | C.LE
   | C.GE | C.EQ | C.NE | C.And | C.Xor | C.Or | C.LAnd | C.LOr ->
-      let typ = Cil.typeOf lhs_expr in
+      let typ =
+        if
+          Cil.typeOf lhs_expr |> Cil.isIntegralType
+          && Cil.typeOf rhs_expr |> Cil.isPointerType
+        then Cil.typeOf rhs_expr
+        else Cil.typeOf lhs_expr
+      in
       ( rhs_sl @ lhs_sl,
         Cil.constFoldBinOp false
           (trans_binop lhs_expr rhs_expr kind)

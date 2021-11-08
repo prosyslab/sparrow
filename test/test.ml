@@ -79,6 +79,8 @@ let test_suites =
           "clang/pointer0.c";
           "clang/pointer1.c";
           "clang/pointer2.c";
+          "clang/pointer3.c";
+          "clang/pointer4.c";
           "clang/namespace0.c";
           "clang/missing-proto0.c";
           "clang/stmtexpr0.c";
