@@ -214,25 +214,19 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
     x
 
   let print_dug (global, dug) =
-    if !Options.dug then (
-      if DUGraph.nb_loc dug > 1000 then (
-        L.info ~level:1
-          "Too many abstract locations (> 1000) on DUG. Save as binary rather \
-           than json.\n";
-        let oc = open_out (Filename.concat !Options.outdir "dug.bin") in
-        Marshal.to_channel oc dug [];
-        close_out oc)
-      else
-        let oc = open_out (Filename.concat !Options.outdir "dug.json") in
-        `Assoc
-          [
-            ("callgraph", CallGraph.to_json global.callgraph);
-            ("cfgs", InterCfg.to_json global.icfg);
-            ("dugraph", DUGraph.to_json dug);
-            (*          ("dugraph-inter", DUGraph.to_json_inter dug access);*)
-          ]
-        |> Yojson.Safe.pretty_to_channel oc;
-        close_out oc);
+    let oc = open_out (Filename.concat !Options.outdir "dug.bin") in
+    Marshal.to_channel oc dug [];
+    close_out oc;
+    let oc = open_out (Filename.concat !Options.outdir "dug.json") in
+    `Assoc
+      [
+        ("callgraph", CallGraph.to_json global.callgraph);
+        ("cfgs", InterCfg.to_json global.icfg);
+        ("dugraph", DUGraph.to_json dug);
+        (*          ("dugraph-inter", DUGraph.to_json_inter dug access);*)
+      ]
+    |> Yojson.Safe.pretty_to_channel oc;
+    close_out oc;
     prerr_memory_usage ();
     L.info "#Nodes in def-use graph : %d\n" (DUGraph.nb_node dug);
     L.info "#Locs on def-use graph : %d\n" (DUGraph.nb_loc dug)
