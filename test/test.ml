@@ -64,6 +64,7 @@ let test_suites =
           "clang/struct4.c";
           "clang/struct5.c";
           "clang/struct6.c";
+          "clang/struct7.c";
           "clang/implicit-cast0.c";
           "clang/implicit-cast1.c";
           "clang/implicit-cast2.c";
