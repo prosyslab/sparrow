@@ -1071,9 +1071,9 @@ module Chunk = struct
   end
 
   type t = {
-    mutable stmts : Cil.stmt list;
+    stmts : Cil.stmt list;
     cases : Cil.stmt list;
-    mutable labels : Cil.stmt ref LabelMap.t;
+    labels : Cil.stmt ref LabelMap.t;
     gotos : string GotoMap.t;
     user_typs : Cil.global list;
   }
@@ -1124,14 +1124,20 @@ let append_label chunk label loc in_origin =
   match chunk.Chunk.stmts with
   | h :: _ ->
       h.labels <- h.labels @ [ l ];
-      chunk.labels <- Chunk.LabelMap.add label (ref h) chunk.labels;
-      chunk
+      { chunk with labels = Chunk.LabelMap.add label (ref h) chunk.labels }
+  (*       chunk.labels <- Chunk.LabelMap.add label (ref h) chunk.labels; *)
+  (*       chunk *)
   | [] ->
       let h = Cil.mkStmt (Cil.Instr []) in
       h.labels <- [ l ];
-      chunk.stmts <- [ h ];
-      chunk.labels <- Chunk.LabelMap.add label (ref h) chunk.labels;
-      chunk
+      {
+        chunk with
+        stmts = [ h ];
+        labels = Chunk.LabelMap.add label (ref h) chunk.labels;
+      }
+(*chunk.stmts <- [ h ];
+  chunk.labels <- Chunk.LabelMap.add label (ref h) chunk.labels;
+  chunk*)
 
 let trans_storage decl =
   match C.Ast.cursor_of_node decl |> C.cursor_get_storage_class with
