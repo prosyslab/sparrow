@@ -2267,12 +2267,9 @@ and mk_init scope loc fitype expr_list =
       let e = Option.get expr_opt in
       (Cil.SingleInit e, el)
   (* common *)
-  | Cil.TComp (ci, _), e :: el -> (
+  | Cil.TComp (ci, _), _ ->
       (* struct in struct *)
-      match e.C.Ast.desc with
-      | C.Ast.DesignatedInit d ->
-          mk_global_struct_init scope loc fitype ci.cfields (d.init :: el)
-      | _ -> mk_global_struct_init scope loc fitype ci.cfields expr_list)
+      mk_global_struct_init scope loc fitype ci.cfields expr_list
   | Cil.TArray (arr_type, arr_exp, _), _ ->
       let len_exp = Option.get arr_exp in
       let arr_len =
@@ -2344,6 +2341,16 @@ and mk_global_struct_init scope loc typ cfields expr_list =
             let field, find, i = grab_matching_field origin_cfields f e in
             let f = List.hd field in
             let i = if i >= 0 then find else idx + 1 in
+            let expr_list =
+              if i >= 0 then
+                match expr_list with
+                | e :: el -> (
+                    match e.C.Ast.desc with
+                    | C.Ast.DesignatedInit d -> d.init :: el
+                    | _ -> expr_list)
+                | _ -> expr_list
+              else expr_list
+            in
             let init, expr_remainders =
               mk_init scope loc f.Cil.ftype expr_list
             in
