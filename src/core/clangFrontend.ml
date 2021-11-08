@@ -2375,8 +2375,17 @@ and mk_global_struct_init scope loc typ cfields expr_list =
 
 and trans_global_init scope loc typ (e : C.Ast.expr) =
   match (e.C.Ast.desc, Cil.unrollType typ) with
-  | C.Ast.InitList el, Cil.TArray (elt_typ, arr_exp, _) ->
-      let len_exp = Option.get arr_exp in
+  | C.Ast.InitList el, Cil.TArray (elt_typ, None, _) ->
+      let init_list =
+        List.fold_left
+          (fun (r, o) i ->
+            let init = trans_global_init scope loc elt_typ i in
+            ((Cil.Index (Cil.integer o, Cil.NoOffset), init) :: r, o + 1))
+          ([], 0) el
+        |> fst |> List.rev
+      in
+      Cil.CompoundInit (typ, init_list)
+  | C.Ast.InitList el, Cil.TArray (elt_typ, Some len_exp, _) ->
       let arr_len =
         match len_exp with
         | Const c -> (
