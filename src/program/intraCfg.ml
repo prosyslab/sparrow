@@ -834,9 +834,9 @@ let compute_dom g =
 
 let compute_scc g = { g with scc_list = Scc.scc_list g.graph }
 
-let process_gvardecl fd lv loc entry g =
-  match Cil.unrollTypeDeep (Cil.typeOfLval lv) with
-  | TArray (typ, Some exp, _) ->
+let process_gvardecl fd lv init_opt loc entry g =
+  match (Cil.unrollTypeDeep (Cil.typeOfLval lv), init_opt) with
+  | TArray (typ, Some exp, _), _ ->
       let tmp = (Cil.Var (Cil.makeTempVar fd Cil.voidPtrType), Cil.NoOffset) in
       let term, g = make_array tmp typ exp loc entry g in
       let cast_node = Node.make () in
@@ -846,11 +846,23 @@ let process_gvardecl fd lv loc entry g =
       let g = g |> add_cmd cast_node cast_cmd |> add_edge term cast_node in
       let term, g = make_nested_array fd lv typ exp loc cast_node true g in
       (term, g)
-  | TInt (_, _) | TFloat (_, _) ->
+  | TArray (typ, None, _), Some ilist ->
+      (* For example, int arr[] = {1,2,3}. CIL generates "int arr[3] = ..." while Clang generates "int arr[] = ..." *)
+      let tmp = (Cil.Var (Cil.makeTempVar fd Cil.voidPtrType), Cil.NoOffset) in
+      let exp = List.length ilist |> Cil.integer in
+      let term, g = make_array tmp typ exp loc entry g in
+      let cast_node = Node.make () in
+      let cast_cmd =
+        Cmd.Cset (lv, Cil.CastE (Cil.TPtr (typ, []), Cil.Lval tmp), loc)
+      in
+      let g = g |> add_cmd cast_node cast_cmd |> add_edge term cast_node in
+      let term, g = make_nested_array fd lv typ exp loc cast_node true g in
+      (term, g)
+  | TInt (_, _), _ | TFloat (_, _), _ ->
       let node = Node.make () in
       let cmd = Cmd.Cset (lv, Cil.zero, loc) in
       (node, g |> add_cmd node cmd |> add_edge entry node)
-  | TComp (comp, _) ->
+  | TComp (comp, _), _ ->
       let term, g = make_struct lv comp loc entry g in
       let term, g = generate_allocs_field comp.cfields lv fd term g in
       (term, g)
@@ -872,7 +884,8 @@ let rec process_init fd lv i loc entry g =
 
 let process_gvar fd lv i loc entry g =
   match (Cil.typeOfLval lv, i.init) with
-  | _, None -> process_gvardecl fd lv loc entry g (* e.g., int global;     *)
+  | _, None ->
+      process_gvardecl fd lv None loc entry g (* e.g., int global;     *)
   | _, Some (SingleInit _ as init) ->
       (* e.g., int global = 1; *)
       process_init fd lv init loc entry g
@@ -882,7 +895,7 @@ let process_gvar fd lv i loc entry g =
       if length > 1000 then
         Logging.warn "WARN: too large global array initialization (%d) %@ %s\n"
           (List.length ilist) (CilHelper.s_location loc);
-      let node, g = process_gvardecl fd lv loc entry g in
+      let node, g = process_gvardecl fd lv (Some ilist) loc entry g in
       if length < !Options.unsound_skip_global_array_init then
         process_init fd lv init loc node g
       else (node, g)
@@ -1010,7 +1023,7 @@ let generate_global_proc globals fd =
         | Cil.GVar (var, init, loc) when not (ignore_file regexps loc) ->
             process_gvar fd (Cil.var var) init loc node g
         | Cil.GVarDecl (var, loc) when not (ignore_file regexps loc) ->
-            process_gvardecl fd (Cil.var var) loc node g
+            process_gvardecl fd (Cil.var var) None loc node g
         | Cil.GFun (fundec, loc) when not (ignore_file regexps loc) ->
             process_fundecl fundec loc node g
         | _ -> (node, g))
