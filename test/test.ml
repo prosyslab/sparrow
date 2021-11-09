@@ -149,6 +149,7 @@ let test_suites =
           "clang/unary_operator0.c";
           "clang/anonymous-struct0.c";
           "clang/anonymous-struct1.c";
+          "clang/anonymous-struct2.c";
           "clang/type0.c";
           "clang/type1.c";
           "clang/type2.c";
