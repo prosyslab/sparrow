@@ -192,14 +192,14 @@ let anonymous_id_table = H.create 1024
 let new_record_id is_struct (rdecl : C.Ast.record_decl) cursor =
   if rdecl.C.Ast.name = "" then (
     let h = C.hash_cursor cursor in
-    if H.mem anonymous_id_table h then H.find anonymous_id_table h
+    if H.mem anonymous_id_table h then (H.find anonymous_id_table h, false)
     else
       let kind = if is_struct then "struct" else "union" in
       let name = "__anon" ^ kind ^ "_" ^ string_of_int !struct_id_count in
       struct_id_count := !struct_id_count + 1;
       H.add anonymous_id_table h name;
-      name)
-  else rdecl.name
+      (name, true))
+  else (rdecl.name, false)
 
 let new_enum_id name =
   let new_id = "__anonenum_" ^ name ^ "_" ^ string_of_int !struct_id_count in
@@ -450,7 +450,7 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
   | Elaborated et -> trans_type ~compinfo scope et.named_type
   | Record rt ->
       let name = name_of_ident_ref rt in
-      let name =
+      let name, scope =
         if name = "" then
           let decl = C.Type.get_declaration typ in
           let rdecl, is_struct =
@@ -459,8 +459,24 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
             | _ -> failwith "Invalid type"
           in
           let cursor = C.Ast.cursor_of_decoration decl.decoration in
-          new_record_id is_struct rdecl cursor
-        else name
+          let name, is_new_anon = new_record_id is_struct rdecl cursor in
+          let callback compinfo =
+            List.fold_left
+              (fun fl (decl : C.Ast.decl) ->
+                match decl.C.Ast.desc with
+                | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+                | _ -> fl)
+              [] rdecl.fields
+          in
+          let scope =
+            if is_new_anon then
+              let compinfo = Cil.mkCompInfo is_struct name callback [] in
+              let tcomp = Cil.TComp (compinfo, []) in
+              Scope.add_comp name tcomp scope
+            else scope
+          in
+          (name, scope)
+        else (name, scope)
       in
       Scope.find_comp ~compinfo name scope
   | Enum et -> Scope.find_type (name_of_ident_ref et) scope
@@ -1272,16 +1288,43 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
       | C.Ast.RecordDecl rdecl when rdecl.C.Ast.complete_definition ->
           let is_struct = rdecl.keyword = C.Struct in
           let cursor = C.Ast.cursor_of_decoration d.decoration in
-          let globals, scope =
-            trans_global_decl
-              ~new_name:(new_record_id is_struct rdecl cursor)
-              scope d
+          let new_name, is_new_anon = new_record_id is_struct rdecl cursor in
+          let callback compinfo =
+            List.fold_left
+              (fun fl (decl : C.Ast.decl) ->
+                match decl.C.Ast.desc with
+                | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+                | _ -> fl)
+              [] rdecl.fields
           in
+          let scope =
+            if is_new_anon then
+              let compinfo = Cil.mkCompInfo is_struct new_name callback [] in
+              let tcomp = Cil.TComp (compinfo, []) in
+              Scope.add_comp new_name tcomp scope
+            else scope
+          in
+          let globals, scope = trans_global_decl ~new_name scope d in
           (sl, user_typs @ globals, scope)
       | C.Ast.RecordDecl rdecl ->
           let is_struct = rdecl.keyword = C.Struct in
           let cursor = C.Ast.cursor_of_decoration d.decoration in
-          let name = new_record_id is_struct rdecl cursor in
+          let name, is_new_anon = new_record_id is_struct rdecl cursor in
+          let callback compinfo =
+            List.fold_left
+              (fun fl (decl : C.Ast.decl) ->
+                match decl.C.Ast.desc with
+                | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+                | _ -> fl)
+              [] rdecl.fields
+          in
+          let scope =
+            if is_new_anon then
+              let compinfo = Cil.mkCompInfo is_struct name callback [] in
+              let tcomp = Cil.TComp (compinfo, []) in
+              Scope.add_comp name tcomp scope
+            else scope
+          in
           if Scope.mem_typ name scope then (sl, user_typs, scope)
           else
             let globals, scope = trans_global_decl ~new_name:name scope d in
@@ -2168,7 +2211,8 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       in
       let cursor = C.Ast.cursor_of_decoration decl.decoration in
       let name =
-        if new_name = "" then new_record_id is_struct rdecl cursor else new_name
+        if new_name = "" then new_record_id is_struct rdecl cursor |> fst
+        else new_name
       in
       let compinfo = Cil.mkCompInfo is_struct name callback [] in
       compinfo.cdefined <- true;
@@ -2185,7 +2229,8 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       let is_struct = rdecl.keyword = C.Struct in
       let cursor = C.Ast.cursor_of_decoration decl.decoration in
       let name =
-        if new_name = "" then new_record_id is_struct rdecl cursor else new_name
+        if new_name = "" then new_record_id is_struct rdecl cursor |> fst
+        else new_name
       in
       if Scope.mem_comp name scope then
         let typ = Scope.find_comp name scope in
