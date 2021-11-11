@@ -709,7 +709,10 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       L.warn ~to_consol:false "StmtExpr at %s\n" (CilHelper.s_location loc);
       ([], Some Cil.zero)
   | C.Ast.DesignatedInit d -> trans_expr scope fundec_opt loc action d.init
-  | C.Ast.UnknownExpr (_, _) -> ([], Some Cil.zero)
+  | C.Ast.UnknownExpr (_, _) ->
+      print_endline "UnknownExpr not supported yet";
+      L.warn ~to_consol:false "Unknown ext StmtExpr at %s\n" (CilHelper.s_location loc);
+      ([], Some Cil.zero)
   | C.Ast.Predefined pre ->
       let cstr = Cil.CStr pre.function_name in
       let const = Cil.Const cstr in
