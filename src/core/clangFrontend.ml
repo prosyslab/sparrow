@@ -2509,12 +2509,16 @@ let split_decl (items : C.Ast.decl list) =
     items
 
 let parse fname =
+  let index =
+    C.create_index ~exclude_declarations_from_pch:false
+      ~display_diagnostics:false
+  in
   let options = { C.Ast.Options.default with ignore_implicit_cast = false } in
   L.debug "Loading %s\n" fname;
   if !Options.debug then L.flush_all ();
   let tu : C.Ast.translation_unit =
     StepManager.stepf ~to_consol:false false ("Parsing " ^ fname)
-      (C.Ast.parse_file ~options)
+      (C.Ast.parse_file ~index ~options)
       fname
   in
   let scope = initialize_builtins (Scope.create ()) in
