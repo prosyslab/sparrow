@@ -77,6 +77,7 @@ let test_suites =
           "clang/ternop3.c";
           "clang/enum0.c";
           "clang/enum1.c";
+          "clang/enum2.c";
           "clang/pointer0.c";
           "clang/pointer1.c";
           "clang/pointer2.c";

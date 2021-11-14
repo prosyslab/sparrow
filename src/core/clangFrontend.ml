@@ -711,7 +711,8 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
   | C.Ast.DesignatedInit d -> trans_expr scope fundec_opt loc action d.init
   | C.Ast.UnknownExpr (_, _) ->
       print_endline "UnknownExpr not supported yet";
-      L.warn ~to_consol:false "Unknown ext StmtExpr at %s\n" (CilHelper.s_location loc);
+      L.warn ~to_consol:false "Unknown ext StmtExpr at %s\n"
+        (CilHelper.s_location loc);
       ([], Some Cil.zero)
   | C.Ast.Predefined pre ->
       let cstr = Cil.CStr pre.function_name in
@@ -2261,7 +2262,11 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
             (eitems @ [ (c.desc.constant_name, value, loc) ], scope, next))
           ([], scope, Cil.zero) edecl.constants
       in
-      let name = if new_name = "" then edecl.name else new_name in
+      let name =
+        if new_name = "" then
+          if edecl.name = "" then new_enum_id "" else edecl.name
+        else new_name
+      in
       let einfo =
         {
           Cil.ename = name;
