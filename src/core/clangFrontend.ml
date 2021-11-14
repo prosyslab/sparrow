@@ -2533,9 +2533,20 @@ let parse fname =
       ([], scope) (types @ vars)
     |> fst |> List.rev
   in
-  {
-    Cil.fileName = fname;
-    Cil.globals;
-    Cil.globinit = None;
-    Cil.globinitcalled = false;
-  }
+  let cil =
+    {
+      Cil.fileName = fname;
+      Cil.globals;
+      Cil.globinit = None;
+      Cil.globinitcalled = false;
+    }
+  in
+  (* the below is a temporal workaround for clangml's strange behavior *)
+  let target =
+    Filename.concat
+      (Filename.concat !Options.outdir "preprocess")
+      (Filename.basename fname ^ ".bin")
+  in
+  let oc = open_out target in
+  Marshal.to_channel oc cil [];
+  close_out oc

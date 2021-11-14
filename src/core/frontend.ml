@@ -48,15 +48,30 @@ let parse_arg arg =
 let parseOneFile fname =
   (* PARSE and convert to CIL *)
   if !Cilutil.printStages then ignore (E.log "Parsing %s\n" fname);
-  let cil =
-    if !Options.frontend = Options.Cil then F.parse fname ()
-    else ClangFrontend.parse fname
-  in
+  let cil = F.parse fname () in
   if not (Feature.enabled "epicenter") then Rmtmps.removeUnusedTemps cil;
   cil
 
+let parse_internal files =
+  if !Options.frontend = Options.Cil then List.map parseOneFile files
+  else
+    let _ = List.iter ClangFrontend.parse files in
+    List.map
+      (fun fname ->
+        let target =
+          Filename.concat
+            (Filename.concat !Options.outdir "preprocess")
+            (Filename.basename fname ^ ".bin")
+        in
+        let ic = open_in target in
+        let cil = Marshal.from_channel ic in
+        close_in ic;
+        if not (Feature.enabled "epicenter") then Rmtmps.removeUnusedTemps cil;
+        cil)
+      files
+
 let parse () =
-  match List.map parseOneFile !files with
+  match parse_internal !files with
   | [ one ] -> one
   | [] ->
       prerr_endline "Error: No arguments are given";
