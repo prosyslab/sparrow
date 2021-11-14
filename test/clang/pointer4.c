@@ -1,5 +1,5 @@
 void f() {
-  int offet = 1;
+  int offset = 1;
   char *s = "string";
   char *p = s;
   *(offset + p) = 1;
