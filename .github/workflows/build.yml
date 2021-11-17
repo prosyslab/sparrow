@@ -1,10 +1,10 @@
-name: test
+name: build
 
 on: [push, pull_request]
 
 jobs:
   check:
-    name: test
+    name: build
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
