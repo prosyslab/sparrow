@@ -1,47 +1,10 @@
-# Sparrow
+# Sparrow ![build](https://github.com/prosyslab/sparrow-incubator/actions/workflows/build.yml/badge.svg)
 
 Sparrow is a state-of-the-art static analyzer that aims to verify the absence
 of fatal bugs in C source. Sparrow is designed based on the Abstract Interpretation 
 framework and the analysis is sound in design. Sparrow adopts a number of well-founded 
 static analysis techniques for scalability, precision, and user convenience.
-This is the academic version of Sparrow that is different from the [commercial version][fasoo].
-
-## Build Status
-Linux|MAC OSX
------|-------
-[![Build Status](https://ci.appveyor.com/api/projects/status/github/ropas/sparrow?branch=master&svg=true)](https://ci.appveyor.com/api/projects/status/github/ropas/sparrow)|[![Build Status](https://travis-ci.org/ropas/sparrow.svg?branch=master)](https://travis-ci.org/ropas/sparrow)
- 
-## Sparrow Dependencies
-To build Sparrow, you need
--   [OCaml][] >= 4.04.0
--   [OPAM][] >= 1.2.2
--   [Batteries][] >= 2.3.1
--   [Cil][] >= 1.7.3
--   [Ocamlgraph][] >= 1.8.7
--   [Apron][] >= 0.9.10
--   [Yojson][] >= 1.2.3
--   [Lymp][] >= 0.1.3
--   [Ppx_compare][] >= 113.33
--   [Ppx_deriving][] >= 4.1
-
-Optionally, you need the following prerequisites to use machine-learning features
--   [Python][] >= 2.7
--   [Scikit-learn][] >= 0.18
-
-[Ocaml]: http://caml.inria.fr
-[OPam]: https://opam.ocaml.org
-[Batteries]: http://batteries.forge.ocamlcore.org
-[Cil]: https://github.com/cil-project/cil
-[Ocamlgraph]: http://ocamlgraph.lri.fr/index.en.html
-[Apron]: http://apron.cri.ensmp.fr/library
-[Yojson]: http://mjambon.com/yojson.html
-[Lymp]: https://github.com/dbousque/lymp
-[Ppx_compare]: https://github.com/janestreet/ppx_compare
-[Ppx_deriving]: https://github.com/whitequark/ppx_deriving
-[Python]: https://www.python.org
-[Scikit-learn]: http://scikit-learn.org
-[OPAM]: http://opam.ocaml.org
-[fasoo]: http://en.fasoo.com/sparrow
+This is the academic version of Sparrow that is different from the [commercial version](http://en.fasoo.com/sparrow).
 
 ## Install Sparrow with OPAM
 The easiest way to install Sparrow is to use [OPAM][].
