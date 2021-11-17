@@ -7,7 +7,7 @@ static analysis techniques for scalability, precision, and user convenience.
 This is the academic version of Sparrow that is different from the [commercial version](http://en.fasoo.com/sparrow).
 
 ## Install Sparrow with OPAM
-The easiest way to install Sparrow is to use [OPAM][].
+The easiest way to install Sparrow is to use [OPAM](https://opam.ocaml.org).
 Once you have cloned the source codes, run the build script to install the prerequisites and Sparrow:
 ```sh
 $ git clone git@github.com:ropas/sparrow.git
