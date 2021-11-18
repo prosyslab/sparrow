@@ -986,20 +986,35 @@ and trans_member scope fundec_opt loc base arrow field =
           in
           Cil.Lval
             (Cil.mkMem ~addr:e ~off:(Cil.Field (fieldinfo, Cil.NoOffset)))
-      | Some (Cil.Lval lv) when not arrow ->
+      | Some (Cil.Lval lv) when not arrow -> (
           let typ = Cil.typeOfLval lv in
-          let fieldinfo =
-            match Cil.unrollTypeDeep typ with
-            | Cil.TComp (comp, _) ->
-                let name =
-                  match field with
-                  | C.Ast.FieldName f -> name_of_ident_ref f.desc
-                  | _ -> "unknown"
-                in
+          match Cil.unrollTypeDeep typ with
+          | Cil.TComp (comp, _) ->
+              let name =
+                match field with
+                | C.Ast.FieldName f -> name_of_ident_ref f.desc
+                | _ -> "unknown"
+              in
+              let fieldinfo =
                 List.find (fun f -> f.Cil.fname = name) comp.Cil.cfields
-            | _ -> failwith "fail"
-          in
-          Cil.Lval (Cil.addOffsetLval (Cil.Field (fieldinfo, Cil.NoOffset)) lv)
+              in
+              Cil.Lval
+                (Cil.addOffsetLval (Cil.Field (fieldinfo, Cil.NoOffset)) lv)
+          | Cil.TPtr (TComp (comp, _), _) ->
+              (* this case is counterintuitive but it's required to parse
+                 the code referencing the anonymous struct inside struct *)
+              let name =
+                match field with
+                | C.Ast.FieldName f -> name_of_ident_ref f.desc
+                | _ -> "unknown"
+              in
+              let fieldinfo =
+                List.find (fun f -> f.Cil.fname = name) comp.Cil.cfields
+              in
+              Cil.Lval
+                (Cil.mkMem ~addr:(Option.get bexp)
+                   ~off:(Cil.Field (fieldinfo, Cil.NoOffset)))
+          | _ -> failwith "fail")
       | Some e ->
           CilHelper.s_location loc |> prerr_endline;
           CilHelper.s_exp e |> prerr_endline;
