@@ -151,6 +151,10 @@ let test_suites =
           "clang/anonymous-struct0.c";
           "clang/anonymous-struct1.c";
           "clang/anonymous-struct2.c";
+          "clang/indirect-field0.c";
+          "clang/indirect-field1.c";
+          "clang/indirect-field2.c";
+          "clang/indirect-field3.c";
           "clang/type0.c";
           "clang/type1.c";
           "clang/type2.c";
