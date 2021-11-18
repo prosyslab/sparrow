@@ -160,7 +160,6 @@ let print analysis global dug alarms =
   let fmt_loophead = Format.formatter_of_out_channel oc_loophead in
   G.iter_edges
     (fun src dst ->
-      L.info "%a, %a\n" Node.pp src Node.pp dst;
       if
         BatSet.mem dst (G.loopheads dug)
         && Node.get_cfgnode dst |> IntraCfg.is_entry |> not
