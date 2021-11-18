@@ -187,6 +187,7 @@ module AlarmSet = Set.Make (struct
 end)
 
 type formatter = {
+  start : F.formatter;
   alarm : F.formatter;
   array_exp : F.formatter;
   deref_exp : F.formatter;
@@ -288,6 +289,7 @@ let pp_alarm_exp fmt aexp =
   | BufferOverrunLib (name, _, _) -> failwith name
 
 let close_formatters fmt channels =
+  F.pp_print_flush fmt.start ();
   F.pp_print_flush fmt.alarm ();
   F.pp_print_flush fmt.array_exp ();
   F.pp_print_flush fmt.deref_exp ();
@@ -308,6 +310,7 @@ let close_formatters fmt channels =
 let print_alarm analysis alarms =
   let alarms = Report.get alarms Report.UnProven in
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
+  let oc_start = open_out (dirname ^ "/Start.facts") in
   let oc_alarm = open_out (dirname ^ "/SparrowAlarm.facts") in
   let oc_array_exp = open_out (dirname ^ "/AlarmArrayExp.facts") in
   let oc_deref_exp = open_out (dirname ^ "/AlarmDerefExp.facts") in
@@ -327,6 +330,7 @@ let print_alarm analysis alarms =
   let oc_taint = open_out (dirname ^ "/AlarmTaint.facts") in
   let fmt =
     {
+      start = F.formatter_of_out_channel oc_start;
       alarm = F.formatter_of_out_channel oc_alarm;
       array_exp = F.formatter_of_out_channel oc_array_exp;
       deref_exp = F.formatter_of_out_channel oc_deref_exp;
@@ -344,6 +348,7 @@ let print_alarm analysis alarms =
       taint = F.formatter_of_out_channel oc_taint;
     }
   in
+  F.fprintf fmt.start "%s\n" "_G_-ENTRY";
   ignore
     (List.fold_left
        (fun set alarm ->
@@ -359,6 +364,7 @@ let print_alarm analysis alarms =
        AlarmSet.empty alarms);
   close_formatters fmt
     [
+      oc_start;
       oc_alarm;
       oc_array_exp;
       oc_deref_exp;
