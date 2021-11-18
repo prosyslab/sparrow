@@ -465,6 +465,8 @@ let rec trans_type ?(compinfo = None) scope (typ : C.Type.t) =
               (fun fl (decl : C.Ast.decl) ->
                 match decl.C.Ast.desc with
                 | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+                | C.Ast.IndirectField _ ->
+                    fl @ trans_indirect_field_decl scope compinfo decl
                 | _ -> fl)
               [] rdecl.fields
           in
@@ -599,6 +601,28 @@ and trans_field_decl scope compinfo (field : C.Ast.decl) =
       let typ = trans_type ~compinfo:(Some compinfo) scope fdecl.qual_type in
       (fdecl.name, typ, None, [], floc)
   | _ -> failwith_decl field
+
+and trans_indirect_field_decl scope compinfo (ifdecl : C.Ast.decl) =
+  match ifdecl.C.Ast.desc with
+  | C.Ast.IndirectField fdecls ->
+      (* IndirectField consists of several FieldDecls.
+         Some of them are anonymous field whose name is '',
+         and the rest are named fields.
+         Only named fields are required to be embedded.*)
+      let named_decls =
+        List.fold_left
+          (fun ndecls (fdecl : C.Ast.decl) ->
+            match fdecl.C.Ast.desc with
+            | C.Ast.Field fdecl_desc ->
+                if fdecl_desc.name <> "" then fdecl :: ndecls else ndecls
+            | _ -> failwith_decl fdecl)
+          [] fdecls
+      in
+
+      List.fold_left
+        (fun res ndecl -> res @ [ trans_field_decl scope compinfo ndecl ])
+        [] named_decls
+  | _ -> failwith_decl ifdecl
 
 and trans_params scope args fundec =
   match args with
@@ -1298,6 +1322,8 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
               (fun fl (decl : C.Ast.decl) ->
                 match decl.C.Ast.desc with
                 | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+                | C.Ast.IndirectField _ ->
+                    fl @ trans_indirect_field_decl scope compinfo decl
                 | _ -> fl)
               [] rdecl.fields
           in
@@ -1319,6 +1345,8 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
               (fun fl (decl : C.Ast.decl) ->
                 match decl.C.Ast.desc with
                 | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+                | C.Ast.IndirectField _ ->
+                    fl @ trans_indirect_field_decl scope compinfo decl
                 | _ -> fl)
               [] rdecl.fields
           in
@@ -1348,10 +1376,11 @@ and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
       | Function _ ->
           (* if the program is valid, there must be the corresponding def somewhere *)
           (sl, user_typs, scope)
-      | Field _ | EmptyDecl | AccessSpecifier _ | Namespace _ | UsingDirective _
-      | UsingDeclaration _ | Constructor _ | Destructor _ | LinkageSpec _
-      | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
-      | StaticAssert _ | TypeAlias _ | Decomposition _
+      | Field _ | IndirectField _ | EmptyDecl | AccessSpecifier _ | Namespace _
+      | UsingDirective _ | UsingDeclaration _ | Constructor _ | Destructor _
+      | LinkageSpec _ | TemplateTemplateParameter _ | Friend _
+      | NamespaceAlias _ | Directive _ | StaticAssert _ | TypeAlias _
+      | Decomposition _
       | UnknownDecl (_, _) ->
           L.warn ~to_consol:false "Unknown var decl %s\n"
             (CilHelper.s_location loc);
@@ -2210,6 +2239,8 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
           (fun fl (decl : C.Ast.decl) ->
             match decl.C.Ast.desc with
             | C.Ast.Field _ -> fl @ [ trans_field_decl scope compinfo decl ]
+            | C.Ast.IndirectField _ ->
+                fl @ trans_indirect_field_decl scope compinfo decl
             | _ -> fl)
           [] rdecl.fields
       in
@@ -2278,10 +2309,10 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       in
       let scope = Scope.add_type edecl.name (Cil.TEnum (einfo, [])) scope in
       ([ Cil.GEnumTag (einfo, loc) ], scope)
-  | Field _ | EmptyDecl | AccessSpecifier _ | Namespace _ | UsingDirective _
-  | UsingDeclaration _ | Constructor _ | Destructor _ | LinkageSpec _
-  | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _ | Directive _
-  | StaticAssert _ | TypeAlias _ | Decomposition _
+  | Field _ | IndirectField _ | EmptyDecl | AccessSpecifier _ | Namespace _
+  | UsingDirective _ | UsingDeclaration _ | Constructor _ | Destructor _
+  | LinkageSpec _ | TemplateTemplateParameter _ | Friend _ | NamespaceAlias _
+  | Directive _ | StaticAssert _ | TypeAlias _ | Decomposition _
   | UnknownDecl (_, _) ->
       ([], scope)
   | TemplateDecl _ | TemplatePartialSpecialization _ | CXXMethod _ ->
@@ -2513,7 +2544,14 @@ let parse fname =
     C.create_index ~exclude_declarations_from_pch:false
       ~display_diagnostics:false
   in
-  let options = { C.Ast.Options.default with ignore_implicit_cast = false } in
+  let options =
+    {
+      C.Ast.Options.default with
+      ignore_implicit_cast = false;
+      ignore_indirect_fields = false;
+      ignore_anonymous_fields = false;
+    }
+  in
   L.debug "Loading %s\n" fname;
   if !Options.debug then L.flush_all ();
   let tu : C.Ast.translation_unit =
