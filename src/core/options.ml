@@ -15,6 +15,8 @@ type frontend = Clang | Cil
 
 let task = ref All
 
+let entry_point = ref "main"
+
 (* Capture *)
 let skip_build = ref false
 
@@ -221,6 +223,7 @@ let opts =
     ( "-dug_slice",
       Arg.Set_string dug_slice_target,
       "Slice DUG w.r.t a given target" );
+    ("-entry_point", Arg.Set_string entry_point, "Entry point (default: main)");
     ("-noalarm", Arg.Set noalarm, "Do not print alarms");
     ("-verbose", Arg.Set_int verbose, "Verbose level (default: 1)");
     ("-debug", Arg.Set debug, "Print debug information");

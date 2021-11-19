@@ -86,6 +86,8 @@ val unsound_skip_global_array_init : int ref
 
 (** {2 Main Analysis } *)
 
+val entry_point : string ref
+
 val narrow : bool ref
 
 val scaffold : bool ref

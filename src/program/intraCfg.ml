@@ -904,7 +904,7 @@ let get_main_dec globals =
   List.fold_left
     (fun s g ->
       match g with
-      | Cil.GFun (fundec, loc) when fundec.svar.vname = "main" ->
+      | Cil.GFun (fundec, loc) when fundec.svar.vname = !Options.entry_point ->
           Some (fundec, loc)
       | _ -> s)
     None globals
