@@ -2559,8 +2559,7 @@ let split_decl (items : C.Ast.decl list) =
   List.partition
     (fun (decl : C.Ast.decl) ->
       match decl.C.Ast.desc with
-      | C.Ast.Function _ -> false
-      | C.Ast.Var _ -> false
+      | C.Ast.Function _ | C.Ast.Var _ -> false
       | _ -> true)
     items
 
