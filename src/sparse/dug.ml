@@ -14,6 +14,8 @@ module type S = sig
 
   type node = BasicDom.Node.t
 
+  module V = BasicDom.Node
+
   module Loc : AbsDom.SET
 
   module PowLoc : PowDom.CPO with type elt = Loc.t
@@ -40,6 +42,8 @@ module type S = sig
 
   val add_edge : node -> node -> t -> t
 
+  val remove_edge : node -> node -> t -> t
+
   val remove_node : node -> t -> t
 
   val get_abslocs : node -> node -> t -> PowLoc.t
@@ -56,7 +60,11 @@ module type S = sig
 
   val update_loopheads : node BatSet.t -> t -> t
 
+  val update_backedges : (node, node list) BatMap.t -> t -> t
+
   val loopheads : t -> node BatSet.t
+
+  val backedges : t -> (node, node list) BatMap.t
 
   val shortest_path : t -> node -> node -> node list
 
@@ -77,6 +85,8 @@ module type S = sig
   val fold_edges : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
 
   val fold_edges_e : (node -> node -> PowLoc.t -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val iter_vertex : (node -> unit) -> t -> unit
 
   val iter_node : (node -> unit) -> t -> unit
 
@@ -100,6 +110,7 @@ end
 module Make (Access : Access.S) = struct
   type node = BasicDom.Node.t
 
+  module V = BasicDom.Node
   module PowLoc = Access.PowLoc
   module Loc = Access.Loc
   module Access = Access
@@ -275,15 +286,30 @@ module Make (Access : Access.S) = struct
     let check_path pc src dst = Check.check_path pc src dst
   end
 
-  type t = { graph : G.t; access : Access.t; loopheads : node BatSet.t }
+  type t = {
+    graph : G.t;
+    access : Access.t;
+    loopheads : node BatSet.t;
+    backedges : (node, node list) BatMap.t;
+  }
 
   type path_checker = G.path_checker
 
   let create ?(size = 0) ?(access = Access.empty) () =
-    { graph = G.create ~size (); access; loopheads = BatSet.empty }
+    {
+      graph = G.create ~size ();
+      access;
+      loopheads = BatSet.empty;
+      backedges = BatMap.empty;
+    }
 
   let copy dug =
-    { graph = G.copy dug.graph; access = dug.access; loopheads = dug.loopheads }
+    {
+      graph = G.copy dug.graph;
+      access = dug.access;
+      loopheads = dug.loopheads;
+      backedges = dug.backedges;
+    }
 
   let nodesof dug = G.fold_vertex BatSet.add dug.graph BatSet.empty
 
@@ -359,7 +385,11 @@ module Make (Access : Access.S) = struct
 
   let update_loopheads loopheads g = { g with loopheads }
 
+  let update_backedges backedges g = { g with backedges }
+
   let loopheads g = g.loopheads
+
+  let backedges g = g.backedges
 
   let shortest_path g src dst =
     let el = G.Dijkstra.shortest_path g.graph.graph src dst |> fst in

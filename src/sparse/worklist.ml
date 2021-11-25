@@ -28,6 +28,8 @@ module type S = sig
   val is_loopheader : BasicDom.Node.t -> t -> bool
 
   val loopheads : t -> BasicDom.Node.t BatSet.t
+
+  val backedges : t -> (BasicDom.Node.t, BasicDom.Node.t list) BatMap.t
 end
 
 module NGraph = struct
@@ -62,6 +64,7 @@ module Make (DUGraph : Dug.S) = struct
       order : (DUGraph.node, int * bool) BatMap.t;
       headorder : (DUGraph.node, int) BatMap.t;
       loopheads : DUGraph.node BatSet.t;
+      backedges : (DUGraph.node, DUGraph.node list) BatMap.t;
     }
 
     let empty =
@@ -69,6 +72,7 @@ module Make (DUGraph : Dug.S) = struct
         order = BatMap.empty;
         headorder = BatMap.empty;
         loopheads = BatSet.empty;
+        backedges = BatMap.empty;
       }
 
     let make g =
@@ -112,29 +116,29 @@ module Make (DUGraph : Dug.S) = struct
       let get_score n =
         let preds = NGraph.pred ng n in
         let preds = List.filter (fun n -> Hashtbl.mem scc n) preds in
-        List.length preds
+        (preds, List.length preds)
       in
       let score =
         NGraph.fold_edges
           (fun src dst score ->
             if (not (Hashtbl.mem scc src)) && Hashtbl.mem scc dst then
-              let new_score = get_score dst in
+              let preds, new_score = get_score dst in
               match score with
-              | None -> Some (dst, new_score)
-              | Some (_, old_score) when new_score > old_score ->
-                  Some (dst, new_score)
+              | None -> Some (dst, preds, new_score)
+              | Some (_, _, old_score) when new_score > old_score ->
+                  Some (dst, preds, new_score)
               | _ -> score
             else score)
           ng None
       in
-      match score with Some (n, _) -> n | None -> assert false
+      match score with Some (n, preds, _) -> (n, preds) | None -> assert false
 
     let cut_backedges ng entry =
       let preds = NGraph.pred ng entry in
       let cut_edge pred ng = NGraph.remove_edge ng pred entry in
       list_fold cut_edge preds ng
 
-    let rec get_order1 sccs ng (wo, lhs, ho) order =
+    let rec get_order1 sccs ng (wo, lhs, bes, ho) order =
       match sccs with
       | scc :: t ->
           let size = List.length scc in
@@ -146,19 +150,25 @@ module Make (DUGraph : Dug.S) = struct
             let ng' = projection scc_hash ng in
             Profiler.finish_event "Worklist.projection";
             Profiler.start_event "Worklist.loophead_of";
-            let lh = try loophead_of scc_hash ng with _ -> List.hd scc in
+            let lh, preds =
+              try loophead_of scc_hash ng with _ -> (List.hd scc, [])
+            in
             Profiler.finish_event "Worklist.loophead_of";
-            let lhs, ho = (BatSet.add lh lhs, BatMap.add lh headorder ho) in
-            let wo, lhs, ho, _ =
-              get_order1 t ng (wo, lhs, ho) (headorder + 1)
+            let lhs, bes, ho =
+              ( BatSet.add lh lhs,
+                BatMap.add lh preds bes,
+                BatMap.add lh headorder ho )
+            in
+            let wo, lhs, bes, ho, _ =
+              get_order1 t ng (wo, lhs, bes, ho) (headorder + 1)
             in
             let ng' = cut_backedges ng' lh in
             let sccs' = List.rev (NGraph.scc_list ng') in
-            get_order1 sccs' ng' (wo, lhs, ho) order)
+            get_order1 sccs' ng' (wo, lhs, bes, ho) order)
           else
             let n = List.hd scc in
-            get_order1 t ng (BatMap.add n order wo, lhs, ho) (order + 1)
-      | [] -> (wo, lhs, ho, order)
+            get_order1 t ng (BatMap.add n order wo, lhs, bes, ho) (order + 1)
+      | [] -> (wo, lhs, bes, ho, order)
 
     let rec get_order2 sccs (wo, lhs, ho) order =
       match sccs with
@@ -169,7 +179,7 @@ module Make (DUGraph : Dug.S) = struct
             let scc_hash = Hashtbl.create size in
             List.iter (fun x -> Hashtbl.add scc_hash x x) scc;
             Profiler.start_event "Worklist.loophead_of";
-            let lh = loophead_of scc_hash ng in
+            let lh, _ = loophead_of scc_hash ng in
             Profiler.finish_event "Worklist.loophead_of";
             let lhs, ho = (BatSet.add lh lhs, BatMap.add lh headorder ho) in
             Profiler.start_event "Worklist.projection";
@@ -191,8 +201,10 @@ module Make (DUGraph : Dug.S) = struct
       let ng, i2n = make g in
       let sccs = List.rev (NGraph.scc_list ng) in
       Profiler.start_event "Worklist.get_order";
-      let wo, lhs, ho, _ =
-        get_order1 sccs ng (BatMap.empty, BatSet.empty, BatMap.empty) 0
+      let wo, lhs, bes, ho, _ =
+        get_order1 sccs ng
+          (BatMap.empty, BatSet.empty, BatMap.empty, BatMap.empty)
+          0
       in
       Profiler.finish_event "Worklist.get_order";
       let add_rec_node src dst nodes =
@@ -211,9 +223,10 @@ module Make (DUGraph : Dug.S) = struct
       Profiler.start_event "Worklist.trans";
       let wo = trans_map trans_k (fun k v -> (v, BatSet.mem k lhs)) wo in
       let lhs = trans_set (fun v -> BatMap.find v i2n) lhs in
+      let bes = trans_map trans_k (fun _ v -> List.map trans_k v) bes in
       let ho = trans_map trans_k (fun _ v -> v) ho in
       Profiler.finish_event "Worklist.trans";
-      { order = wo; headorder = ho; loopheads = lhs }
+      { order = wo; headorder = ho; loopheads = lhs; backedges = bes }
   end
 
   module Ord = struct
@@ -273,6 +286,8 @@ module Make (DUGraph : Dug.S) = struct
   let is_loopheader idx ws = Workorder.is_loopheader idx ws.order
 
   let loopheads ws = ws.order.loopheads
+
+  let backedges ws = ws.order.backedges
 
   let pick ws =
     try

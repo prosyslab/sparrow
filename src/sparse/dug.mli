@@ -15,6 +15,8 @@ module type S = sig
 
   type node = BasicDom.Node.t
 
+  module V = BasicDom.Node
+
   module Loc : AbsDom.SET
 
   module PowLoc : PowDom.CPO with type elt = Loc.t
@@ -41,6 +43,8 @@ module type S = sig
 
   val add_edge : node -> node -> t -> t
 
+  val remove_edge : node -> node -> t -> t
+
   val remove_node : node -> t -> t
 
   val get_abslocs : node -> node -> t -> PowLoc.t
@@ -57,7 +61,11 @@ module type S = sig
 
   val update_loopheads : node BatSet.t -> t -> t
 
+  val update_backedges : (node, node list) BatMap.t -> t -> t
+
   val loopheads : t -> node BatSet.t
+
+  val backedges : t -> (node, node list) BatMap.t
 
   val shortest_path : t -> node -> node -> node list
 
@@ -78,6 +86,8 @@ module type S = sig
   val fold_edges : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
 
   val fold_edges_e : (node -> node -> PowLoc.t -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val iter_vertex : (node -> unit) -> t -> unit
 
   val iter_node : (node -> unit) -> t -> unit
 

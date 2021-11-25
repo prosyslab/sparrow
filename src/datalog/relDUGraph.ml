@@ -119,11 +119,29 @@ let optimize alarms g =
   (*   let g = optimize_inter_edge global g in *)
   g
 
+module SCC = Graph.Components.Make (G)
+
+let cycle_elim dug =
+  let backedges = G.backedges dug in
+  let dug =
+    BatMap.foldi
+      (fun lh bes dug ->
+        List.fold_left
+          (fun dug pred -> G.remove_edge pred lh dug)
+          dug
+          (bes : Node.t list))
+      backedges dug
+  in
+  (* sanity check *)
+  assert (SCC.scc_list dug = []);
+  dug
+
 let print analysis global dug alarms =
   let dug = G.copy dug in
   let alarms = Report.get alarms Report.UnProven in
   let dug =
     if !Options.extract_datalog_fact_full_no_opt then dug
+    else if !Options.extract_datalog_fact_full_no_opt_dag then cycle_elim dug
     else optimize alarms dug
   in
   let true_branch, false_branch =

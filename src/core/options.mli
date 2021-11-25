@@ -130,6 +130,8 @@ val extract_datalog_fact_full : bool ref
 
 val extract_datalog_fact_full_no_opt : bool ref
 
+val extract_datalog_fact_full_no_opt_dag : bool ref
+
 (** {2 Pretty Printer & Debugging } *)
 
 val nobar : bool ref
