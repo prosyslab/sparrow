@@ -1237,6 +1237,31 @@ let trans_decl_attribute attrs =
       | _ -> attrs)
     [] attrs
 
+let get_stmt_lst (stmt : C.Ast.stmt) =
+  match stmt.C.Ast.desc with C.Ast.Compound l -> l | _ -> []
+
+let get_opt_stmt_lst stmt_opt =
+  match stmt_opt with Some s -> get_stmt_lst s | None -> []
+
+let rec add_labels scope sl =
+  let sc', new_sl =
+    List.fold_left
+      (fun (s', (sls' : C.Ast.stmt list)) (stmt : C.Ast.stmt) ->
+        match stmt.C.Ast.desc with
+        | Label desc -> (Scope.add_label desc.label s', sls')
+        | Compound sl' -> (s', sl' @ sls')
+        | If desc ->
+            ( s',
+              (get_stmt_lst desc.then_branch @ get_opt_stmt_lst desc.else_branch)
+              @ sls' )
+        | For desc -> (s', get_stmt_lst desc.body @ sls')
+        | While desc -> (s', get_stmt_lst desc.body @ sls')
+        | Do desc -> (s', get_stmt_lst desc.body @ sls')
+        | _ -> (s', sls'))
+      (scope, []) sl
+  in
+  if new_sl = [] then sc' else add_labels sc' new_sl
+
 let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
   let loc = trans_location stmt in
   match stmt.C.Ast.desc with
@@ -1309,15 +1334,7 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       ({ Chunk.empty with stmts }, scope)
 
 and trans_compound scope fundec sl =
-  let scope =
-    let s = scope |> Scope.enter_block in
-    List.fold_left
-      (fun s' (stmt : C.Ast.stmt) ->
-        match stmt.C.Ast.desc with
-        | Label desc -> Scope.add_label desc.label s'
-        | _ -> s')
-      s sl
-  in
+  let scope = scope |> Scope.enter_block in
   ( List.fold_left
       (fun (l, scope) s ->
         let chunk, scope = trans_stmt scope fundec s in
@@ -2191,7 +2208,7 @@ and trans_label scope fundec loc label body =
    * Instead, we only add the label name to the scope,
    * to avoid conflicts with CIL-generated label names.
    * Note that scope is not updated here, as it should have
-   * been handled in advance (trans_compund)
+   * been handled in advance (trans_function_body)
    *)
   let chunk = trans_stmt scope fundec body |> fst in
   (append_label chunk label loc true, scope)
@@ -2344,7 +2361,12 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Ast.decl) =
       failwith "Unsupported C++ features"
   | Concept _ | Export _ -> failwith "new cases: Concept | Export"
 
-and trans_function_body scope fundec body =
+and trans_function_body scope fundec (body : C.Ast.stmt) =
+  let scope =
+    match body.C.Ast.desc with
+    | C.Ast.Compound l -> add_labels scope l
+    | _ -> scope
+  in
   let chunk = trans_block scope fundec body in
   let vis = new replaceGotoVisitor chunk.Chunk.gotos chunk.Chunk.labels in
   ( {
