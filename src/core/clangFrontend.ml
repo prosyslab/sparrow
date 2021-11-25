@@ -1309,7 +1309,15 @@ let rec trans_stmt scope fundec (stmt : C.Ast.stmt) : Chunk.t * Scope.t =
       ({ Chunk.empty with stmts }, scope)
 
 and trans_compound scope fundec sl =
-  let scope = Scope.enter_block scope in
+  let scope =
+    let s = scope |> Scope.enter_block in
+    List.fold_left
+      (fun s' (stmt : C.Ast.stmt) ->
+        match stmt.C.Ast.desc with
+        | Label desc -> Scope.add_label desc.label s'
+        | _ -> s')
+      s sl
+  in
   ( List.fold_left
       (fun (l, scope) s ->
         let chunk, scope = trans_stmt scope fundec s in
@@ -2181,8 +2189,10 @@ and trans_label scope fundec loc label body =
   (* Clang frontend guarantees the uniqueness of label names,
    * so do not need to create unique names.
    * Instead, we only add the label name to the scope,
-   * to avoid conflicts with CIL-generated label names *)
-  let scope = Scope.add_label label scope in
+   * to avoid conflicts with CIL-generated label names.
+   * Note that scope is not updated here, as it should have
+   * been handled in advance (trans_compund)
+   *)
   let chunk = trans_stmt scope fundec body |> fst in
   (append_label chunk label loc true, scope)
 
