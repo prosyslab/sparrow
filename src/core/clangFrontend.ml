@@ -242,7 +242,7 @@ let create_local_variable scope fundec name typ =
   let scope = Scope.add name (EnvData.EnvVar varinfo) scope in
   (varinfo, scope)
 
-let create_label scope label =
+let rec create_label scope label =
   let new_name =
     if Scope.mem_label label scope then (
       let new_name = label ^ "___" ^ string_of_int !alpha_count in
@@ -250,8 +250,10 @@ let create_label scope label =
       new_name)
     else label
   in
-  let scope = Scope.add_label new_name scope in
-  (new_name, scope)
+  if Scope.mem_label new_name scope then create_label scope label
+  else
+    let scope = Scope.add_label new_name scope in
+    (new_name, scope)
 
 let trans_location node =
   let location =
@@ -1115,7 +1117,15 @@ module Chunk = struct
   module LabelMap = struct
     include Map.Make (String)
 
-    let append xm ym = union (fun _ _ _ -> failwith "duplicated labels") xm ym
+    let pp_keys fmt m = iter (fun k _ -> F.fprintf fmt "%s\n" k) m
+
+    let append xm ym =
+      union
+        (fun x _ _ ->
+          F.fprintf F.std_formatter "1st LabelMap keys:\n%a" pp_keys xm;
+          F.fprintf F.std_formatter "2nd LabelMap keys:\n%a" pp_keys ym;
+          failwith ("duplicated labels: " ^ x))
+        xm ym
   end
 
   module GotoMap = struct
@@ -1238,7 +1248,10 @@ let trans_decl_attribute attrs =
     [] attrs
 
 let get_stmt_lst (stmt : C.Ast.stmt) =
-  match stmt.C.Ast.desc with C.Ast.Compound l -> l | _ -> []
+  match stmt.C.Ast.desc with
+  | C.Ast.Compound l -> l
+  | Label _ -> [ stmt ]
+  | _ -> []
 
 let get_opt_stmt_lst stmt_opt =
   match stmt_opt with Some s -> get_stmt_lst s | None -> []
@@ -1248,7 +1261,8 @@ let rec add_labels scope sl =
     List.fold_left
       (fun (s', (sls' : C.Ast.stmt list)) (stmt : C.Ast.stmt) ->
         match stmt.C.Ast.desc with
-        | Label desc -> (Scope.add_label desc.label s', sls')
+        | Label desc ->
+            (Scope.add_label desc.label s', get_stmt_lst desc.body @ sls')
         | Compound sl' -> (s', sl' @ sls')
         | If desc ->
             ( s',
