@@ -67,17 +67,17 @@ module BlockEnv = struct
 end
 
 module LabelEnv = struct
-  type t = { label : (string, string) H.t }
+  type t = (string, string) H.t
 
-  let create () = { label = H.create 64 }
+  let create () = H.create 64
 
   let add_label name env =
-    H.add env.label name name;
+    H.add env name name;
     env
 
-  let mem_label name env = H.mem env.label name
+  let mem_label name env = H.mem env name
 
-  let find_label name env = H.find env.label name
+  let find_label name env = H.find env name
 end
 
 module Scope = struct
