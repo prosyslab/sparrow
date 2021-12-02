@@ -1248,10 +1248,7 @@ let trans_decl_attribute attrs =
     [] attrs
 
 let get_stmt_lst (stmt : C.Ast.stmt) =
-  match stmt.C.Ast.desc with
-  | C.Ast.Compound l -> l
-  | Label _ -> [ stmt ]
-  | _ -> []
+  match stmt.C.Ast.desc with C.Ast.Compound l -> l | _ -> [ stmt ]
 
 let get_opt_stmt_lst stmt_opt =
   match stmt_opt with Some s -> get_stmt_lst s | None -> []
