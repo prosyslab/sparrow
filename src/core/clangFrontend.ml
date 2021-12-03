@@ -399,7 +399,8 @@ let sort_list_with_index data_list idx_list =
   |> List.sort (fun (_, idx1) (_, idx2) -> if idx1 > idx2 then 1 else 0)
   |> List.split |> fst |> List.rev
 
-let should_ignore_implicit_cast expr qual_type e typ =
+let should_ignore_implicit_cast ?(is_ignore_fun_ptr_decay = true) expr qual_type
+    e typ =
   (* heuristics to selectively make implicit cast explicit because clangml
    * does not fully expose all the implicit casting information *)
   if
@@ -413,7 +414,9 @@ let should_ignore_implicit_cast expr qual_type e typ =
     in
     (* ignore FunctionToPointerDecay and BuiltinFnToFnPtr *)
     expr_kind = C.ImplicitCastExpr
-    && (type_kind = C.FunctionNoProto || type_kind = C.FunctionProto)
+    && type_kind = C.FunctionNoProto
+    && is_ignore_fun_ptr_decay
+    || type_kind = C.FunctionProto
     (* ignore LValueToRValue *)
     || CilHelper.eq_typ (Cil.typeOf e) typ
 
@@ -641,7 +644,8 @@ and trans_params scope args fundec =
 
 (* In case of failure, produce 0 if default_ptr is false, a temp var if true *)
 and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
-    scope fundec_opt loc action (expr : C.Ast.expr) =
+    ?(is_ignore_fun_ptr_decay = true) scope fundec_opt loc action
+    (expr : C.Ast.expr) =
   match expr.C.Ast.desc with
   | C.Ast.IntegerLiteral il ->
       ([], Some (trans_integer_literal expr.decoration il))
@@ -669,8 +673,10 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       if is_void then (sl, None)
       else
         let e = Option.get expr_opt in
-        if should_ignore_implicit_cast expr cast.qual_type e typ then
-          (sl, Some e)
+        if
+          should_ignore_implicit_cast ~is_ignore_fun_ptr_decay expr
+            cast.qual_type e typ
+        then (sl, Some e)
         else (sl, Some (Cil.CastE (typ, e)))
   | C.Ast.Member mem ->
       ([], Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field))
@@ -1033,10 +1039,14 @@ and trans_cond_op scope fundec_opt loc cond then_branch else_branch =
   let cond_sl, cond_expr = trans_expr scope fundec_opt loc AExp cond in
   let then_sl, then_expr =
     match then_branch with
-    | Some tb -> trans_expr scope fundec_opt loc ADrop tb
+    | Some tb ->
+        trans_expr ~is_ignore_fun_ptr_decay:false scope fundec_opt loc ADrop tb
     | None -> ([], None)
   in
-  let else_sl, else_expr = trans_expr scope fundec_opt loc ADrop else_branch in
+  let else_sl, else_expr =
+    trans_expr ~is_ignore_fun_ptr_decay:false scope fundec_opt loc ADrop
+      else_branch
+  in
   let cond_expr = Option.get cond_expr in
   match fundec_opt with
   | None ->
