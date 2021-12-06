@@ -298,6 +298,33 @@ let cmd_common { filename; dug } alarm allocsites =
   P.printf "#edges     = %d\n" (DUGraph.nb_edge dug);
   P.printf "#abs locs  = %d\n" (DUGraph.nb_loc dug)
 
+let cmd_functions { filename; dug } functions =
+  let new_dug = DUGraph.copy dug in
+  let new_dug =
+    DUGraph.fold_node
+      (fun node new_dug ->
+        if List.mem (Node.get_pid node) functions then dug
+        else DUGraph.remove_node node new_dug)
+      dug new_dug
+  in
+  let dirname = Filename.dirname filename in
+  let basename =
+    Filename.basename filename |> Fun.flip Filename.chop_suffix ".bin"
+  in
+  let filename = Filename.concat dirname basename in
+  let oc = open_out (filename ^ ".dot") in
+  P.fprintf oc "%s\n" (DUGraph.to_dot new_dug);
+  close_out oc;
+  Unix.create_process "dot"
+    [| "dot"; "-Tsvg"; "-o"; filename ^ ".svg"; filename ^ ".dot" |]
+    Unix.stdin Unix.stdout Unix.stderr
+  |> ignore;
+  Unix.wait () |> ignore;
+  P.printf "Done\n";
+  P.printf "#nodes     = %d\n" (DUGraph.nb_node dug);
+  P.printf "#edges     = %d\n" (DUGraph.nb_edge dug);
+  P.printf "#abs locs  = %d\n" (DUGraph.nb_loc dug)
+
 let cmd_help () =
   P.printf
     "    common [alarm] [allocsite1] [allocsite2] ... : draw a common subgraph\n"
@@ -306,6 +333,7 @@ let repl env cmd =
   let components = Str.split (Str.regexp "[ \t]+") cmd in
   match components with
   | "common" :: alarm :: allocsites -> cmd_common env alarm allocsites
+  | "functions" :: fns -> cmd_functions env fns
   | [ "help" ] -> cmd_help ()
   | [ "exit" ] -> cmd_exit ()
   | _ -> P.eprintf "Invalid command\nTry help\n"
