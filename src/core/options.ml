@@ -17,6 +17,8 @@ let task = ref All
 
 let entry_point = ref "main"
 
+let skip_main_analysis = ref false
+
 (* Capture *)
 let skip_build = ref false
 
@@ -65,6 +67,7 @@ let pack_manual = ref false
 let taint = ref false
 
 (* Analyzer *)
+
 let nobar = ref false
 
 let narrow = ref false
@@ -233,6 +236,7 @@ let opts =
     ( "-dug_slice",
       Arg.Set_string dug_slice_target,
       "Slice DUG w.r.t a given target" );
+    ("-skip_main_analysis", Arg.Set skip_main_analysis, "Skip main analysis");
     ("-entry_point", Arg.Set_string entry_point, "Entry point (default: main)");
     ("-noalarm", Arg.Set noalarm, "Do not print alarms");
     ("-verbose", Arg.Set_int verbose, "Verbose level (default: 1)");
