@@ -413,10 +413,9 @@ let should_ignore_implicit_cast ?(is_ignore_fun_ptr_decay = true) expr qual_type
       C.get_pointee_type qual_type.C.Ast.cxtype |> C.ext_type_get_kind
     in
     (* ignore FunctionToPointerDecay and BuiltinFnToFnPtr *)
-    expr_kind = C.ImplicitCastExpr
-    && type_kind = C.FunctionNoProto
+    ((expr_kind = C.ImplicitCastExpr && type_kind = C.FunctionNoProto)
+    || type_kind = C.FunctionProto)
     && is_ignore_fun_ptr_decay
-    || type_kind = C.FunctionProto
     (* ignore LValueToRValue *)
     || CilHelper.eq_typ (Cil.typeOf e) typ
 
