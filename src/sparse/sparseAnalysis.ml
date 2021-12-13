@@ -40,6 +40,8 @@ module type S = sig
 
   val generate_dug : Spec.t -> Global.t -> DUGraph.t
 
+  val to_json : (Global.t * DUGraph.t) -> Yojson.Safe.t
+
   val perform :
     Spec.t -> Global.t -> DUGraph.t -> Global.t * DUGraph.t * Table.t * Table.t
 end
@@ -213,6 +215,15 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
     L.info ~level:1 "#iteration in narrowing : %d\n" !total_iterations;
     x
 
+  let to_json (global, dug) =
+        `Assoc
+          [
+            ("callgraph", CallGraph.to_json global.callgraph);
+            ("cfgs", InterCfg.to_json global.icfg);
+            ("dugraph", DUGraph.to_json dug);
+            (*          ("dugraph-inter", DUGraph.to_json_inter dug access);*)
+          ]
+
   let print_dug (global, dug) =
     if !Options.dug then (
       if DUGraph.nb_loc dug > 1000 then (
@@ -221,16 +232,14 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
            than json.\n";
         let oc = open_out (Filename.concat !Options.outdir "dug.bin") in
         Marshal.to_channel oc dug [];
-        close_out oc)
+        close_out oc;
+        let oc = open_out (Filename.concat !Options.outdir "global.bin") in
+        Marshal.to_channel oc global [];
+        close_out oc
+      )
       else
         let oc = open_out (Filename.concat !Options.outdir "dug.json") in
-        `Assoc
-          [
-            ("callgraph", CallGraph.to_json global.callgraph);
-            ("cfgs", InterCfg.to_json global.icfg);
-            ("dugraph", DUGraph.to_json dug);
-            (*          ("dugraph-inter", DUGraph.to_json_inter dug access);*)
-          ]
+        to_json( global, dug )
         |> Yojson.Safe.pretty_to_channel oc;
         close_out oc);
     prerr_memory_usage ();

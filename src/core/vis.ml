@@ -195,7 +195,7 @@ let gen_dug = function
   | _ -> raise (Failure "error")
 
 let dump json =
-  let dir = !file ^ ".vis" in
+  let dir = Filename.dirname !file ^ "/vis" in
   (try Unix.mkdir dir 0o755 with _ -> ());
   Unix.chdir dir;
   create_index ();
@@ -228,7 +228,7 @@ let cmd_exit () =
 
 module PowNode = BasicDom.PowNode
 
-type env = { filename : string; dug : DUGraph.t }
+type env = { filename : string; global : Global.t; dug : DUGraph.t }
 
 let rec slice allocs pc workset allocsites dug new_dug =
   if PowNode.is_empty workset then new_dug
@@ -256,7 +256,7 @@ let rec slice allocs pc workset allocsites dug new_dug =
     in
     slice allocs pc workset allocsites dug new_dug
 
-let cmd_common { filename; dug } alarm allocsites =
+let cmd_common { filename; dug; _ } alarm allocsites =
   let allocsite_nodes =
     List.map
       (fun x -> DUGraph.find_node_of_string dug x |> Option.get)
@@ -298,7 +298,18 @@ let cmd_common { filename; dug } alarm allocsites =
   P.printf "#edges     = %d\n" (DUGraph.nb_edge dug);
   P.printf "#abs locs  = %d\n" (DUGraph.nb_loc dug)
 
-let cmd_functions { filename; dug } functions =
+let cmd_all {global; dug; _} =
+  P.printf "#nodes     = %d\n" (DUGraph.nb_node dug);
+  P.printf "#edges     = %d\n" (DUGraph.nb_edge dug);
+  P.printf "#abs locs  = %d\n" (DUGraph.nb_loc dug);
+  let json = ItvAnalysis.Analysis.to_json (global, dug) in
+  dump json
+
+let cmd_cfgs {global;  _} =
+  let json = ItvAnalysis.Analysis.to_json (global, DUGraph.create ()) in
+  dump json
+
+let cmd_functions { global; dug; _ } functions =
   let new_dug = DUGraph.copy dug in
   let new_dug =
     DUGraph.fold_node
@@ -307,33 +318,25 @@ let cmd_functions { filename; dug } functions =
         else DUGraph.remove_node node new_dug)
       dug new_dug
   in
-  let dirname = Filename.dirname filename in
-  let basename =
-    Filename.basename filename |> Fun.flip Filename.chop_suffix ".bin"
-  in
-  let filename = Filename.concat dirname basename in
-  let oc = open_out (filename ^ ".dot") in
-  P.fprintf oc "%s\n" (DUGraph.to_dot new_dug);
-  close_out oc;
-  Unix.create_process "dot"
-    [| "dot"; "-Tsvg"; "-o"; filename ^ ".svg"; filename ^ ".dot" |]
-    Unix.stdin Unix.stdout Unix.stderr
-  |> ignore;
-  Unix.wait () |> ignore;
-  P.printf "Done\n";
   P.printf "#nodes     = %d\n" (DUGraph.nb_node dug);
   P.printf "#edges     = %d\n" (DUGraph.nb_edge dug);
-  P.printf "#abs locs  = %d\n" (DUGraph.nb_loc dug)
+  P.printf "#abs locs  = %d\n" (DUGraph.nb_loc dug);
+  let json = ItvAnalysis.Analysis.to_json (global, new_dug) in
+  dump json
 
 let cmd_help () =
-  P.printf
-    "    common [alarm] [allocsite1] [allocsite2] ... : draw a common subgraph\n"
+  P.printf "    all                                          : draw the full dugraph\n";
+  P.printf "    cfgs                                         : draw cfgs only\n";
+  P.printf "    functions [func1] [func2] ... [funcN]        : draw a dugraph only for given functions\n";
+  P.printf "    common [alarm] [allocsite1] [allocsite2] ... : draw a common subgraph\n"
 
 let repl env cmd =
   let components = Str.split (Str.regexp "[ \t]+") cmd in
   match components with
-  | "common" :: alarm :: allocsites -> cmd_common env alarm allocsites
+  | ["all"]  -> cmd_all env
+  | ["cfgs"]  -> cmd_cfgs env
   | "functions" :: fns -> cmd_functions env fns
+  | "common" :: alarm :: allocsites -> cmd_common env alarm allocsites
   | [ "help" ] -> cmd_help ()
   | [ "exit" ] -> cmd_exit ()
   | _ -> P.eprintf "Invalid command\nTry help\n"
@@ -352,7 +355,10 @@ let dump_bin filename =
   let ic = open_in filename in
   let dug = Marshal.from_channel ic in
   close_in ic;
-  let env = { filename; dug } in
+  let ic = open_in (Filename.dirname filename ^ "/global.bin") in
+  let global = Marshal.from_channel ic in
+  close_in ic;
+  let env = { filename; global; dug } in
   P.printf "Processing...\n";
   P.printf "#nodes     = %d\n" (DUGraph.nb_node dug);
   P.printf "#edges     = %d\n" (DUGraph.nb_edge dug);
