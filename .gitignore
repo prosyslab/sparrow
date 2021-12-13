@@ -28,3 +28,5 @@ sparrow-out
 
 # merlin
 .merlin
+
+.sparrow-vis-history.txt
