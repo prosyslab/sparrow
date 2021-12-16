@@ -94,7 +94,8 @@ module Scope = struct
     match scope with
     | bs, fs -> (BlockEnv.create () :: bs, LabelEnv.create () :: fs)
 
-  (* exit_block is never needed, since scope is immutable *)
+  let exit_block scope = match scope with bs, fs -> (List.tl bs, fs)
+
   let exit_function scope = match scope with bs, fs -> (List.tl bs, List.tl fs)
 
   let add name varinfo = function
@@ -1361,7 +1362,7 @@ and trans_compound scope fundec sl =
         (Chunk.append l chunk, scope))
       (Chunk.empty, scope) sl
     |> fst,
-    scope )
+    scope |> Scope.exit_block )
 
 and trans_var_decl_list scope fundec loc action (dl : C.Ast.decl list) =
   List.fold_left
@@ -1575,6 +1576,7 @@ and mk_tmp_var fundec loc expr_list_len scope =
  *   arr[tmp] = 0;    // for all unspecified element, assign 0
  *)
 and mk_arr_stmt scope fundec loc action lv len_exp el =
+  let scope = scope |> Scope.enter_block in
   let arr_len =
     match len_exp with
     | Cil.Const (CInt64 (v, _, _)) -> Int64.to_int v
@@ -1604,19 +1606,9 @@ and mk_arr_stmt scope fundec loc action lv len_exp el =
   if List.length el < arr_len then
     let sl = arr_init idx_list in
     (* tmp var *)
-    let vi, scope = create_local_variable scope fundec "tmp" Cil.uintType in
-    let tmp_var_lval = (Cil.Var vi, Cil.NoOffset) in
-    let tmp_var_instr =
-      Cil.Set
-        ( tmp_var_lval,
-          Cil.CastE (Cil.uintType, Cil.integer (List.length el)),
-          loc )
+    let tmp_var_lval, tmp_var_expr, tmp_var_stmt, unary_plus_expr, scope =
+      mk_tmp_var fundec loc (List.length el) scope
     in
-    let tmp_var_stmt = Cil.mkStmt (Cil.Instr [ tmp_var_instr ]) in
-    let tmp_var_expr = Cil.Lval tmp_var_lval in
-
-    (* tmp++ *)
-    let one = Cil.BinOp (Cil.PlusA, tmp_var_expr, Cil.one, Cil.intType) in
 
     (* arr[tmp] = 0 *)
     let lv = Cil.addOffsetLval (Cil.Index (tmp_var_expr, Cil.NoOffset)) lv in
@@ -1624,33 +1616,12 @@ and mk_arr_stmt scope fundec loc action lv len_exp el =
     let var_stmt = Cil.mkStmt var_instr in
 
     (* while *)
-    let cond_expr =
-      Cil.BinOp (Cil.Ge, tmp_var_expr, Cil.integer arr_len, Cil.intType)
-    in
-    let unary_plus_instr = Cil.Instr [ Cil.Set (tmp_var_lval, one, loc) ] in
-    let unary_plus_stmt = Cil.mkStmt unary_plus_instr in
     let while_stmt =
-      [
-        Cil.mkStmt
-          (Cil.Loop
-             ( Cil.mkBlock
-                 [
-                   Cil.mkStmt
-                     (Cil.If
-                        ( cond_expr,
-                          Cil.mkBlock [ Cil.mkStmt (Break loc) ],
-                          Cil.mkBlock [],
-                          loc ));
-                   var_stmt;
-                   unary_plus_stmt;
-                 ],
-               loc,
-               None,
-               None ));
-      ]
+      mk_while_stmt arr_len loc tmp_var_expr tmp_var_lval unary_plus_expr
+        [ var_stmt ]
     in
-    (sl @ [ tmp_var_stmt ] @ while_stmt, scope)
-  else (arr_init idx_list, scope)
+    (sl @ [ tmp_var_stmt ] @ while_stmt, scope |> Scope.exit_block)
+  else (arr_init idx_list, scope |> Scope.exit_block)
 
 and mk_local_struct_init scope cfields fundec action loc lv expr_list =
   let origin_cfields = cfields in
@@ -2033,7 +2004,7 @@ and trans_for scope fundec loc init cond_var cond inc body =
       gotos = body_stmt.gotos;
       user_typs = body_stmt.user_typs;
     },
-    scope )
+    scope |> Scope.exit_block )
 
 and trans_while scope fundec loc condition_variable cond body =
   let decl_stmt, scope =
