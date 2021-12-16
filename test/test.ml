@@ -104,6 +104,7 @@ let test_suites =
           "clang/return1.c";
           "clang/return2.c";
           "clang/block0.c";
+          "clang/block1.c";
           "clang/function0.c";
           "clang/if0.c";
           "clang/if1.c";
@@ -111,6 +112,7 @@ let test_suites =
           "clang/if3.c";
           "clang/init-list0.c";
           "clang/init-list1.c";
+          "clang/init-list2.c";
           "clang/nested-init-0.c";
           "clang/nested-init-1.c";
           "clang/nested-init-2.c";
