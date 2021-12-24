@@ -145,6 +145,8 @@ let test_suites =
           "clang/array-subscript0.c";
           "clang/array-subscript1.c";
           "clang/array-subscript2.c";
+          "clang/array-subscript3.c";
+          "clang/array-subscript4.c";
           "clang/array-init0.c";
           "clang/incomplete-array0.c";
           "clang/designated-init0.c";
