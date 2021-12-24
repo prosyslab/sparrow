@@ -742,7 +742,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       ([], Some Cil.zero)
   | C.Ast.DesignatedInit d -> trans_expr scope fundec_opt loc action d.init
   | C.Ast.UnknownExpr (_, _) ->
-      print_endline "UnknownExpr not supported yet";
+      F.fprintf F.err_formatter "UnknownExpr not supported yet";
       L.warn ~to_consol:false "Unknown ext StmtExpr at %s\n"
         (CilHelper.s_location loc);
       ([], Some Cil.zero)
