@@ -681,39 +681,48 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
   | C.Ast.Member mem ->
       ([], Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field))
   | C.Ast.ArraySubscript arr -> (
-      let sl1, base = trans_expr scope fundec_opt loc action arr.base in
-      let sl2, idx = trans_expr scope fundec_opt loc action arr.index in
-      let base = Option.get base in
-      (* base may contain casting such as (char * ) 0. But we have to preserve such important castings. Otherwise, CIL will crash  *)
+      let sl1, lexp = trans_expr scope fundec_opt loc action arr.base in
+      let sl2, rexp = trans_expr scope fundec_opt loc action arr.index in
+
+      (* for array subscription, lexp and rexp must be exist *)
+      let lexp = Option.get lexp in
+      let rexp = Option.get rexp in
+
+      (* distinguish base and index *)
+      let distinguish e1 e2 =
+        if e1 |> Cil.typeOf |> Cil.isPointerType then (e1, e2)
+        else
+          match CilHelper.remove_cast e1 with
+          | Cil.Lval exp' when Cil.isArrayType (exp' |> Cil.typeOfLval) ->
+              (e1, e2)
+          | Cil.BinOp (_, _, _, Cil.TArray (_, _, _)) -> (e1, e2)
+          | _ -> (e2, e1)
+      in
+
+      let base, idx = distinguish lexp rexp in
+
       match CilHelper.remove_cast base with
-      | Cil.Lval base' ->
+      (* base = arr *)
+      | Cil.Lval base' when Cil.isArrayType (base' |> Cil.typeOfLval) ->
           let new_lval =
-            match idx with
-            | Some x when Cil.isPointerType (Cil.typeOfLval base') ->
-                ( Cil.Mem (Cil.BinOp (Cil.PlusPI, base, x, Cil.typeOf base)),
-                  Cil.NoOffset )
-            | Some x -> Cil.addOffsetLval (Cil.Index (x, Cil.NoOffset)) base'
-            | _ -> failwith "lval"
+            Cil.addOffsetLval (Cil.Index (idx, Cil.NoOffset)) base'
           in
           (sl1 @ sl2, Some (Cil.Lval new_lval))
+      (* base = (arr+i) *)
       | Cil.BinOp (_, _, _, Cil.TArray (t, _, _)) ->
           let new_lval =
-            match idx with
-            | Some x ->
-                ( Cil.Mem (Cil.BinOp (Cil.PlusPI, base, x, Cil.TPtr (t, []))),
-                  Cil.NoOffset )
-            | _ -> failwith "lval"
+            ( Cil.Mem (Cil.BinOp (Cil.PlusPI, base, idx, Cil.TPtr (t, []))),
+              Cil.NoOffset )
           in
           (sl1 @ sl2, Some (Cil.Lval new_lval))
-      | _ ->
+      (* base = (ptr+i) *)
+      | _ when Cil.isPointerType (Cil.typeOf base) ->
           let new_lval =
-            match idx with
-            | Some x ->
-                ( Cil.Mem (Cil.BinOp (Cil.PlusPI, base, x, Cil.typeOf base)),
-                  Cil.NoOffset )
-            | _ -> failwith "lval"
+            ( Cil.Mem (Cil.BinOp (Cil.PlusPI, base, idx, Cil.typeOf base)),
+              Cil.NoOffset )
           in
-          (sl1 @ sl2, Some (Cil.Lval new_lval)))
+          (sl1 @ sl2, Some (Cil.Lval new_lval))
+      | _ -> failwith "ArraySubscript")
   | C.Ast.ConditionalOperator co ->
       trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
   | C.Ast.UnaryExpr ue ->
