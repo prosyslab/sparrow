@@ -110,8 +110,6 @@ let extract_datalog_fact_full = ref false
 
 let extract_datalog_fact_full_no_opt = ref false
 
-let extract_datalog_fact_full_no_opt_dag = ref false
-
 (* Alarm Report *)
 let noalarm = ref false
 
@@ -214,14 +212,6 @@ let datalog_opts =
           extract_datalog_fact_full := true;
           extract_datalog_fact_full_no_opt := true),
       "Extract extensive datalog facts" );
-    ( "-extract_datalog_fact_full_no_opt_dag",
-      Arg.Unit
-        (fun () ->
-          extract_datalog_fact := true;
-          extract_datalog_fact_full := true;
-          extract_datalog_fact_full_no_opt := true;
-          extract_datalog_fact_full_no_opt_dag := true),
-      "Extract extensive datalog facts with cycle slimination" );
   ]
 
 let opts =

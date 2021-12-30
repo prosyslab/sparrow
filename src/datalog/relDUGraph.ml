@@ -153,8 +153,7 @@ let print analysis global dug alarms =
   let dug = G.copy dug in
   let alarms = Report.get alarms Report.UnProven in
   let dug =
-    if !Options.extract_datalog_fact_full_no_opt_dag then cycle_elim dug
-    else if !Options.extract_datalog_fact_full_no_opt then dug
+    if !Options.extract_datalog_fact_full_no_opt then dug
     else optimize alarms dug
   in
   let true_branch, false_branch =
