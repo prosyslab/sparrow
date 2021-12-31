@@ -13,7 +13,7 @@
 type t
 (** Abstract type of call graph *)
 
-val empty : t
+val empty : unit -> t
 
 val callees : InterCfg.pid -> t -> BasicDom.PowProc.t
 

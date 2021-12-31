@@ -36,7 +36,7 @@ module Oper = Graph.Oper.I (G)
 
 type t = { graph : G.t; trans_calls : G.t }
 
-let empty = { graph = G.create (); trans_calls = G.create () }
+let empty () = { graph = G.create (); trans_calls = G.create () }
 
 let add_edge src dst g =
   G.add_edge g.graph src dst;

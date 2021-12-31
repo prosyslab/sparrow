@@ -71,7 +71,7 @@ let init file =
   {
     file;
     icfg = InterCfg.init file;
-    callgraph = CallGraph.empty;
+    callgraph = CallGraph.empty ();
     dump = Dump.empty;
     mem = ItvDom.Mem.bot;
     table = ItvDom.Table.bot;
