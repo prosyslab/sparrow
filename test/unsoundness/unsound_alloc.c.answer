@@ -11,10 +11,10 @@ Excluded too large functions : []
 -inline xmalloc3 @unsound_alloc.c:39
 -inline xmalloc4 @unsound_alloc.c:42
 -inline xmalloc4 @unsound_alloc.c:43
-#Procs : 6
-#Nodes : 84
-#Nodes in def-use graph : 66
-#Locs on def-use graph : 53
+#Procs : 2
+#Nodes : 64
+#Nodes in def-use graph : 54
+#Locs on def-use graph : 45
 
 = Alarms =
 

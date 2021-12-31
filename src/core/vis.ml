@@ -298,14 +298,14 @@ let cmd_common { filename; dug; _ } alarm allocsites =
   P.printf "#edges     = %d\n" (DUGraph.nb_edge dug);
   P.printf "#abs locs  = %d\n" (DUGraph.nb_loc dug)
 
-let cmd_all {global; dug; _} =
+let cmd_all { global; dug; _ } =
   P.printf "#nodes     = %d\n" (DUGraph.nb_node dug);
   P.printf "#edges     = %d\n" (DUGraph.nb_edge dug);
   P.printf "#abs locs  = %d\n" (DUGraph.nb_loc dug);
   let json = ItvAnalysis.Analysis.to_json (global, dug) in
   dump json
 
-let cmd_cfgs {global;  _} =
+let cmd_cfgs { global; _ } =
   let json = ItvAnalysis.Analysis.to_json (global, DUGraph.create ()) in
   dump json
 
@@ -325,16 +325,20 @@ let cmd_functions { global; dug; _ } functions =
   dump json
 
 let cmd_help () =
-  P.printf "    all                                          : draw the full dugraph\n";
+  P.printf
+    "    all                                          : draw the full dugraph\n";
   P.printf "    cfgs                                         : draw cfgs only\n";
-  P.printf "    functions [func1] [func2] ... [funcN]        : draw a dugraph only for given functions\n";
-  P.printf "    common [alarm] [allocsite1] [allocsite2] ... : draw a common subgraph\n"
+  P.printf
+    "    functions [func1] [func2] ... [funcN]        : draw a dugraph only \
+     for given functions\n";
+  P.printf
+    "    common [alarm] [allocsite1] [allocsite2] ... : draw a common subgraph\n"
 
 let repl env cmd =
   let components = Str.split (Str.regexp "[ \t]+") cmd in
   match components with
-  | ["all"]  -> cmd_all env
-  | ["cfgs"]  -> cmd_cfgs env
+  | [ "all" ] -> cmd_all env
+  | [ "cfgs" ] -> cmd_cfgs env
   | "functions" :: fns -> cmd_functions env fns
   | "common" :: alarm :: allocsites -> cmd_common env alarm allocsites
   | [ "help" ] -> cmd_help ()
