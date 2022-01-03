@@ -51,10 +51,10 @@ let compute_trans_calls callgraph =
   { callgraph with trans_calls }
 
 let is_rec callgraph pid =
-  try
+  if G.mem_vertex callgraph.trans_calls pid then
     let trans = G.succ callgraph.trans_calls pid in
     List.mem pid trans
-  with _ ->
+  else
     (* conservative answer for exceptional cases (e.g., unreachable functions) *)
     true
 
