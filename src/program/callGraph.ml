@@ -16,23 +16,53 @@ module G = struct
   include Graph.Imperative.Digraph.Concrete (BasicDom.Proc)
   module PredHash = Hashtbl.Make (BasicDom.Proc)
 
+  (* Since ocamlgraph does not maintain predecessor list, computing transitive
+   * colsure takes too long. Rewrote the transitive closure computation logic in
+   * https://github.com/backtracking/ocamlgraph/blob/1c028af0/src/oper.ml#L40 to
+   * use a hash table for predecessors. *)
+
   let pred_hash = PredHash.create 10000
 
-  let add_edge g s d =
+  let bootstrap g =
+    PredHash.clear pred_hash;
+    iter_edges
+      (fun s d ->
+        let old_pred =
+          try PredHash.find pred_hash d with _ -> PowProc.empty
+        in
+        let new_pred = PowProc.add s old_pred in
+        PredHash.replace pred_hash d new_pred)
+      g
+
+  let add_edge_htbl g s d =
     let old_pred = try PredHash.find pred_hash d with _ -> PowProc.empty in
     let new_pred = PowProc.add s old_pred in
     PredHash.replace pred_hash d new_pred;
     add_edge g s d
 
-  let fold_pred f _ v a =
+  let fold_pred_htbl f _ v a =
     let preds = try PredHash.find pred_hash v with _ -> PowProc.empty in
     PowProc.fold f preds a
 
+  let add_transitive_closure_htbl g0 =
+    let phi v g =
+      fold_succ
+        (fun sv g ->
+          fold_pred_htbl
+            (fun pv g ->
+              add_edge_htbl g pv sv;
+              g)
+            g v g)
+        g v g
+    in
+    fold_vertex phi g0 g0
+
+  let transitive_closure g0 =
+    bootstrap g0;
+    add_transitive_closure_htbl (copy g0)
+
   let succ g pid = try succ g pid with _ -> []
 end
-
-module SCC = Graph.Components.Make (G)
-module Oper = Graph.Oper.I (G)
 
 type t = { graph : G.t; trans_calls : G.t }
 
@@ -47,7 +77,7 @@ let callees pid g = G.succ g.graph pid |> PowProc.of_list
 let trans_callees pid g = G.succ g.trans_calls pid |> PowProc.of_list
 
 let compute_trans_calls callgraph =
-  let trans_calls = Oper.transitive_closure callgraph.graph in
+  let trans_calls = G.transitive_closure callgraph.graph in
   { callgraph with trans_calls }
 
 let is_rec callgraph pid =
