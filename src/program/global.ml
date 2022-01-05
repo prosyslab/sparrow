@@ -49,13 +49,18 @@ let remove_unreachable_functions global =
   let pids_all = PowProc.of_list (InterCfg.pidsof global.icfg) in
   let reachable =
     CallGraph.trans_callees InterCfg.global_proc global.callgraph
+    |> BatSet.fold PowProc.add !Options.keep_unreachable_from
+    |> BatSet.fold
+         (fun f rset ->
+           CallGraph.trans_callees f global.callgraph |> PowProc.join rset)
+         !Options.keep_unreachable_from
   in
   let unreachable =
     PowProc.diff pids_all reachable |> PowProc.remove InterCfg.global_proc
   in
   let recursive = PowProc.filter (fun pid -> is_rec pid global) reachable in
   let global =
-    if !Options.bugfinder >= 2 || !Options.extract_datalog_fact then global
+    if !Options.bugfinder >= 2 then global
     else PowProc.fold remove_function unreachable global
   in
   L.info ~level:1 "%-16s: %d\n" "#functions all" (PowProc.cardinal pids_all);

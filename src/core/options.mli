@@ -34,6 +34,8 @@ val optil : bool ref
 
 val keep_unreachable : bool ref
 
+val keep_unreachable_from : string BatSet.t ref
+
 (** {2 Context Sensitivity } *)
 
 val inline : string list ref

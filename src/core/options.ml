@@ -37,6 +37,8 @@ let optil = ref true
 
 let keep_unreachable = ref false
 
+let keep_unreachable_from = ref BatSet.empty
+
 (* Context & Flow Sensitivity *)
 let inline = ref []
 
@@ -319,7 +321,13 @@ let opts =
       "Filter alarms from recursive call cycles" );
     ("-optil", Arg.Set optil, "Optimize IL (default)");
     ("-no_optil", Arg.Clear optil, "Do not optimize IL");
-    ("-keep_unreachable", Arg.Set keep_unreachable, "Keep unreachable functions");
+    ( "-keep_unreachable",
+      Arg.Set keep_unreachable,
+      "Keep all unreachable functions" );
+    ( "-keep_unreachable_from",
+      Arg.String
+        (fun s -> keep_unreachable_from := BatSet.add s !keep_unreachable_from),
+      "Keep unreachable functions from the given function" );
     ( "-marshal_in",
       Arg.Set marshal_in,
       "Read analysis results from marshaled data" );

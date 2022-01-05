@@ -390,7 +390,6 @@ let print_datalog_fact _ global dug alarms =
       alarms
   in
   RelSyntax.print analysis global.icfg;
-  Provenance.print analysis global.relations;
   RelDUGraph.print analysis global dug alarms;
   RelDUGraph.print_alarm analysis alarms
 
