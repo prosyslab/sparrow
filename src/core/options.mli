@@ -58,6 +58,8 @@ val taint : bool ref
 
 (** {2 Unsoundness } *)
 
+val max_pre_iter : int ref
+
 val unsound_loop : string BatSet.t ref
 
 val unsound_lib : string BatSet.t ref

@@ -77,6 +77,8 @@ let profile = ref false
 let scaffold = ref true
 
 (* Unsoundness *)
+let max_pre_iter = ref 0
+
 let unsound_loop = ref BatSet.empty
 
 let unsound_lib = ref BatSet.empty
@@ -167,6 +169,9 @@ let memtrace = ref false
 
 let unsoundness_opts =
   [
+    ( "-max_pre_iter",
+      Arg.Set_int max_pre_iter,
+      "Maximum number of iterations for pre-analysis" );
     ( "-unsound_loop",
       Arg.String (fun s -> unsound_loop := BatSet.add s !unsound_loop),
       "Unsound loops" );

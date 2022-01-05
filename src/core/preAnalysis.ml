@@ -31,6 +31,9 @@ let rec fixpt nodes k (mem, global) =
   if Mem.le mem' mem && Dump.le global'.dump global.dump then (
     L.info ~level:1 "#iteration : %d\n" k;
     (mem', global'))
+  else if !Options.max_pre_iter > 0 && !Options.max_pre_iter = k then (
+    L.info ~level:1 "#iteration : %d (unsound)\n" k;
+    (mem', global'))
   else fixpt nodes (k + 1) (mem', global')
 
 let callees_of icfg node mem =
