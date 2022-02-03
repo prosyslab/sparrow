@@ -4,9 +4,10 @@ set -e
 export OPAMYES=1
 
 NCPU="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
-OCAML_VERSION="4.11.0+flambda"
-SPARROW_OPAM_SWITCH=sparrow-"$OCAML_VERSION"
-opam init --compiler=$OCAML_VERSION -j $NCPU --no-setup
+OCAML_VERSION="4.13.1"
+SPARROW_OPAM_SWITCH=sparrow-"$OCAML_VERSION"+flambda
+SPARROW_OPAM_SWITCH_OPTION="--package=ocaml-variants.${OCAML_VERSION}+options,ocaml-option-flambda"
+opam init --reinit --bare --no-setup
 
 switch_exists=no
 for installed_switch in $(opam switch list --short); do
@@ -16,7 +17,7 @@ for installed_switch in $(opam switch list --short); do
   fi
 done
 if [ "$switch_exists" = "no" ]; then
-  opam switch create $SPARROW_OPAM_SWITCH $OCAML_VERSION
+  opam switch create $SPARROW_OPAM_SWITCH_OPTION $SPARROW_OPAM_SWITCH
 else
   opam switch $SPARROW_OPAM_SWITCH
 fi
