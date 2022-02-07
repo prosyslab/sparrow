@@ -754,7 +754,7 @@ let transform_allocs fd g =
             let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
             let g = add_cmd node cmd g in
             (node, g))
-    | SizeOfE e -> transform lv (SizeOf (Cil.typeOf e)) loc node g
+    | SizeOfE e | CastE (_, SizeOfE e) -> transform lv (SizeOf (Cil.typeOf e)) loc node g
     | _ ->
         let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
         let g = add_cmd node cmd g in
