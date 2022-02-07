@@ -53,22 +53,24 @@ let parseOneFile fname =
   cil
 
 let parse_internal files =
-  if !Options.frontend = Options.Cil then List.map parseOneFile files
-  else
-    let _ = List.iter ClangFrontend.parse files in
-    List.map
-      (fun fname ->
-        let target =
-          Filename.concat
-            (Filename.concat !Options.outdir "preprocess")
-            (Filename.basename fname ^ ".bin")
-        in
-        let ic = open_in target in
-        let cil = Marshal.from_channel ic in
-        close_in ic;
-        if not (Feature.enabled "epicenter") then Rmtmps.removeUnusedTemps cil;
-        cil)
-      files
+  match !Options.frontend with
+  | Options.Cil -> List.map parseOneFile files
+  | Options.Claml -> List.map ClamlFrontend.parse files
+  | _ ->
+      let _ = List.iter ClangFrontend.parse files in
+      List.map
+        (fun fname ->
+          let target =
+            Filename.concat
+              (Filename.concat !Options.outdir "preprocess")
+              (Filename.basename fname ^ ".bin")
+          in
+          let ic = open_in target in
+          let cil = Marshal.from_channel ic in
+          close_in ic;
+          if not (Feature.enabled "epicenter") then Rmtmps.removeUnusedTemps cil;
+          cil)
+        files
 
 let parse () =
   match parse_internal !files with

@@ -12,7 +12,7 @@
 
 type task = All | Capture | Analyze
 
-type frontend = Clang | Cil
+type frontend = Clang | Claml | Cil
 
 val task : task ref
 

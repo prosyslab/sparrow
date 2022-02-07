@@ -5,16 +5,40 @@
  (wrapped false)
  (modules_without_implementation absDom absSem)
  (modules :standard \ vis main)
- (libraries apron apron.octMPQ batteries cil cil.all-features clangml
-   clangml.printer lymp ocamlgraph str yojson)
+ (libraries
+  apron
+  apron.octMPQ
+  batteries
+  cil
+  cil.all-features
+  clangml
+  clangml.printer
+  claml
+  lymp
+  ocamlgraph
+  str
+  yojson)
  (preprocess
   (pps ppx_compare)))
 
 (executable
  (name main)
  (modules main)
- (libraries apron apron.octMPQ batteries cil cil.all-features clangml
-   clangml.printer lymp memtrace ocamlgraph str yojson sparrow)
+ (libraries
+  apron
+  apron.octMPQ
+  batteries
+  cil
+  cil.all-features
+  clangml
+  clangml.printer
+  claml
+  lymp
+  memtrace
+  ocamlgraph
+  str
+  yojson
+  sparrow)
  (preprocess
   (pps ppx_compare)))
 

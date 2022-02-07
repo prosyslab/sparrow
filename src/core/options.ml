@@ -11,7 +11,7 @@
 
 type task = All | Capture | Analyze
 
-type frontend = Clang | Cil
+type frontend = Clang | Claml | Cil
 
 let task = ref All
 
@@ -225,7 +225,10 @@ let opts =
   [
     ( "-frontend",
       Arg.String
-        (fun s -> if s = "clang" then frontend := Clang else frontend := Cil),
+        (fun s ->
+          if s = "clang" then frontend := Clang
+          else if s = "claml" then frontend := Claml
+          else frontend := Cil),
       "Frontend" );
     ("-il", Arg.Set il, "Show the input program in IL");
     ("-cfg", Arg.Set cfg, "Print Cfg");
