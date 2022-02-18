@@ -228,6 +228,7 @@ type formatter = {
   memmove : F.formatter;
   memchr : F.formatter;
   strncmp : F.formatter;
+  sprintf : F.formatter;
   bufferoverrunlib : F.formatter;
   strcat : F.formatter;
   allocsize : F.formatter;
@@ -308,6 +309,11 @@ let pp_alarm_exp fmt aexp =
       let e2_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
       F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e0_id e1_id e2_id;
       F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
+  | BufferOverrunLib (("sprintf" as name), el, _) ->
+      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
+      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
+      F.fprintf fmt.sprintf "%s\t%s\t%s\n" id e0_id e1_id;
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e1_id
   | AllocSize (_, e1, _) ->
       let e1_id = find_exp RelSyntax.exp_map e1 in
       F.fprintf fmt.allocsize "%s\t%s\n" id e1_id;
@@ -331,6 +337,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.memmove ();
   F.pp_print_flush fmt.memchr ();
   F.pp_print_flush fmt.strncmp ();
+  F.pp_print_flush fmt.sprintf ();
   F.pp_print_flush fmt.bufferoverrunlib ();
   F.pp_print_flush fmt.allocsize ();
   F.pp_print_flush fmt.printf ();
@@ -351,6 +358,7 @@ let print_alarm analysis alarms =
   let oc_memcpy = open_out (dirname ^ "/AlarmMemcpy.facts") in
   let oc_memchr = open_out (dirname ^ "/AlarmMemchr.facts") in
   let oc_strncmp = open_out (dirname ^ "/AlarmStrncmp.facts") in
+  let oc_sprintf = open_out (dirname ^ "/AlarmSprintf.facts") in
   let oc_bufferoverrunlib =
     open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
   in
@@ -371,6 +379,7 @@ let print_alarm analysis alarms =
       memmove = F.formatter_of_out_channel oc_memmove;
       memchr = F.formatter_of_out_channel oc_memchr;
       strncmp = F.formatter_of_out_channel oc_strncmp;
+      sprintf = F.formatter_of_out_channel oc_sprintf;
       bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
       strcat = F.formatter_of_out_channel oc_strcat;
       allocsize = F.formatter_of_out_channel oc_allocsize;
@@ -403,6 +412,9 @@ let print_alarm analysis alarms =
       oc_strncpy;
       oc_memmove;
       oc_memcpy;
+      oc_memchr;
+      oc_strncmp;
+      oc_sprintf;
       oc_bufferoverrunlib;
       oc_strcat;
       oc_allocsize;

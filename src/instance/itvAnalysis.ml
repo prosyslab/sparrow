@@ -163,6 +163,14 @@ let inspect_aexp_bo node aexp mem queries =
         (fun (status, a, desc) ->
           { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         lst1
+  | BufferOverrunLib ("sprintf", [ e1; _; e3 ], loc) ->
+      let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
+      let v3 = ItvSem.eval (InterCfg.Node.get_pid node) e3 mem in
+      let lst = check_bo v1 (Some v3) in
+      List.map
+        (fun (status, a, desc) ->
+          { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
+        lst
   | _ -> [])
   @ queries
 

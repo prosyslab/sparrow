@@ -108,7 +108,16 @@ and c_exp e loc =
 and c_exps exps loc = List.fold_left (fun q e -> q @ c_exp e loc) [] exps
 
 let query_lib =
-  [ "strcpy"; "memcpy"; "memmove"; "strncpy"; "strcat"; "memchr"; "strncmp" ]
+  [
+    "strcpy";
+    "memcpy";
+    "memmove";
+    "strncpy";
+    "strcat";
+    "memchr";
+    "strncmp";
+    "sprintf";
+  ]
 
 let c_lib f es loc =
   match f.vname with
@@ -122,7 +131,7 @@ let c_lib f es loc =
       Strncpy (List.nth es 0, List.nth es 1, List.nth es 2, loc)
       :: c_exps es loc
   | "strcat" -> Strcat (List.nth es 0, List.nth es 1, loc) :: c_exps es loc
-  | "memchr" | "strncmp" ->
+  | "memchr" | "strncmp" | "sprintf" ->
       BufferOverrunLib
         (f.vname, [ List.nth es 0; List.nth es 1; List.nth es 2 ], loc)
       :: c_exps es loc
