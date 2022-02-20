@@ -131,7 +131,8 @@ let main () =
       |> case
            [
              (!Options.oct, octagon_analysis); (!Options.taint, taint_analysis);
-           ] (fun (global, _, _, _, alarm) -> (global, alarm))
+           ]
+           (fun (global, _, _, _, alarm) -> (global, alarm))
       |> fun (global, alarm) -> Report.print global alarm )
       |> fun () -> finalize t0
 

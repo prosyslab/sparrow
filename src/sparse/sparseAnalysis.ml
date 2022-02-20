@@ -220,8 +220,8 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
       [
         ("callgraph", CallGraph.to_json global.callgraph);
         ("cfgs", InterCfg.to_json global.icfg);
-        ("dugraph", DUGraph.to_json dug);
-        (*          ("dugraph-inter", DUGraph.to_json_inter dug access);*)
+        ("dugraph", DUGraph.to_json dug)
+        (*          ("dugraph-inter", DUGraph.to_json_inter dug access);*);
       ]
 
   let print_dug (global, dug) =

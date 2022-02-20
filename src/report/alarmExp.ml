@@ -131,7 +131,7 @@ let c_lib f es loc =
       Strncpy (List.nth es 0, List.nth es 1, List.nth es 2, loc)
       :: c_exps es loc
   | "strcat" -> Strcat (List.nth es 0, List.nth es 1, loc) :: c_exps es loc
-  | "memchr" | "strncmp" | "sprintf" ->
+  | ("memchr" | "strncmp" | "sprintf") when List.length es > 2 ->
       BufferOverrunLib
         (f.vname, [ List.nth es 0; List.nth es 1; List.nth es 2 ], loc)
       :: c_exps es loc
