@@ -364,6 +364,7 @@ let make_formatters dirname =
       oc_exit;
       oc_skip;
       oc_assign;
+      oc_assume;
       oc_alloc;
       oc_salloc;
       oc_call;
@@ -386,6 +387,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.exit ();
   F.pp_print_flush fmt.skip ();
   F.pp_print_flush fmt.assign ();
+  F.pp_print_flush fmt.assume ();
   F.pp_print_flush fmt.alloc ();
   F.pp_print_flush fmt.salloc ();
   F.pp_print_flush fmt.call ();
