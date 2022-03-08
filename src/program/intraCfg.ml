@@ -736,8 +736,8 @@ let transform_allocs fd g =
             let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
             let g = add_cmd node cmd g in
             (node, g))
-    | BinOp (Mult, SizeOfE ex1, ex2, _) | BinOp (Mult, ex2, SizeOfE ex1, _) ->(
-        let typ = (Cil.typeOf ex1) in
+    | BinOp (Mult, SizeOfE ex1, ex2, _) | BinOp (Mult, ex2, SizeOfE ex1, _) -> (
+        let typ = Cil.typeOf ex1 in
         match (lv, typ) with
         | (Var _, NoOffset), TComp (_, _) ->
             (* dynamic struct array alloc *)
