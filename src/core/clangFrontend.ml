@@ -1687,7 +1687,8 @@ and mk_local_struct_init scope cfields fundec action loc lv expr_list =
           let lv = Cil.addOffsetLval (Cil.Field (f, Cil.NoOffset)) lv in
           let instr = Cil.Set (lv, expr, loc) in
           let stmt = Cil.mkStmt (Cil.Instr [ instr ]) in
-          loop scope true fl [] (f :: fis) (stmts @ [ stmt ])
+          loop scope true fl [] (f :: fis)
+            (stmts @ [ stmt ])
             ((idx + 1) :: idx_list) (idx + 1)
     | [], _ -> (stmts, expr_list, scope, idx_list, idx)
   in
