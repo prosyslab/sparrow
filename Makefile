@@ -9,10 +9,12 @@ all:
 
 test: all
 	dune build test/test.exe
+	dune test
 	@script/check-format
 	@cd test; ../_build/default/test/test.exe
 
 promote:
+	dune promote
 	@script/promote
 
 clean:
