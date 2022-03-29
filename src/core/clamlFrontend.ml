@@ -2085,17 +2085,17 @@ and trans_while scope fundec loc stmt =
   let decl_stmt, scope =
     trans_var_decl_opt scope fundec loc condition_variable
   in
-  let cond_expr =
-    trans_expr scope (Some fundec) loc AExp cond |> snd |> get_opt "while_cond"
-  in
+  let cond_stmt, cond_expr_opt = trans_expr scope (Some fundec) loc AExp cond in
+  let cond_expr = get_opt "while_cond" cond_expr_opt in
   let break_stmt = Cil.mkBlock [ Cil.mkStmt (Cil.Break loc) ] in
   let body_stmt = trans_block scope fundec body in
   let bstmts =
     match Cil.constFold false cond_expr |> Cil.isInteger with
     | Some i64 when Cil.i64_to_int i64 = 1 -> body_stmt.Chunk.stmts
     | _ ->
-        Cil.mkStmt (Cil.If (cond_expr, empty_block, break_stmt, loc))
-        :: body_stmt.Chunk.stmts
+        cond_stmt
+        @ Cil.mkStmt (Cil.If (cond_expr, empty_block, break_stmt, loc))
+          :: body_stmt.Chunk.stmts
   in
   let block = { Cil.battrs = []; bstmts } in
   let stmts = decl_stmt @ [ Cil.mkStmt (Cil.Loop (block, loc, None, None)) ] in

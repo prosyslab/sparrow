@@ -94,6 +94,7 @@ let test_suites =
           "clang/while0.c";
           "clang/while1.c";
           "clang/while2.c";
+          "clang/while3.c";
           "clang/goto0.c";
           "clang/goto1.c";
           "clang/goto2.c";
@@ -220,6 +221,7 @@ let test_suites =
           "claml/while0.c";
           "claml/while1.c";
           "claml/while2.c";
+          "clang/while3.c";
           "claml/goto0.c";
           "claml/goto1.c";
           "claml/goto2.c";
