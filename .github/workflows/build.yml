@@ -13,7 +13,7 @@ jobs:
       - name: Set up OCaml
         uses: ocaml/setup-ocaml@v2
         with:
-          ocaml-compiler: 4.11.0
+          ocaml-compiler: 4.13.1
 
       - name: Install deps
         run: |
