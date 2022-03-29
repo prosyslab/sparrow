@@ -1901,3 +1901,19 @@
  (alias runtest)
  (action
   (diff nested-init0.expected nested-init0.output)))
+
+(rule
+ (deps compound-literal0.c)
+ (targets compound-literal0.output)
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (ignore-stderr
+     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+    (run clang-format)))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff compound-literal0.expected compound-literal0.output)))

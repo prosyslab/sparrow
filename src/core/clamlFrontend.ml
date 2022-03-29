@@ -431,6 +431,172 @@ let rec append_stmt_list_internal sl1 sl2 result =
 
 let append_stmt_list sl1 sl2 = append_stmt_list_internal sl1 sl2 [] |> List.rev
 
+let get_opt msg = function Some x -> x | None -> failwith msg
+
+let goto_count = ref 0
+
+module Chunk = struct
+  module LabelMap = struct
+    include Map.Make (String)
+
+    let pp_keys fmt m = iter (fun k _ -> F.fprintf fmt "%s\n" k) m
+
+    let append xm ym =
+      union
+        (fun x _ _ ->
+          F.fprintf F.std_formatter "1st LabelMap keys:\n%a" pp_keys xm;
+          F.fprintf F.std_formatter "2nd LabelMap keys:\n%a" pp_keys ym;
+          failwith ("duplicated labels: " ^ x))
+        xm ym
+  end
+
+  module GotoMap = struct
+    include Map.Make (struct
+      type t = Cil.stmt ref
+
+      let compare = compare
+    end)
+
+    let append xm ym =
+      union (fun _ _ _ -> failwith "duplicated goto targets") xm ym
+  end
+
+  type t = {
+    stmts : Cil.stmt list;
+    cases : Cil.stmt list;
+    labels : Cil.stmt ref LabelMap.t;
+    gotos : string GotoMap.t;
+    user_typs : Cil.global list;
+  }
+
+  let empty =
+    {
+      stmts = [];
+      cases = [];
+      labels = LabelMap.empty;
+      gotos = GotoMap.empty;
+      user_typs = [];
+    }
+
+  let append x y =
+    {
+      stmts = append_stmt_list x.stmts y.stmts;
+      cases = x.cases @ y.cases;
+      labels = LabelMap.append x.labels y.labels;
+      gotos = GotoMap.append x.gotos y.gotos;
+      user_typs = x.user_typs @ y.user_typs;
+    }
+end
+
+class replaceGotoVisitor gotos labels =
+  object
+    inherit Cil.nopCilVisitor
+
+    method! vstmt stmt =
+      match stmt.Cil.skind with
+      | Cil.Goto (placeholder, loc) -> (
+          match Chunk.GotoMap.find placeholder gotos with
+          | label ->
+              let target =
+                try Chunk.LabelMap.find label labels
+                with Not_found ->
+                  failwith
+                    (CilHelper.s_location loc ^ ": label " ^ label
+                   ^ " not found")
+              in
+              stmt.Cil.skind <- Cil.Goto (target, loc);
+              Cil.DoChildren
+          | exception Not_found -> Cil.DoChildren)
+      | _ -> Cil.DoChildren
+  end
+
+let append_label chunk label loc in_origin =
+  let l = Cil.Label (label, loc, in_origin) in
+  match chunk.Chunk.stmts with
+  | h :: _ ->
+      h.labels <- h.labels @ [ l ];
+      { chunk with labels = Chunk.LabelMap.add label (ref h) chunk.labels }
+  | [] ->
+      let h = Cil.mkStmt (Cil.Instr []) in
+      h.labels <- [ l ];
+      {
+        chunk with
+        stmts = [ h ];
+        labels = Chunk.LabelMap.add label (ref h) chunk.labels;
+      }
+
+let trans_storage decl =
+  match C.Decl.get_storage_class decl with
+  | C.Decl.Extern -> Cil.Extern
+  | C.Decl.Register -> Cil.Register
+  | C.Decl.Static -> Cil.Static
+  | _ -> Cil.NoStorage
+
+let trans_goto loc label =
+  let dummy_instr =
+    Cil.Asm
+      ( [],
+        [ "dummy goto target " ^ string_of_int !goto_count ],
+        [],
+        [],
+        [],
+        Cil.locUnknown )
+  in
+  goto_count := !goto_count + 1;
+  let placeholder = Cil.mkStmt (Cil.Instr [ dummy_instr ]) in
+  let reference = ref placeholder in
+  {
+    Chunk.empty with
+    stmts = [ Cil.mkStmt (Cil.Goto (reference, loc)) ];
+    gotos = Chunk.GotoMap.add reference label Chunk.GotoMap.empty;
+  }
+
+let att_nothrow = Cil.Attr ("nothrow", [])
+
+let att_gnu_inline = Cil.Attr ("gnu_inline", [])
+
+let trans_decl_attribute attrs =
+  List.fold_left
+    (fun attrs attr ->
+      match C.Attr.get_kind attr with
+      | C.AttrKind.GNUInline -> att_gnu_inline :: attrs
+      | C.AttrKind.NoThrow -> att_nothrow :: attrs
+      | _ -> attrs)
+    [] attrs
+
+let get_stmt_lst stmt =
+  match C.Stmt.get_kind stmt with
+  | C.StmtKind.CompoundStmt -> C.CompoundStmt.body_list stmt
+  | _ -> [ stmt ]
+
+let get_opt_stmt_lst stmt_opt =
+  match stmt_opt with Some s -> get_stmt_lst s | None -> []
+
+let rec add_labels scope sl =
+  let sc', new_sl =
+    List.fold_left
+      (fun (s', sls') stmt ->
+        match C.Stmt.get_kind stmt with
+        | C.StmtKind.LabelStmt ->
+            ( Scope.add_label (C.LabelStmt.get_name stmt) s',
+              get_stmt_lst (C.LabelStmt.get_sub_stmt stmt) @ sls' )
+        | CompoundStmt -> (s', C.CompoundStmt.body_list stmt @ sls')
+        | IfStmt ->
+            let tb = C.IfStmt.get_then stmt |> get_stmt_lst in
+            let fb =
+              if C.IfStmt.has_else_storage stmt then
+                C.IfStmt.get_else stmt |> Option.get |> get_stmt_lst
+              else []
+            in
+            (s', tb @ fb @ sls')
+        | ForStmt -> (s', (C.ForStmt.get_body stmt |> get_stmt_lst) @ sls')
+        | WhileStmt -> (s', (C.WhileStmt.get_body stmt |> get_stmt_lst) @ sls')
+        | DoStmt -> (s', (C.DoStmt.get_body stmt |> get_stmt_lst) @ sls')
+        | _ -> (s', sls'))
+      (scope, []) sl
+  in
+  if new_sl = [] then sc' else add_labels sc' new_sl
+
 let rec trans_type ?(compinfo = None) scope typ =
   (*   F.eprintf "==%a\n==" C.QualType.pp typ; *)
   match C.Type.get_kind typ.C.QualType.ty with
@@ -802,11 +968,26 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
   | OpaqueValueExpr ->
       C.OpaqueValueExpr.get_source_expr expr
       |> trans_expr scope fundec_opt loc action
+  | CompoundLiteralExpr ->
+      (* see https://en.cppreference.com/w/c/language/compound_literal *)
+      trans_compound_literal_expr scope fundec_opt loc expr
   | _ ->
       L.warn ~to_consol:true "Unknown expr %s at %s\n"
         (C.Expr.get_kind_name expr)
         (CilHelper.s_location loc);
       ([], Some Cil.zero)
+
+and trans_compound_literal_expr scope fundec_opt loc expr =
+  let fundec = Option.get fundec_opt in
+  let typ = C.CompoundLiteralExpr.get_type expr |> trans_type scope in
+  let varinfo, scope = create_local_variable scope fundec "tmp" typ in
+  let lv = (Cil.Var varinfo, Cil.NoOffset) in
+  let stmts =
+    C.CompoundLiteralExpr.get_initializer expr
+    |> handle_stmt_init scope typ fundec loc ADrop lv
+    |> fst
+  in
+  (stmts, Some (Cil.Lval lv))
 
 and trans_unary_operator scope fundec_opt loc action kind expr =
   let get_var var_opt =
@@ -1028,8 +1209,6 @@ and trans_call scope skip_lhs fundec_opt loc callee args =
   (append_instr (callee_insts @ args_insts) instr, retvar_exp)
 
 and trans_member scope fundec_opt loc base arrow field =
-  (* match base with
-     | Some b -> ( *)
   let _, bexp = trans_expr scope fundec_opt loc ADrop base in
   match bexp with
   | Some e when arrow ->
@@ -1186,173 +1365,7 @@ and trans_unary_expr scope fundec_opt loc e =
       let typ = trans_type scope t in
       ([], Some (Cil.AlignOf typ))
 
-let get_opt msg = function Some x -> x | None -> failwith msg
-
-let goto_count = ref 0
-
-module Chunk = struct
-  module LabelMap = struct
-    include Map.Make (String)
-
-    let pp_keys fmt m = iter (fun k _ -> F.fprintf fmt "%s\n" k) m
-
-    let append xm ym =
-      union
-        (fun x _ _ ->
-          F.fprintf F.std_formatter "1st LabelMap keys:\n%a" pp_keys xm;
-          F.fprintf F.std_formatter "2nd LabelMap keys:\n%a" pp_keys ym;
-          failwith ("duplicated labels: " ^ x))
-        xm ym
-  end
-
-  module GotoMap = struct
-    include Map.Make (struct
-      type t = Cil.stmt ref
-
-      let compare = compare
-    end)
-
-    let append xm ym =
-      union (fun _ _ _ -> failwith "duplicated goto targets") xm ym
-  end
-
-  type t = {
-    stmts : Cil.stmt list;
-    cases : Cil.stmt list;
-    labels : Cil.stmt ref LabelMap.t;
-    gotos : string GotoMap.t;
-    user_typs : Cil.global list;
-  }
-
-  let empty =
-    {
-      stmts = [];
-      cases = [];
-      labels = LabelMap.empty;
-      gotos = GotoMap.empty;
-      user_typs = [];
-    }
-
-  let append x y =
-    {
-      stmts = append_stmt_list x.stmts y.stmts;
-      cases = x.cases @ y.cases;
-      labels = LabelMap.append x.labels y.labels;
-      gotos = GotoMap.append x.gotos y.gotos;
-      user_typs = x.user_typs @ y.user_typs;
-    }
-end
-
-class replaceGotoVisitor gotos labels =
-  object
-    inherit Cil.nopCilVisitor
-
-    method! vstmt stmt =
-      match stmt.Cil.skind with
-      | Cil.Goto (placeholder, loc) -> (
-          match Chunk.GotoMap.find placeholder gotos with
-          | label ->
-              let target =
-                try Chunk.LabelMap.find label labels
-                with Not_found ->
-                  failwith
-                    (CilHelper.s_location loc ^ ": label " ^ label
-                   ^ " not found")
-              in
-              stmt.Cil.skind <- Cil.Goto (target, loc);
-              Cil.DoChildren
-          | exception Not_found -> Cil.DoChildren)
-      | _ -> Cil.DoChildren
-  end
-
-let append_label chunk label loc in_origin =
-  let l = Cil.Label (label, loc, in_origin) in
-  match chunk.Chunk.stmts with
-  | h :: _ ->
-      h.labels <- h.labels @ [ l ];
-      { chunk with labels = Chunk.LabelMap.add label (ref h) chunk.labels }
-  | [] ->
-      let h = Cil.mkStmt (Cil.Instr []) in
-      h.labels <- [ l ];
-      {
-        chunk with
-        stmts = [ h ];
-        labels = Chunk.LabelMap.add label (ref h) chunk.labels;
-      }
-
-let trans_storage decl =
-  match C.Decl.get_storage_class decl with
-  | C.Decl.Extern -> Cil.Extern
-  | C.Decl.Register -> Cil.Register
-  | C.Decl.Static -> Cil.Static
-  | _ -> Cil.NoStorage
-
-let trans_goto loc label =
-  let dummy_instr =
-    Cil.Asm
-      ( [],
-        [ "dummy goto target " ^ string_of_int !goto_count ],
-        [],
-        [],
-        [],
-        Cil.locUnknown )
-  in
-  goto_count := !goto_count + 1;
-  let placeholder = Cil.mkStmt (Cil.Instr [ dummy_instr ]) in
-  let reference = ref placeholder in
-  {
-    Chunk.empty with
-    stmts = [ Cil.mkStmt (Cil.Goto (reference, loc)) ];
-    gotos = Chunk.GotoMap.add reference label Chunk.GotoMap.empty;
-  }
-
-let att_nothrow = Cil.Attr ("nothrow", [])
-
-let att_gnu_inline = Cil.Attr ("gnu_inline", [])
-
-let trans_decl_attribute attrs =
-  List.fold_left
-    (fun attrs attr ->
-      match C.Attr.get_kind attr with
-      | C.AttrKind.GNUInline -> att_gnu_inline :: attrs
-      | C.AttrKind.NoThrow -> att_nothrow :: attrs
-      | _ -> attrs)
-    [] attrs
-
-let get_stmt_lst stmt =
-  match C.Stmt.get_kind stmt with
-  | C.StmtKind.CompoundStmt -> C.CompoundStmt.body_list stmt
-  | _ -> [ stmt ]
-
-let get_opt_stmt_lst stmt_opt =
-  match stmt_opt with Some s -> get_stmt_lst s | None -> []
-
-let rec add_labels scope sl =
-  let sc', new_sl =
-    List.fold_left
-      (fun (s', sls') stmt ->
-        match C.Stmt.get_kind stmt with
-        | C.StmtKind.LabelStmt ->
-            ( Scope.add_label (C.LabelStmt.get_name stmt) s',
-              get_stmt_lst (C.LabelStmt.get_sub_stmt stmt) @ sls' )
-        | CompoundStmt -> (s', C.CompoundStmt.body_list stmt @ sls')
-        | IfStmt ->
-            let tb = C.IfStmt.get_then stmt |> get_stmt_lst in
-            let fb =
-              if C.IfStmt.has_else_storage stmt then
-                C.IfStmt.get_else stmt |> Option.get |> get_stmt_lst
-              else []
-            in
-            (s', tb @ fb @ sls')
-        | ForStmt -> (s', (C.ForStmt.get_body stmt |> get_stmt_lst) @ sls')
-        | WhileStmt -> (s', (C.WhileStmt.get_body stmt |> get_stmt_lst) @ sls')
-        | DoStmt -> (s', (C.DoStmt.get_body stmt |> get_stmt_lst) @ sls')
-        | _ -> (s', sls'))
-      (scope, []) sl
-  in
-  if new_sl = [] then sc' else add_labels sc' new_sl
-
-let rec trans_stmt scope fundec stmt : Chunk.t * Scope.t =
+and trans_stmt scope fundec stmt : Chunk.t * Scope.t =
   let loc = C.Stmt.get_source_location stmt |> trans_location in
   match C.Stmt.get_kind stmt with
   | C.StmtKind.NullStmt | AttributedStmt ->
