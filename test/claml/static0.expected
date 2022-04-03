@@ -3,7 +3,7 @@
 
 #line 6 "static0.c"
 struct S {
-  int (*fp)();
+  int (*fp)(void);
 };
 #line 1 "static0.c"
 static int static_f(void) {

@@ -598,7 +598,6 @@ let rec add_labels scope sl =
   if new_sl = [] then sc' else add_labels sc' new_sl
 
 let rec trans_type ?(compinfo = None) scope typ =
-  (*   F.eprintf "==%a\n==" C.QualType.pp typ; *)
   match C.Type.get_kind typ.C.QualType.ty with
   | C.TypeKind.PointerType -> (
       try
@@ -712,21 +711,6 @@ and trans_builtin_type t =
       failwith "trans_builtin_type"
 
 and trans_function_type scope fundec_opt decl_opt typ =
-  let ty = typ.C.QualType.ty in
-  let rec is_function_type_variadic typ =
-    match C.Type.get_kind typ.C.QualType.ty with
-    | C.TypeKind.FunctionProtoType -> C.FunctionProtoType.is_variadic typ.ty
-    | C.TypeKind.FunctionNoProtoType -> false
-    | C.TypeKind.TypedefType ->
-        C.TypedefType.get_decl typ.ty
-        |> C.TypedefDecl.get_underlying_type |> is_function_type_variadic
-    | C.TypeKind.ParenType ->
-        C.ParenType.desugar typ.ty |> is_function_type_variadic
-    | _ ->
-        F.fprintf F.err_formatter "%a (%s)\n" C.QualType.pp typ
-          (C.Type.get_kind_name typ.ty);
-        assert false
-  in
   let return_typ =
     match decl_opt with
     | Some decl ->
@@ -734,43 +718,62 @@ and trans_function_type scope fundec_opt decl_opt typ =
         trans_type scope rt
     | _ -> trans_type scope (C.FunctionType.return_type typ.C.QualType.ty)
   in
-  let is_variadic = is_function_type_variadic typ in
   let param_types, var_arg, scope =
-    match decl_opt with
-    | Some decl ->
-        trans_parameter_types_with_decls scope fundec_opt
-          (C.FunctionDecl.get_params decl)
-          is_variadic
-    | None ->
-        trans_parameter_types_without_decls scope
-          (C.FunctionType.param_types ty)
-          is_variadic
+    trans_parameter_types_with_decls_new scope fundec_opt decl_opt typ
   in
   (Cil.TFun (return_typ, param_types, var_arg, []), scope)
 
-and trans_parameter_types_with_decls scope fundec_opt params is_variadic =
-  match params with
-  | [] -> (None, false, scope)
-  | _ ->
+and trans_parameter_types_with_decls_new scope fundec_opt decl_opt typ =
+  match (C.Type.get_kind typ.C.QualType.ty, decl_opt) with
+  | C.TypeKind.FunctionProtoType, Some decl ->
+      let is_variadic = C.FunctionProtoType.is_variadic typ.ty in
+      let scope, formals =
+        C.FunctionDecl.get_params decl
+        |> List.fold_left
+             (fun (scope, formals) param ->
+               let param_typ =
+                 trans_type scope (C.ParmVarDecl.get_type param)
+               in
+               let name = C.ParmVarDecl.get_name param in
+               let result = (name, param_typ, []) in
+               if name = "" then (scope, result :: formals)
+               else
+                 let make_var =
+                   match fundec_opt with
+                   | Some fundec -> fun n t -> Cil.makeFormalVar fundec n t
+                   | None -> fun n t -> Cil.makeVarinfo false n t
+                 in
+                 let vi = make_var name param_typ in
+                 let scope = Scope.add name (EnvData.EnvVar vi) scope in
+                 (scope, result :: formals))
+             (scope, [])
+      in
+      (List.rev formals |> Option.some, is_variadic, scope)
+  | C.TypeKind.FunctionProtoType, None ->
+      let param_types = C.FunctionType.param_types typ.C.QualType.ty in
+      let is_variadic = C.FunctionProtoType.is_variadic typ.ty in
       let scope, formals =
         List.fold_left
           (fun (scope, formals) param ->
-            let param_typ = trans_type scope (C.ParmVarDecl.get_type param) in
-            let name = C.ParmVarDecl.get_name param in
+            let param_typ = trans_type scope param in
+            let name = "" in
             let result = (name, param_typ, []) in
-            if name = "" then (scope, result :: formals)
-            else
-              let make_var =
-                match fundec_opt with
-                | Some fundec -> fun n t -> Cil.makeFormalVar fundec n t
-                | None -> fun n t -> Cil.makeVarinfo false n t
-              in
-              let vi = make_var name param_typ in
-              let scope = Scope.add name (EnvData.EnvVar vi) scope in
-              (scope, result :: formals))
-          (scope, []) params
+            (scope, result :: formals))
+          (scope, []) param_types
       in
       (List.rev formals |> Option.some, is_variadic, scope)
+  | C.TypeKind.FunctionNoProtoType, _ -> (None, false, scope)
+  | C.TypeKind.TypedefType, _ ->
+      C.TypedefType.get_decl typ.ty
+      |> C.TypedefDecl.get_underlying_type
+      |> trans_parameter_types_with_decls_new scope fundec_opt decl_opt
+  | C.TypeKind.ParenType, _ ->
+      C.ParenType.desugar typ.ty
+      |> trans_parameter_types_with_decls_new scope fundec_opt decl_opt
+  | _ ->
+      F.fprintf F.err_formatter "%a (%s)\n" C.QualType.pp typ
+        (C.Type.get_kind_name typ.ty);
+      assert false
 
 and trans_parameter_types_without_decls scope param_types is_variadic =
   match param_types with
