@@ -750,7 +750,7 @@ and trans_parameter_types_with_decls_new scope fundec_opt decl_opt typ =
       in
       (List.rev formals |> Option.some, is_variadic, scope)
   | C.TypeKind.FunctionProtoType, None ->
-      let param_types = C.FunctionType.param_types typ.C.QualType.ty in
+      let param_types = C.FunctionProtoType.param_types typ.C.QualType.ty in
       let is_variadic = C.FunctionProtoType.is_variadic typ.ty in
       let scope, formals =
         List.fold_left
