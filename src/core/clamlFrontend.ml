@@ -685,6 +685,8 @@ let rec trans_type ?(compinfo = None) scope typ =
       in
       let attr = trans_attribute typ in
       Cil.TArray (elem_type, Some (Option.get size), attr)
+  | TypeOfType ->
+      C.TypeOfType.get_underlying_type typ.ty |> trans_type ~compinfo scope
   | TypeOfExprType ->
       C.TypeOfExprType.get_underlying_expr typ.ty
       |> C.Expr.get_type |> trans_type ~compinfo scope
@@ -1359,14 +1361,14 @@ and trans_unary_expr scope fundec_opt loc e =
       let _, exp = trans_expr scope fundec_opt loc ADrop e in
       match exp with Some e -> ([], Some (Cil.SizeOfE e)) | None -> ([], None))
   | (AlignOf | VecStep | OpenMPRequiredSimdAlign | PreferredAlignOf)
-    when C.UnaryExprOrTypeTraitExpr.is_expr e -> (
-      let e = C.UnaryExprOrTypeTraitExpr.get_argument_expr e in
-      let _, exp = trans_expr scope fundec_opt loc ADrop e in
-      match exp with Some e -> ([], Some (Cil.AlignOfE e)) | None -> ([], None))
-  | AlignOf | VecStep | OpenMPRequiredSimdAlign | PreferredAlignOf ->
+    when C.UnaryExprOrTypeTraitExpr.is_argument_type e ->
       let t = C.UnaryExprOrTypeTraitExpr.get_argument_type e in
       let typ = trans_type scope t in
       ([], Some (Cil.AlignOf typ))
+  | AlignOf | VecStep | OpenMPRequiredSimdAlign | PreferredAlignOf -> (
+      let e = C.UnaryExprOrTypeTraitExpr.get_argument_expr e in
+      let _, exp = trans_expr scope fundec_opt loc ADrop e in
+      match exp with Some e -> ([], Some (Cil.AlignOfE e)) | None -> ([], None))
 
 and trans_stmt scope fundec stmt : Chunk.t * Scope.t =
   let loc = C.Stmt.get_source_location stmt |> trans_location in
@@ -2713,6 +2715,7 @@ let split_decl tu =
   |> fun (ts, vs) -> (List.rev ts, List.rev vs)
 
 let parse fname =
+  C.initialize ~debug:false ();
   let tu = C.TranslationUnit.parse_file [| fname |] in
   let scope = initialize_builtins (Scope.create ()) in
   (* to make it consistent with CIL, translate types first, vars next *)
