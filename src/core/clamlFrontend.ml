@@ -985,6 +985,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
 and trans_compound_literal_expr scope fundec_opt loc expr =
   match fundec_opt with
   | Some fundec ->
+      let scope = Scope.enter_block scope in
       let typ = C.CompoundLiteralExpr.get_type expr |> trans_type scope in
       let varinfo, scope = create_local_variable scope fundec "tmp" typ in
       let lv = (Cil.Var varinfo, Cil.NoOffset) in
