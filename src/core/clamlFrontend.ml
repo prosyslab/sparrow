@@ -1556,11 +1556,15 @@ and handle_stmt_init scope typ fundec loc action lv e =
   (* primitive array *)
   | InitListExpr, Cil.TArray (arr_typ, Some arr_exp, _)
     when is_primitive_typ arr_typ ->
-      C.InitListExpr.get_inits e
+      (match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e)
+      |> C.InitListExpr.get_inits
       |> mk_arr_stmt scope fundec loc action lv arr_exp
   (* struct array *)
   | InitListExpr, Cil.TArray (arr_typ, Some arr_exp, _)
     when is_struct_typ arr_typ ->
+      let e =
+        match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
+      in
       let el = C.InitListExpr.get_inits e in
       let ci =
         match Cil.unrollType arr_typ with
@@ -1590,6 +1594,9 @@ and handle_stmt_init scope typ fundec loc action lv e =
       (stmts, scope)
   (* struct *)
   | InitListExpr, Cil.TComp (ci, _) ->
+      let e =
+        match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
+      in
       let el = C.InitListExpr.get_inits e in
       let stmts, _, scope =
         mk_local_struct_init scope ci.cfields fundec action loc lv el
@@ -1597,6 +1604,9 @@ and handle_stmt_init scope typ fundec loc action lv e =
       (stmts, scope)
   (* primitive init list (contains only one element) *)
   | InitListExpr, _ ->
+      let e =
+        match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
+      in
       let el = C.InitListExpr.get_inits e in
       let e =
         if List.length el <> 1 then
@@ -2649,6 +2659,9 @@ and mk_global_struct_init scope loc typ cfields expr_list =
 and trans_global_init scope loc typ e =
   match (C.Expr.get_kind e, Cil.unrollType typ) with
   | C.StmtKind.InitListExpr, Cil.TArray (elt_typ, None, _) ->
+      let e =
+        match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
+      in
       let el = C.InitListExpr.get_inits e in
       let init_list =
         List.fold_left
@@ -2660,6 +2673,9 @@ and trans_global_init scope loc typ e =
       in
       Cil.CompoundInit (typ, init_list)
   | InitListExpr, Cil.TArray (elt_typ, Some len_exp, _) ->
+      let e =
+        match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
+      in
       let el = C.InitListExpr.get_inits e in
       let arr_len =
         match len_exp with
@@ -2682,9 +2698,15 @@ and trans_global_init scope loc typ e =
       in
       Cil.CompoundInit (typ, init_list)
   | InitListExpr, Cil.TComp (ci, _) ->
+      let e =
+        match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
+      in
       let el = C.InitListExpr.get_inits e in
       mk_global_struct_init scope loc typ ci.cfields el |> fst
   | InitListExpr, _ ->
+      let e =
+        match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
+      in
       let el = C.InitListExpr.get_inits e in
       if el <> [] then
         (* accept only first scalar and ignore remainder *)
