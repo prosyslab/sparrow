@@ -983,16 +983,21 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       ([], Some Cil.zero)
 
 and trans_compound_literal_expr scope fundec_opt loc expr =
-  let fundec = Option.get fundec_opt in
-  let typ = C.CompoundLiteralExpr.get_type expr |> trans_type scope in
-  let varinfo, scope = create_local_variable scope fundec "tmp" typ in
-  let lv = (Cil.Var varinfo, Cil.NoOffset) in
-  let stmts =
-    C.CompoundLiteralExpr.get_initializer expr
-    |> handle_stmt_init scope typ fundec loc ADrop lv
-    |> fst
-  in
-  (stmts, Some (Cil.Lval lv))
+  match fundec_opt with
+  | Some fundec ->
+      let typ = C.CompoundLiteralExpr.get_type expr |> trans_type scope in
+      let varinfo, scope = create_local_variable scope fundec "tmp" typ in
+      let lv = (Cil.Var varinfo, Cil.NoOffset) in
+      let stmts =
+        C.CompoundLiteralExpr.get_initializer expr
+        |> handle_stmt_init scope typ fundec loc ADrop lv
+        |> fst
+      in
+      (stmts, Some (Cil.Lval lv))
+  | None ->
+      L.warn ~to_consol:true
+        "Global compound liter is not fully supported yet\n";
+      ([], Some Cil.zero)
 
 and trans_unary_operator scope fundec_opt loc action kind expr =
   let get_var var_opt =
@@ -2332,6 +2337,15 @@ and trans_stmt_opt scope fundec = function
   | Some s -> trans_stmt scope fundec s
   | None -> (Chunk.empty, scope)
 
+and trans_global_var_decl scope loc storage typ name init =
+  let vi, scope = find_global_variable scope name typ in
+  vi.vstorage <- storage;
+  match init with
+  | Some init ->
+      vi.vinit.init <- Some init;
+      (Cil.GVar (vi, { Cil.init = Some init }, loc), scope)
+  | None -> (Cil.GVarDecl (vi, loc), scope)
+
 and trans_global_decl ?(new_name = "") scope (decl : C.Decl.t) =
   let loc = C.Decl.get_source_location decl |> trans_location in
   let storage = trans_storage decl in
@@ -2376,20 +2390,19 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Decl.t) =
       let scope = Scope.exit_function scope in
       ([ Cil.GVarDecl (svar, loc) ], scope)
   | VarDecl when C.VarDecl.has_init decl ->
+      let e = C.VarDecl.get_init decl |> Option.get in
       let typ = C.VarDecl.get_type decl |> trans_type scope in
       let name = C.VarDecl.get_name decl in
-      let vi, scope = find_global_variable scope name typ in
-      vi.vstorage <- storage;
-      let e = C.VarDecl.get_init decl |> Option.get in
-      let init = Some (trans_global_init scope loc typ e) in
-      vi.vinit.init <- init;
-      ([ Cil.GVar (vi, { Cil.init }, loc) ], scope)
+      let gdecls, init = trans_global_init scope loc typ e in
+      let vdecl, scope =
+        trans_global_var_decl scope loc storage typ name (Some init)
+      in
+      (gdecls @ [ vdecl ], scope)
   | VarDecl ->
       let typ = C.VarDecl.get_type decl |> trans_type scope in
       let name = C.VarDecl.get_name decl in
-      let vi, scope = find_global_variable scope name typ in
-      vi.vstorage <- storage;
-      ([ Cil.GVarDecl (vi, loc) ], scope)
+      trans_global_var_decl scope loc storage typ name None
+      |> fun (vdecl, scope) -> ([ vdecl ], scope)
   | RecordDecl when C.RecordDecl.is_complete_definition decl ->
       let is_struct = C.RecordDecl.is_struct decl in
       let globals, scope =
@@ -2594,7 +2607,7 @@ and mk_global_struct_init scope loc typ cfields expr_list =
             (idx + 1)
         else if f.Cil.fcomp.cstruct then
           if is_init_list e then
-            let init = trans_global_init scope loc f.ftype e in
+            let init = trans_global_init scope loc f.ftype e |> snd in
             loop union_flag fl el (f :: fis) (init :: inits)
               ((idx + 1) :: idx_list) (idx + 1)
           else
@@ -2618,7 +2631,7 @@ and mk_global_struct_init scope loc typ cfields expr_list =
             loop union_flag fl expr_remainders (f :: fis) (init :: inits)
               (i :: idx_list) (idx + 1)
         else if is_init_list e then
-          let init = trans_global_init scope loc f.ftype e in
+          let init = trans_global_init scope loc f.ftype e |> snd in
           loop true fl el (f :: fis) (init :: inits) ((idx + 1) :: idx_list)
             (idx + 1)
         else
@@ -2666,12 +2679,12 @@ and trans_global_init scope loc typ e =
       let init_list =
         List.fold_left
           (fun (r, o) i ->
-            let init = trans_global_init scope loc elt_typ i in
+            let init = trans_global_init scope loc elt_typ i |> snd in
             ((Cil.Index (Cil.integer o, Cil.NoOffset), init) :: r, o + 1))
           ([], 0) el
         |> fst |> List.rev
       in
-      Cil.CompoundInit (typ, init_list)
+      ([], Cil.CompoundInit (typ, init_list))
   | InitListExpr, Cil.TArray (elt_typ, Some len_exp, _) ->
       let e =
         match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
@@ -2691,18 +2704,18 @@ and trans_global_init scope loc typ e =
       let init_list =
         List.fold_left
           (fun (r, o) i ->
-            let init = trans_global_init scope loc elt_typ i in
+            let init = trans_global_init scope loc elt_typ i |> snd in
             ((Cil.Index (Cil.integer o, Cil.NoOffset), init) :: r, o + 1))
           ([], 0) el
         |> fst |> List.rev
       in
-      Cil.CompoundInit (typ, init_list)
+      ([], Cil.CompoundInit (typ, init_list))
   | InitListExpr, Cil.TComp (ci, _) ->
       let e =
         match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
       in
       let el = C.InitListExpr.get_inits e in
-      mk_global_struct_init scope loc typ ci.cfields el |> fst
+      ([], mk_global_struct_init scope loc typ ci.cfields el |> fst)
   | InitListExpr, _ ->
       let e =
         match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
@@ -2711,13 +2724,45 @@ and trans_global_init scope loc typ e =
       if el <> [] then
         (* accept only first scalar and ignore remainder *)
         List.hd el |> trans_expr scope None loc ADrop |> snd |> Option.get
-        |> fun x -> Cil.SingleInit x
+        |> fun x -> ([], Cil.SingleInit x)
       else
         trans_expr scope None loc ADrop e |> snd |> Option.get |> fun x ->
-        Cil.SingleInit x
+        ([], Cil.SingleInit x)
+  | ImplicitCastExpr, _ -> (
+      let gdecls, init =
+        C.ImplicitCastExpr.get_sub_expr e |> trans_global_init scope loc typ
+      in
+      let qt = C.CastExpr.get_type e in
+      let typ = trans_type scope qt in
+      match init with
+      | Cil.SingleInit x ->
+          if should_ignore_implicit_cast e qt x typ then
+            (gdecls, Cil.SingleInit x)
+          else (gdecls, Cil.SingleInit (Cil.CastE (typ, x)))
+      | _ -> failwith "Unknown case")
+  | CompoundLiteralExpr, Cil.TPtr (elt_typ, _) ->
+      let typ = C.CompoundLiteralExpr.get_type e |> trans_type scope in
+      let vi, scope = find_global_variable scope "tmp" typ in
+      let lv = (Cil.Var vi, Cil.NoOffset) in
+      let e = C.CompoundLiteralExpr.get_initializer e in
+      let e =
+        match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
+      in
+      let el = C.InitListExpr.get_inits e in
+      let init_list =
+        List.fold_left
+          (fun (r, o) i ->
+            let init = trans_global_init scope loc elt_typ i |> snd in
+            ((Cil.Index (Cil.integer o, Cil.NoOffset), init) :: r, o + 1))
+          ([], 0) el
+        |> fst |> List.rev
+      in
+      let init = Cil.CompoundInit (typ, init_list) in
+      let decls = [ Cil.GVar (vi, { Cil.init = Some init }, loc) ] in
+      (decls, Cil.SingleInit (Cil.Lval lv))
   | _ ->
       trans_expr scope None loc ADrop e |> snd |> Option.get |> fun x ->
-      Cil.SingleInit x
+      ([], Cil.SingleInit x)
 
 let initialize_builtins scope =
   H.fold
@@ -2746,9 +2791,9 @@ let parse fname =
     List.fold_left
       (fun (globals, scope) decl ->
         let new_globals, scope = trans_global_decl scope decl in
-        (List.rev_append new_globals globals, scope))
+        (globals @ new_globals, scope))
       ([], scope) (types @ vars)
-    |> fst |> List.rev
+    |> fst
   in
   {
     Cil.fileName = fname;
