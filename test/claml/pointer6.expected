@@ -39,7 +39,7 @@ int main(void) {
 #line 6
       f = tmp;
 #line 7
-      __cil_tmp4 = f();
+      __cil_tmp4 = (*f)();
     }
 #line 7
     return (__cil_tmp4);

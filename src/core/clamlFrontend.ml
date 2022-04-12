@@ -1193,7 +1193,13 @@ and trans_call scope skip_lhs fundec_opt loc callee args =
   let callee_insts, callee_opt =
     trans_expr ~allow_undef:true scope fundec_opt loc AExp callee
   in
-  let callee = match callee_opt with Some x -> x | None -> failwith "call" in
+  let callee =
+    match (callee_opt, C.ImplicitCastExpr.get_kind callee) with
+    | Some x, C.ImplicitCastKind.LValueToRValue ->
+        Cil.Lval (Cil.Mem x, Cil.NoOffset)
+    | Some x, _ -> x
+    | None, _ -> failwith "call"
+  in
   let args_insts, args_exprs =
     List.fold_left
       (fun (args_insts, args_exprs) arg ->

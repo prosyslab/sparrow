@@ -42,7 +42,7 @@ int main(int x) {
 #line 7
       slen = 10;
 #line 8
-      __cil_tmp6 = fn(word, "const char str", slen);
+      __cil_tmp6 = (*fn)(word, "const char str", slen);
     }
 #line 8
     return (__cil_tmp6);

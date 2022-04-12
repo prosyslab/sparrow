@@ -1231,6 +1231,22 @@
   (diff pointer6.expected pointer6.output)))
 
 (rule
+ (deps pointer7.c)
+ (targets pointer7.output)
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (ignore-stderr
+     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+    (run clang-format)))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff pointer7.expected pointer7.output)))
+
+(rule
  (deps predef-macro.c)
  (targets predef-macro.output)
  (action
