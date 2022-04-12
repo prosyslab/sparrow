@@ -81,7 +81,7 @@ module LabelEnv = struct
 end
 
 module Scope = struct
-  type t = BlockEnv.t list * LabelEnv.t list (* (BlockScope * FunScope) List *)
+  type t = BlockEnv.t list * LabelEnv.t list
 
   let empty = ([], [])
 
@@ -390,11 +390,9 @@ let sort_list_with_index data_list idx_list =
   |> List.sort (fun (_, idx1) (_, idx2) -> if idx1 > idx2 then 1 else 0)
   |> List.split |> fst |> List.rev
 
-let should_ignore_implicit_cast ?(is_ignore_fun_ptr_decay = true) expr qual_type
-    e typ =
+let should_ignore_implicit_cast expr qual_type e typ =
   match (C.CastExpr.get_kind expr, e) with
-  | C.ImplicitCastKind.FunctionToPointerDecay, _ | BuiltinFnToFnPtr, _ ->
-      is_ignore_fun_ptr_decay
+  | C.ImplicitCastKind.FunctionToPointerDecay, _ | BuiltinFnToFnPtr, _ -> true
   | LValueToRValue, _ | BitCast, _ -> true
   | ArrayToPointerDecay, Cil.Const (Cil.CStr _) -> true
   | _, _ ->
@@ -405,7 +403,6 @@ let should_ignore_implicit_cast ?(is_ignore_fun_ptr_decay = true) expr qual_type
       (expr_kind = C.StmtKind.ImplicitCastExpr
        && type_kind = C.TypeKind.FunctionNoProtoType
       || type_kind = C.TypeKind.FunctionProtoType)
-      && is_ignore_fun_ptr_decay
       (* ignore LValueToRValue *)
       || CilHelper.eq_typ (Cil.typeOf e) typ
 
@@ -649,15 +646,6 @@ let rec trans_type ?(compinfo = None) scope typ =
       let name = C.EnumDecl.get_name decl in
       let name = if name = "" then new_enum_id decl |> fst else name in
       Scope.find_type name scope
-  (* | InvalidType ->
-         L.warn ~to_consol:false "WARN: invalid type (use int instead)\n";
-         Cil.intType
-     | Vector vt ->
-         let size = Cil.integer vt.size in
-         let elem_type = trans_type ~compinfo scope vt.element in
-         let attr = trans_attribute typ in
-         Cil.TArray (elem_type, Some size, attr)
-  *)
   | BuiltinType -> trans_builtin_type typ
   | ConstantArrayType ->
       let size =
@@ -827,7 +815,7 @@ and trans_indirect_field_decl scope compinfo ifdecl =
 
 (* In case of failure, produce 0 if default_ptr is false, a temp var if true *)
 and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
-    ?(is_ignore_fun_ptr_decay = true) scope fundec_opt loc action expr =
+    scope fundec_opt loc action expr =
   match C.Expr.get_kind expr with
   | C.StmtKind.IntegerLiteral -> ([], Some (trans_integer_literal expr))
   | FloatingLiteral -> ([], Some (trans_floating_literal expr))
@@ -864,7 +852,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       else
         let e = Option.get expr_opt in
         (sl, Some (Cil.CastE (typ, e)))
-  | ImplicitCastExpr ->
+  | ImplicitCastExpr -> (
       let qt = C.CastExpr.get_type expr in
       let operand = C.CastExpr.get_sub_expr expr in
       let typ = trans_type scope qt in
@@ -874,12 +862,17 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
         trans_expr ~allow_undef ~skip_lhs:is_void scope fundec_opt loc action
           operand
       in
-      if is_void then (sl, None)
-      else
-        let e = Option.get expr_opt in
-        if should_ignore_implicit_cast ~is_ignore_fun_ptr_decay expr qt e typ
-        then (sl, Some e)
-        else (sl, Some (Cil.CastE (typ, e)))
+      match C.ImplicitCastExpr.get_kind expr with
+      | _ when is_void -> (sl, None)
+      | C.ImplicitCastKind.FunctionToPointerDecay -> (
+          let e = Option.get expr_opt in
+          match e with
+          | Cil.Lval lv -> (sl, Some (Cil.AddrOf lv))
+          | _ -> (sl, Some e))
+      | _ ->
+          let e = Option.get expr_opt in
+          if should_ignore_implicit_cast expr qt e typ then (sl, Some e)
+          else (sl, Some (Cil.CastE (typ, e))))
   | MemberExpr ->
       let base = C.MemberExpr.get_base expr in
       let is_arrow = C.MemberExpr.is_arrow expr in
@@ -954,8 +947,8 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       ([], Some const)
   | ConstantExpr ->
       C.ConstantExpr.get_sub_expr expr
-      |> trans_expr ~allow_undef ~skip_lhs ~default_ptr ~is_ignore_fun_ptr_decay
-           scope fundec_opt loc action
+      |> trans_expr ~allow_undef ~skip_lhs ~default_ptr scope fundec_opt loc
+           action
   | VAArgExpr ->
       (* TODO *)
       L.warn ~to_consol:false "UnexposedExpr at %s\n" (CilHelper.s_location loc);
@@ -1195,8 +1188,12 @@ and trans_call scope skip_lhs fundec_opt loc callee args =
   in
   let callee =
     match (callee_opt, C.ImplicitCastExpr.get_kind callee) with
+    (* fp(x) where fp is a function pointer => *fp(x) *)
     | Some x, C.ImplicitCastKind.LValueToRValue ->
         Cil.Lval (Cil.Mem x, Cil.NoOffset)
+    (* f(x) where f is a function name => ignore & *)
+    | Some (Cil.AddrOf e), C.ImplicitCastKind.FunctionToPointerDecay ->
+        Cil.Lval e
     | Some x, _ -> x
     | None, _ -> failwith "call"
   in
@@ -1301,14 +1298,10 @@ and trans_cond_op_internal scope fundec_opt loc cond then_branch else_branch =
   let cond_sl, cond_expr = trans_expr scope fundec_opt loc AExp cond in
   let then_sl, then_expr =
     match then_branch with
-    | Some tb ->
-        trans_expr ~is_ignore_fun_ptr_decay:false scope fundec_opt loc ADrop tb
+    | Some tb -> trans_expr scope fundec_opt loc ADrop tb
     | None -> ([], None)
   in
-  let else_sl, else_expr =
-    trans_expr ~is_ignore_fun_ptr_decay:false scope fundec_opt loc ADrop
-      else_branch
-  in
+  let else_sl, else_expr = trans_expr scope fundec_opt loc ADrop else_branch in
   let cond_expr = Option.get cond_expr in
   match fundec_opt with
   | None ->
@@ -1449,7 +1442,6 @@ and trans_stmt scope fundec stmt : Chunk.t * Scope.t =
       in
       ({ Chunk.empty with stmts }, scope)
   | _ ->
-      (*       C.Ast.pp_stmt F.err_formatter stmt ; *)
       let stmts = [ Cil.dummyStmt ] in
       ({ Chunk.empty with stmts }, scope)
 

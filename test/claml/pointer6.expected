@@ -30,10 +30,10 @@ int main(void) {
 #line 6
     if (x > 0) {
 #line 6
-      tmp = (int (*)())g;
+      tmp = &g;
     } else {
 #line 6
-      tmp = (int (*)())h;
+      tmp = &h;
     }
     {
 #line 6

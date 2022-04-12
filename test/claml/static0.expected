@@ -30,4 +30,4 @@ int non_static_f(void) {
   }
 }
 #line 10 "static0.c"
-struct S s = {static_f};
+struct S s = {&static_f};

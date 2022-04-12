@@ -20,7 +20,7 @@ int g(char *c1, char const *c2, int s) {
 #line 4 "pointer5.c"
 int main(int x) {
   int (*fn)(char *, char const *, int);
-  int (*tmp)(char *, char const *, int);
+  int (*tmp)(char *c1, char const *c2, int s);
   char *word;
   int slen;
   int __cil_tmp6;
@@ -29,10 +29,10 @@ int main(int x) {
 #line 5
     if (x > 10) {
 #line 5
-      tmp = (int (*)(char *, char const *, int))f;
+      tmp = &f;
     } else {
 #line 5
-      tmp = (int (*)(char *, char const *, int))g;
+      tmp = &g;
     }
     {
 #line 5
