@@ -6,7 +6,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -22,7 +31,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -38,7 +56,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -54,7 +81,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -70,7 +106,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -86,7 +131,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -102,7 +156,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -118,7 +181,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -134,7 +206,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -150,7 +231,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -166,7 +256,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -182,7 +281,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -198,7 +306,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -214,7 +331,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -230,7 +356,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -246,7 +381,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -262,7 +406,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -278,7 +431,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -294,7 +456,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -310,7 +481,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -326,7 +506,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -342,7 +531,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -358,7 +556,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -374,7 +581,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -390,7 +606,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -406,7 +631,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -422,7 +656,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -438,7 +681,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -454,7 +706,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -470,7 +731,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -486,7 +756,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -502,7 +781,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -518,7 +806,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -534,7 +831,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -550,7 +856,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -566,7 +881,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -582,7 +906,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -598,7 +931,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -614,7 +956,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -630,7 +981,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -646,7 +1006,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -662,7 +1031,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -678,7 +1056,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -694,7 +1081,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -710,7 +1106,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -726,7 +1131,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -742,7 +1156,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -758,7 +1181,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -774,7 +1206,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -790,7 +1231,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -806,7 +1256,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -822,7 +1281,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -838,7 +1306,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -854,7 +1331,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -870,7 +1356,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -886,7 +1381,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -902,7 +1406,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -918,7 +1431,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -934,7 +1456,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -950,7 +1481,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -966,7 +1506,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -982,7 +1531,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -998,7 +1556,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1014,7 +1581,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1030,7 +1606,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1046,7 +1631,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1062,7 +1656,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1078,7 +1681,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1094,7 +1706,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1110,7 +1731,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1126,7 +1756,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1142,7 +1781,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1158,7 +1806,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1174,7 +1831,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1190,7 +1856,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1206,7 +1881,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1222,7 +1906,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1238,7 +1931,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1254,7 +1956,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1270,7 +1981,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1286,7 +2006,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1302,7 +2031,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1318,7 +2056,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1334,7 +2081,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1350,7 +2106,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1366,7 +2131,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1382,7 +2156,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1398,7 +2181,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1414,7 +2206,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1430,7 +2231,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1446,7 +2256,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1462,7 +2281,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1478,7 +2306,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1494,7 +2331,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1510,7 +2356,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1526,7 +2381,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1542,7 +2406,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1558,7 +2431,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1574,7 +2456,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1590,7 +2481,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1606,7 +2506,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1622,7 +2531,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1638,7 +2556,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1654,7 +2581,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1670,7 +2606,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1686,7 +2631,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1702,7 +2656,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1718,7 +2681,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1734,7 +2706,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1750,7 +2731,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1766,7 +2756,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1782,7 +2781,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1798,7 +2806,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1814,7 +2831,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1830,7 +2856,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1846,7 +2881,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1862,7 +2906,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1878,7 +2931,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1894,7 +2956,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1910,7 +2981,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1926,7 +3006,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1942,7 +3031,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
@@ -1958,7 +3056,16 @@
    %{targets}
    (pipe-stdout
     (ignore-stderr
-     (run ../../src/main.exe -verbose 0 -frontend claml -il %{deps}))
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
     (run clang-format)))))
 
 (rule
