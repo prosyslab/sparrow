@@ -1210,7 +1210,16 @@ let to_json g =
            :: edges)
          g.graph [])
   in
-  `Assoc [ ("nodes", nodes); ("edges", edges) ]
+  let dom_tree_edges =
+    `List
+      (G.fold_edges
+         (fun v1 v2 edges ->
+           `List [ `String (Node.to_string v1); `String (Node.to_string v2) ]
+           :: edges)
+         g.dom_tree [])
+  in
+
+  `Assoc [ ("nodes", nodes); ("edges", edges); ("dom_tree", dom_tree_edges) ]
 
 let to_json_simple g =
   let nodes =

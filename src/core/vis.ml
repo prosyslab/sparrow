@@ -109,7 +109,7 @@ let dump_cfgs_with_dug json dug =
           Printf.fprintf chan "{\n";
           Printf.fprintf chan "node [shape=box]\n";
           (match cfg with
-          | `Assoc [ (_, `Assoc nodes); (_, `List edges) ] ->
+          | `Assoc [ (_, `Assoc nodes); ("edges", `List edges); _ ] ->
               dump_nodes chan nodes;
               dump_edges chan edges;
               dump_dug chan pid nodes dug
