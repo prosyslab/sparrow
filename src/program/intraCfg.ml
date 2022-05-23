@@ -212,6 +212,7 @@ type t = {
   cmd_map : (node, cmd) BatMap.t;
   dom_fronts : dom_fronts;
   dom_tree : dom_tree;
+  post_dom_fronts : dom_fronts;
   scc_list : node list list;
 }
 
@@ -225,6 +226,7 @@ let empty fd =
     graph = G.empty;
     cmd_map = BatMap.empty;
     dom_fronts = BatMap.empty;
+    post_dom_fronts = BatMap.empty;
     dom_tree = G.empty;
     scc_list = [];
   }
@@ -824,6 +826,8 @@ let insert_return_before_exit g =
   in
   list_fold add_return (pred Node.EXIT g) g
 
+module Oper = Graph.Oper.P (G)
+
 let compute_dom g =
   let dom_functions = Dom.compute_all (GDom.fromG g.graph) Node.ENTRY in
   let dom_tree =
@@ -843,7 +847,16 @@ let compute_dom g =
           dom_fronts)
       BatMap.empty (nodesof g)
   in
-  { g with dom_tree; dom_fronts }
+  let post_dom_functions = Dom.compute_all (Oper.mirror g.graph) Node.EXIT in
+  let post_dom_fronts =
+    List.fold_left
+      (fun post_dom_fronts node ->
+        BatMap.add node
+          (NodeSet.of_list (post_dom_functions.Dom.dom_frontier node))
+          post_dom_fronts)
+      BatMap.empty (nodesof g)
+  in
+  { g with dom_tree; dom_fronts; post_dom_fronts }
 
 let compute_scc g = { g with scc_list = Scc.scc_list g.graph }
 
@@ -1210,16 +1223,43 @@ let to_json g =
            :: edges)
          g.graph [])
   in
-  let dom_tree_edges =
+  let dom_fronts =
     `List
-      (G.fold_edges
-         (fun v1 v2 edges ->
-           `List [ `String (Node.to_string v1); `String (Node.to_string v2) ]
-           :: edges)
-         g.dom_tree [])
+      (BatMap.foldi
+         (fun v1 set edges ->
+           NodeSet.fold
+             (fun v2 edges ->
+               let p =
+                 `List
+                   [ `String (Node.to_string v1); `String (Node.to_string v2) ]
+               in
+               p :: edges)
+             set edges)
+         g.dom_fronts [])
   in
 
-  `Assoc [ ("nodes", nodes); ("edges", edges); ("dom_tree", dom_tree_edges) ]
+  let control_dep =
+    `List
+      (BatMap.foldi
+         (fun v1 set edges ->
+           NodeSet.fold
+             (fun v2 edges ->
+               let p =
+                 `List
+                   [ `String (Node.to_string v1); `String (Node.to_string v2) ]
+               in
+               p :: edges)
+             set edges)
+         g.post_dom_fronts [])
+  in
+
+  `Assoc
+    [
+      ("nodes", nodes);
+      ("edges", edges);
+      ("dom_fronts", dom_fronts);
+      ("control_dep", control_dep);
+    ]
 
 let to_json_simple g =
   let nodes =
