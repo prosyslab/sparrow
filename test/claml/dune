@@ -2349,6 +2349,31 @@
   (diff struct7.expected struct7.output)))
 
 (rule
+ (deps struct8.c)
+ (targets struct8.output)
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (ignore-stderr
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
+    (run clang-format)))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff struct8.expected struct8.output)))
+
+(rule
  (deps switch0.c)
  (targets switch0.output)
  (action

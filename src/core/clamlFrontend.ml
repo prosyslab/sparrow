@@ -160,14 +160,16 @@ module Scope = struct
     | [], _ when name = "__uint128_t" -> Cil.TInt (Cil.IULongLong, [])
     | _ -> failwith ("type of " ^ name ^ " not found")
 
-  let rec find_comp ?(compinfo = None) name = function
+  let rec find_comp ?(compinfos = []) name = function
     | h :: t, fs -> (
         try BlockEnv.find_comp name h
-        with Not_found -> find_comp ~compinfo name (t, fs))
-    | [], _ when compinfo <> None ->
-        let compinfo = Option.get compinfo in
-        if compinfo.Cil.cname = name then Cil.TComp (compinfo, [])
-        else failwith ("comp type of " ^ name ^ " not found (case 1)")
+        with Not_found -> find_comp ~compinfos name (t, fs))
+    | [], fs when compinfos <> [] -> (
+        match compinfos with
+        | compinfo :: compinfos ->
+            if compinfo.Cil.cname = name then Cil.TComp (compinfo, [])
+            else find_comp ~compinfos name ([], fs)
+        | [] -> failwith ("comp type of " ^ name ^ " not found (case 1)"))
     | _ -> failwith ("comp type of " ^ name ^ " not found (case 2)")
 
   let pp fmt scope =
@@ -594,24 +596,24 @@ let rec add_labels scope sl =
   in
   if new_sl = [] then sc' else add_labels sc' new_sl
 
-let rec trans_type ?(compinfo = None) scope typ =
+let rec trans_type ?(compinfos = []) scope typ =
   match C.Type.get_kind typ.C.QualType.ty with
   | C.TypeKind.PointerType -> (
       try
         let t = C.PointerType.get_pointee_type typ.ty in
-        Cil.TPtr (trans_type ~compinfo scope t, trans_attribute typ)
+        Cil.TPtr (trans_type ~compinfos scope t, trans_attribute typ)
       with _ ->
         (* TODO: https://github.com/prosyslab/sparrow/issues/28 *)
         L.warn ~to_consol:false "WARN: type not found\n";
         Cil.voidPtrType)
-  | ParenType -> C.ParenType.desugar typ.ty |> trans_type ~compinfo scope
+  | ParenType -> C.ParenType.desugar typ.ty |> trans_type ~compinfos scope
   | FunctionProtoType | FunctionNoProtoType ->
       trans_function_type scope None None typ |> fst
   | TypedefType ->
       let tname = C.TypedefType.get_decl typ.ty |> C.TypedefDecl.get_name in
       Scope.find_type tname scope
   | ElaboratedType ->
-      C.ElaboratedType.desugar typ.ty |> trans_type ~compinfo scope
+      C.ElaboratedType.desugar typ.ty |> trans_type ~compinfos scope
   | RecordType ->
       let decl = C.RecordType.get_decl typ.ty in
       let name = C.RecordDecl.get_name decl in
@@ -624,9 +626,12 @@ let rec trans_type ?(compinfo = None) scope typ =
             List.fold_left
               (fun fl decl ->
                 match C.Decl.get_kind decl with
-                | FieldDecl -> fl @ [ trans_field_decl scope compinfo decl ]
+                | FieldDecl ->
+                    fl @ [ trans_field_decl scope (compinfo :: compinfos) decl ]
                 | IndirectFieldDecl ->
-                    fl @ trans_indirect_field_decl scope compinfo decl
+                    fl
+                    @ trans_indirect_field_decl scope (compinfo :: compinfos)
+                        decl
                 | _ -> fl)
               [] fields
           in
@@ -640,7 +645,7 @@ let rec trans_type ?(compinfo = None) scope typ =
           (name, scope)
         else (name, scope)
       in
-      Scope.find_comp ~compinfo name scope
+      Scope.find_comp ~compinfos name scope
   | EnumType ->
       let decl = C.EnumType.get_decl typ.ty in
       let name = C.EnumDecl.get_name decl in
@@ -653,14 +658,14 @@ let rec trans_type ?(compinfo = None) scope typ =
       in
       let elem_type =
         C.ConstantArrayType.get_element_type typ.ty
-        |> trans_type ~compinfo scope
+        |> trans_type ~compinfos scope
       in
       let attr = trans_attribute typ in
       Cil.TArray (elem_type, Some size, attr)
   | IncompleteArrayType ->
       let elem_type =
         C.IncompleteArrayType.get_element_type typ.ty
-        |> trans_type ~compinfo scope
+        |> trans_type ~compinfos scope
       in
       let attr = trans_attribute typ in
       Cil.TArray (elem_type, None, attr)
@@ -669,19 +674,20 @@ let rec trans_type ?(compinfo = None) scope typ =
       let _, size = trans_expr scope None Cil.locUnknown AExp size in
       let elem_type =
         C.VariableArrayType.get_element_type typ.ty
-        |> trans_type ~compinfo scope
+        |> trans_type ~compinfos scope
       in
       let attr = trans_attribute typ in
       Cil.TArray (elem_type, Some (Option.get size), attr)
   | TypeOfType ->
-      C.TypeOfType.get_underlying_type typ.ty |> trans_type ~compinfo scope
+      C.TypeOfType.get_underlying_type typ.ty |> trans_type ~compinfos scope
   | TypeOfExprType ->
       C.TypeOfExprType.get_underlying_expr typ.ty
-      |> C.Expr.get_type |> trans_type ~compinfo scope
+      |> C.Expr.get_type
+      |> trans_type ~compinfos scope
   | DecayedType ->
-      C.DecayedType.get_original_type typ.ty |> trans_type ~compinfo scope
+      C.DecayedType.get_original_type typ.ty |> trans_type ~compinfos scope
   | AdjustedType ->
-      C.AdjustedType.get_original_type typ.ty |> trans_type ~compinfo scope
+      C.AdjustedType.get_original_type typ.ty |> trans_type ~compinfos scope
   | UnaryTransformType -> failwith "qwer"
   | _ -> failwith ("Unknown type " ^ C.Type.get_kind_name typ.ty)
 
@@ -780,17 +786,15 @@ and trans_parameter_types_without_decls scope param_types is_variadic =
       in
       (List.rev formals |> Option.some, is_variadic, scope)
 
-and trans_field_decl scope compinfo field =
+and trans_field_decl scope compinfos field =
   let floc = C.Decl.get_source_location field |> trans_location in
   match C.Decl.get_kind field with
   | C.DeclKind.FieldDecl ->
-      let typ =
-        C.FieldDecl.get_type field |> trans_type ~compinfo:(Some compinfo) scope
-      in
+      let typ = C.FieldDecl.get_type field |> trans_type ~compinfos scope in
       (C.FieldDecl.get_name field, typ, None, [], floc)
   | _ -> failwith_decl field
 
-and trans_indirect_field_decl scope compinfo ifdecl =
+and trans_indirect_field_decl scope compinfos ifdecl =
   match C.Decl.get_kind ifdecl with
   | C.DeclKind.IndirectFieldDecl ->
       (* IndirectField consists of several FieldDecls.
@@ -809,7 +813,7 @@ and trans_indirect_field_decl scope compinfo ifdecl =
              []
       in
       List.fold_left
-        (fun res ndecl -> res @ [ trans_field_decl scope compinfo ndecl ])
+        (fun res ndecl -> res @ [ trans_field_decl scope compinfos ndecl ])
         [] named_decls
   | _ -> failwith_decl ifdecl
 
@@ -1236,7 +1240,7 @@ and trans_member scope fundec_opt loc base arrow field =
               | _ -> "unknown"
             in
             List.find (fun f -> f.Cil.fname = name) comp.Cil.cfields
-        | _ -> failwith "fail"
+        | ty -> failwith ("fail (" ^ CilHelper.s_type ty ^ ")")
       in
       if fieldinfo.Cil.fname = "" then e
       else
@@ -1474,9 +1478,9 @@ and trans_var_decl_list scope fundec loc action dl =
                  (fun fl decl ->
                    match C.Decl.get_kind decl with
                    | C.DeclKind.FieldDecl ->
-                       fl @ [ trans_field_decl scope compinfo decl ]
+                       fl @ [ trans_field_decl scope [ compinfo ] decl ]
                    | C.DeclKind.IndirectFieldDecl ->
-                       fl @ trans_indirect_field_decl scope compinfo decl
+                       fl @ trans_indirect_field_decl scope [ compinfo ] decl
                    | _ -> fl)
                  []
           in
@@ -1498,9 +1502,9 @@ and trans_var_decl_list scope fundec loc action dl =
                  (fun fl decl ->
                    match C.Decl.get_kind decl with
                    | C.DeclKind.FieldDecl ->
-                       fl @ [ trans_field_decl scope compinfo decl ]
+                       fl @ [ trans_field_decl scope [ compinfo ] decl ]
                    | C.DeclKind.IndirectFieldDecl ->
-                       fl @ trans_indirect_field_decl scope compinfo decl
+                       fl @ trans_indirect_field_decl scope [ compinfo ] decl
                    | _ -> fl)
                  []
           in
@@ -2345,7 +2349,8 @@ and trans_global_var_decl scope loc storage typ name init =
       (Cil.GVar (vi, { Cil.init = Some init }, loc), scope)
   | None -> (Cil.GVarDecl (vi, loc), scope)
 
-and trans_global_decl ?(new_name = "") scope (decl : C.Decl.t) =
+and trans_global_decl ?(new_name = "") ?(compinfos = []) scope (decl : C.Decl.t)
+    =
   let loc = C.Decl.get_source_location decl |> trans_location in
   let storage = trans_storage decl in
   match C.Decl.get_kind decl with
@@ -2404,22 +2409,15 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Decl.t) =
       |> fun (vdecl, scope) -> ([ vdecl ], scope)
   | RecordDecl when C.RecordDecl.is_complete_definition decl ->
       let is_struct = C.RecordDecl.is_struct decl in
-      let globals, scope =
-        C.RecordDecl.field_list decl
-        |> List.fold_left
-             (fun (globals, scope) decl ->
-               let gs, scope = trans_global_decl scope decl in
-               (globals @ gs, scope))
-             ([], scope)
-      in
       let callback compinfo =
         List.fold_left
           (fun fl decl ->
             match C.Decl.get_kind decl with
             | C.DeclKind.FieldDecl ->
-                fl @ [ trans_field_decl scope compinfo decl ]
+                fl @ [ trans_field_decl scope (compinfo :: compinfos) decl ]
             | C.DeclKind.IndirectFieldDecl ->
-                fl @ trans_indirect_field_decl scope compinfo decl
+                fl
+                @ trans_indirect_field_decl scope (compinfo :: compinfos) decl
             | _ -> fl)
           []
           (C.RecordDecl.field_list decl)
@@ -2428,6 +2426,16 @@ and trans_global_decl ?(new_name = "") scope (decl : C.Decl.t) =
         if new_name = "" then new_record_id is_struct decl |> fst else new_name
       in
       let compinfo = Cil.mkCompInfo is_struct name callback [] in
+      let globals, scope =
+        C.RecordDecl.field_list decl
+        |> List.fold_left
+             (fun (globals, scope) decl ->
+               let gs, scope =
+                 trans_global_decl ~compinfos:(compinfo :: compinfos) scope decl
+               in
+               (globals @ gs, scope))
+             ([], scope)
+      in
       compinfo.cdefined <- true;
       if Scope.mem_comp name scope then (
         let typ = Scope.find_comp name scope in

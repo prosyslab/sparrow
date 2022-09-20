@@ -2,20 +2,20 @@
 /* print_CIL_Input is false */
 
 #line 3 "indirect-field2.c"
-struct __anonstruct_0 {
+struct __anonstruct_2 {
   int c;
 };
 #line 2 "indirect-field2.c"
 struct __anonstruct_1 {
-  struct __anonstruct_0 b;
+  struct __anonstruct_2 b;
 };
 #line 1 "indirect-field2.c"
-struct __anonstruct_2 {
+struct __anonstruct_0 {
   struct __anonstruct_1;
-  struct __anonstruct_0 b;
+  struct __anonstruct_2 b;
 };
 #line 7
-struct __anonstruct_2 a;
+struct __anonstruct_0 a;
 #line 8 "indirect-field2.c"
 int c(void) {
 

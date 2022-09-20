@@ -2,17 +2,17 @@
 /* print_CIL_Input is false */
 
 #line 3 "anonymous-struct1.c"
-struct __anonstruct_0 {};
+struct __anonstruct_2 {};
 #line 2 "anonymous-struct1.c"
 struct __anonstruct_1 {
-  struct __anonstruct_0 a;
+  struct __anonstruct_2 a;
 };
 #line 1 "anonymous-struct1.c"
-struct __anonstruct_2 {
+struct __anonstruct_0 {
   struct __anonstruct_1 b;
 };
 #line 6
-struct __anonstruct_2 c;
+struct __anonstruct_0 c;
 #line 7 "anonymous-struct1.c"
 int d(void) {
   void *p;
