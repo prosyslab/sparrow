@@ -1786,8 +1786,7 @@ and mk_local_struct_init scope cfields fundec action loc lv expr_list =
           let lv = Cil.addOffsetLval (Cil.Field (f, Cil.NoOffset)) lv in
           let instr = Cil.Set (lv, expr, loc) in
           let stmt = Cil.mkStmt (Cil.Instr [ instr ]) in
-          loop scope true fl [] (f :: fis)
-            (stmts @ [ stmt ])
+          loop scope true fl [] (f :: fis) (stmts @ [ stmt ])
             ((idx + 1) :: idx_list) (idx + 1)
     | [], _ -> (stmts, expr_list, scope, idx_list, idx)
   in
@@ -2409,6 +2408,29 @@ and trans_global_decl ?(new_name = "") ?(compinfos = []) scope (decl : C.Decl.t)
       |> fun (vdecl, scope) -> ([ vdecl ], scope)
   | RecordDecl when C.RecordDecl.is_complete_definition decl ->
       let is_struct = C.RecordDecl.is_struct decl in
+      let name =
+        if new_name = "" then new_record_id is_struct decl |> fst else new_name
+      in
+      (* 1. Make a dummy compinfo for this record for recursive type definition.
+       *    See test/claml/struct8.c. *)
+      let callback _ = [] in
+      let compinfo = Cil.mkCompInfo is_struct name callback [] in
+      let typ = Cil.TComp (compinfo, []) in
+      let scope =
+        if Scope.mem_comp name scope then scope
+        else Scope.add_comp name typ scope
+      in
+      let globals, scope =
+        C.RecordDecl.field_list decl
+        |> List.fold_left
+             (fun (globals, scope) decl ->
+               let gs, scope =
+                 trans_global_decl ~compinfos:(compinfo :: compinfos) scope decl
+               in
+               (globals @ gs, scope))
+             ([], scope)
+      in
+      (* 2. Now complete the type definition of this record *)
       let callback compinfo =
         List.fold_left
           (fun fl decl ->
@@ -2422,20 +2444,7 @@ and trans_global_decl ?(new_name = "") ?(compinfos = []) scope (decl : C.Decl.t)
           []
           (C.RecordDecl.field_list decl)
       in
-      let name =
-        if new_name = "" then new_record_id is_struct decl |> fst else new_name
-      in
       let compinfo = Cil.mkCompInfo is_struct name callback [] in
-      let globals, scope =
-        C.RecordDecl.field_list decl
-        |> List.fold_left
-             (fun (globals, scope) decl ->
-               let gs, scope =
-                 trans_global_decl ~compinfos:(compinfo :: compinfos) scope decl
-               in
-               (globals @ gs, scope))
-             ([], scope)
-      in
       compinfo.cdefined <- true;
       if Scope.mem_comp name scope then (
         let typ = Scope.find_comp name scope in
