@@ -1974,6 +1974,31 @@
   (diff pointer8.expected pointer8.output)))
 
 (rule
+ (deps pointer9.c)
+ (targets pointer9.output)
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (ignore-stderr
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
+    (run clang-format)))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff pointer9.expected pointer9.output)))
+
+(rule
  (deps predef-macro.c)
  (targets predef-macro.output)
  (action

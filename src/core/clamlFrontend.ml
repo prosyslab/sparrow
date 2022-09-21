@@ -866,6 +866,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
         trans_expr ~allow_undef ~skip_lhs:is_void scope fundec_opt loc action
           operand
       in
+
       match C.ImplicitCastExpr.get_kind expr with
       | _ when is_void -> (sl, None)
       | C.ImplicitCastKind.FunctionToPointerDecay -> (
@@ -2751,10 +2752,16 @@ and trans_global_init scope loc typ e =
       let qt = C.CastExpr.get_type e in
       let typ = trans_type scope qt in
       match init with
-      | Cil.SingleInit x ->
-          if should_ignore_implicit_cast e qt x typ then
-            (gdecls, Cil.SingleInit x)
-          else (gdecls, Cil.SingleInit (Cil.CastE (typ, x)))
+      | Cil.SingleInit x -> (
+          match C.ImplicitCastExpr.get_kind e with
+          | C.ImplicitCastKind.FunctionToPointerDecay -> (
+              match x with
+              | Cil.Lval lv -> (gdecls, Cil.SingleInit (Cil.AddrOf lv))
+              | _ -> (gdecls, init))
+          | _ ->
+              if should_ignore_implicit_cast e qt x typ then
+                (gdecls, Cil.SingleInit x)
+              else (gdecls, Cil.SingleInit (Cil.CastE (typ, x))))
       | _ -> failwith "Unknown case")
   | CompoundLiteralExpr, Cil.TPtr (elt_typ, _) ->
       let typ = C.CompoundLiteralExpr.get_type e |> trans_type scope in
