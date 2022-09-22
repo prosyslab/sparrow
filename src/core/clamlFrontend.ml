@@ -1059,10 +1059,12 @@ and trans_unary_operator scope fundec_opt loc action kind expr =
       let exp = Cil.BinOp (op, var, Cil.one, Cil.intType) in
       let instr = Cil.Set (lval_of_expr var, exp, loc) in
       (sl @ [ Cil.mkStmt (Cil.Instr [ instr ]) ], Some var)
-  | AddrOf ->
+  | AddrOf -> (
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
-      (sl, Some (Cil.AddrOf (lval_of_expr var)))
+      match var with
+      | Cil.Lval (Cil.Mem e, Cil.NoOffset) -> (sl, Some e)
+      | _ -> (sl, Some (Cil.AddrOf (lval_of_expr var))))
   | Deref ->
       let sl, var_opt =
         trans_expr ~default_ptr:true scope fundec_opt loc action expr
