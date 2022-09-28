@@ -1067,7 +1067,7 @@ let generate_global_proc globals fd =
         |> add_edge call_node Node.EXIT
     | None ->
         prerr_endline "Warning: main not Found";
-        g
+        g |> add_edge term Node.EXIT
   in
   g |> add_call_main |> generate_assumes |> flatten_instructions
   |> remove_if_loop |> transform_string_allocs fd
