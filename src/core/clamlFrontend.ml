@@ -305,8 +305,9 @@ let trans_binop lhs rhs = function
   | C.BinaryOperatorKind.Mul -> Cil.Mult
   | Div -> Cil.Div
   | Rem -> Cil.Mod
-  | Add when Cil.typeOf lhs |> Cil.isPointerType -> Cil.PlusPI
-  | Add -> Cil.PlusA
+  | Add ->
+      let t = Cil.typeOf lhs in
+      if Cil.isPointerType t || Cil.isArrayType t then Cil.PlusPI else Cil.PlusA
   | Sub
     when Cil.typeOf lhs |> Cil.isPointerType
          && Cil.typeOf rhs |> Cil.isPointerType ->

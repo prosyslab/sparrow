@@ -324,6 +324,31 @@
   (diff binop0.expected binop0.output)))
 
 (rule
+ (deps binop1.c)
+ (targets binop1.output)
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (ignore-stderr
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
+    (run clang-format)))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff binop1.expected binop1.output)))
+
+(rule
  (deps block0.c)
  (targets block0.output)
  (action
