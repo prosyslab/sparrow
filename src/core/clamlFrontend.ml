@@ -2096,16 +2096,16 @@ and trans_for scope fundec loc init cond_var cond inc body =
   in
   let break_stmt = Cil.mkBlock [ Cil.mkStmt (Cil.Break loc) ] in
   let body_stmt = trans_block scope fundec body in
+  let inc_stmt = trans_stmt_opt scope fundec inc |> fst in
   let bstmts =
     Cil.mkStmt (Cil.If (cond_expr, empty_block, break_stmt, loc))
     :: body_stmt.Chunk.stmts
+    @ inc_stmt.Chunk.stmts
   in
   let block = { Cil.battrs = []; bstmts } in
-  let inc_stmt = trans_stmt_opt scope fundec inc |> fst in
   let stmts =
     decl_stmt @ init_stmt.Chunk.stmts
     @ [ Cil.mkStmt (Cil.Loop (block, loc, None, None)) ]
-    @ inc_stmt.Chunk.stmts
   in
   let cases = init_stmt.cases @ body_stmt.cases @ inc_stmt.cases in
   ( {

@@ -3074,6 +3074,31 @@
   (diff while2.expected while2.output)))
 
 (rule
+ (deps for0.c)
+ (targets for0.output)
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (ignore-stderr
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
+    (run clang-format)))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff for0.expected for0.output)))
+
+(rule
  (deps decl0.c)
  (targets decl0.output)
  (action
