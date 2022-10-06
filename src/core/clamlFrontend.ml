@@ -190,6 +190,13 @@ let struct_id_count = ref 0
 let is_init_list expr =
   match C.Expr.get_kind expr with C.StmtKind.InitListExpr -> true | _ -> false
 
+let is_nested_init_list expr =
+  match C.Expr.get_kind expr with
+  | C.StmtKind.InitListExpr -> (
+      let inits = C.InitListExpr.get_inits expr in
+      match inits with [] -> false | e :: _ -> is_init_list e)
+  | _ -> false
+
 let anonymous_id_table = H.create 1024
 
 let new_record_id is_struct rdecl =
@@ -1565,17 +1572,38 @@ and handle_stmt_init scope typ fundec loc action lv e =
   | C.StmtKind.InitListExpr, Cil.TArray (_, None, _) | InitListExpr, Cil.TPtr _
     ->
       ([], scope)
+  | InitListExpr, Cil.TArray (arr_typ, Some _, _) when is_nested_init_list e ->
+      let el =
+        (match C.InitListExpr.get_semantic_form e with
+        | Some e -> e
+        | None -> e)
+        |> C.InitListExpr.get_inits
+      in
+      let unroll_nested_init scope idx e =
+        let lv =
+          Cil.addOffsetLval (Cil.Index (Cil.integer idx, Cil.NoOffset)) lv
+        in
+        handle_stmt_init scope arr_typ fundec loc action lv e
+      in
+      let stmts, scope, _ =
+        List.fold_left
+          (fun (stmts, scope, idx) e ->
+            let stmts', scope' = unroll_nested_init scope idx e in
+            (stmts @ stmts', scope', idx + 1))
+          ([], scope, 0) el
+      in
+      (stmts, scope)
   (* primitive array *)
   | InitListExpr, Cil.TArray (arr_typ, Some arr_exp, _)
     when is_primitive_typ arr_typ ->
-      (match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e)
+      (match C.InitListExpr.get_semantic_form e with Some e -> e | None -> e)
       |> C.InitListExpr.get_inits
       |> mk_arr_stmt scope fundec loc action lv arr_exp
   (* struct array *)
   | InitListExpr, Cil.TArray (arr_typ, Some arr_exp, _)
     when is_struct_typ arr_typ ->
       let e =
-        match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
+        match C.InitListExpr.get_semantic_form e with Some e -> e | None -> e
       in
       let el = C.InitListExpr.get_inits e in
       let ci =
@@ -2707,7 +2735,7 @@ and trans_global_init scope loc typ e =
       ([], Cil.CompoundInit (typ, init_list))
   | InitListExpr, Cil.TArray (elt_typ, Some len_exp, _) ->
       let e =
-        match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
+        match C.InitListExpr.get_semantic_form e with Some e -> e | None -> e
       in
       let el = C.InitListExpr.get_inits e in
       let arr_len =
