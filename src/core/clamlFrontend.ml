@@ -324,8 +324,10 @@ let trans_binop lhs rhs = function
     when Cil.typeOf lhs |> Cil.isPointerType
          && Cil.typeOf rhs |> Cil.isPointerType ->
       Cil.MinusPP
-  | Sub when Cil.typeOf lhs |> Cil.isPointerType -> Cil.MinusPI
-  | Sub -> Cil.MinusA
+  | Sub ->
+      let t = Cil.typeOf lhs in
+      if Cil.isPointerType t || Cil.isArrayType t then Cil.MinusPI
+      else Cil.MinusA
   | Shl -> Cil.Shiftlt
   | Shr -> Cil.Shiftrt
   | LT -> Cil.Lt
