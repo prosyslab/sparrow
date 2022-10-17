@@ -244,7 +244,12 @@ let find_global_variable scope name typ =
   if Scope.mem_var name scope then
     let envdata = Scope.find_var_enum name scope in
     match envdata with
-    | EnvData.EnvVar vi -> (vi, scope)
+    | EnvData.EnvVar vi -> (
+        match (vi.Cil.vtype, typ) with
+        | Cil.TArray (_, None, _), Cil.TArray (_, Some _, _) ->
+            vi.Cil.vtype <- typ;
+            (vi, scope)
+        | _ -> (vi, scope))
     | _ -> create_new_global_variable scope name typ
   else create_new_global_variable scope name typ
 

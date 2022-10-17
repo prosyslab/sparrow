@@ -699,6 +699,56 @@
   (diff global-array0.expected global-array0.output)))
 
 (rule
+ (deps global-array1.c)
+ (targets global-array1.output)
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (ignore-stderr
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
+    (run clang-format)))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff global-array1.expected global-array1.output)))
+
+(rule
+ (deps global-array2.c)
+ (targets global-array2.output)
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (ignore-stderr
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
+    (run clang-format)))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff global-array2.expected global-array2.output)))
+
+(rule
  (deps goto0.c)
  (targets goto0.output)
  (action
