@@ -1146,18 +1146,21 @@ and trans_binary_operator scope fundec_opt loc kind lhs rhs =
   match kind with
   | C.BinaryOperatorKind.Mul | Div | Rem | Add | Sub | Shl | Shr | LT | GT | LE
   | GE | EQ | NE | And | Xor | Or | LAnd | LOr ->
-      let typ =
-        if
-          Cil.typeOf lhs_expr |> Cil.isIntegralType
-          && Cil.typeOf rhs_expr |> Cil.isPointerType
-        then Cil.typeOf rhs_expr
-        else Cil.typeOf lhs_expr
-      in
-      ( rhs_sl @ lhs_sl,
-        Cil.constFoldBinOp false
-          (trans_binop lhs_expr rhs_expr kind)
-          lhs_expr rhs_expr typ
-        |> Option.some )
+      if
+        Cil.typeOf lhs_expr |> Cil.isIntegralType
+        && Cil.typeOf rhs_expr |> Cil.isPointerType
+      then
+        ( rhs_sl @ lhs_sl,
+          Cil.constFoldBinOp false
+            (trans_binop rhs_expr lhs_expr kind)
+            rhs_expr lhs_expr (Cil.typeOf rhs_expr)
+          |> Option.some )
+      else
+        ( rhs_sl @ lhs_sl,
+          Cil.constFoldBinOp false
+            (trans_binop lhs_expr rhs_expr kind)
+            lhs_expr rhs_expr (Cil.typeOf lhs_expr)
+          |> Option.some )
   | Assign -> (
       let lval =
         match lhs_expr with Cil.Lval l -> l | _ -> failwith "invalid lhs"

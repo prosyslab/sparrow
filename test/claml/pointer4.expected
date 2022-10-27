@@ -15,7 +15,7 @@ void f(void) {
 #line 4
     p = s;
 #line 5
-    *(offset + p) = (char)1;
+    *(p + offset) = (char)1;
     return;
   }
 }
