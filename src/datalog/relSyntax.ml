@@ -432,6 +432,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.bnot ();
   F.pp_print_flush fmt.lnot ();
   F.pp_print_flush fmt.neg ();
+  F.pp_print_flush fmt.mem ();
   List.iter close_out channels
 
 let print_relation dirname icfg =
