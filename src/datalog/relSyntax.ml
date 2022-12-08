@@ -102,6 +102,10 @@ let new_lv_id lv =
   Hashtbl.add lv_map lv id;
   id
 
+let donotcare_lv =
+  let vi = Cil.makeGlobalVar "__DONOTCARE__" Cil.voidType in
+  (Cil.Var vi, Cil.NoOffset)
+
 let pp_binop fmt bop =
   if Hashtbl.mem binop_map bop then ()
   else
@@ -191,6 +195,20 @@ and pp_exp fmt e =
         F.fprintf fmt.start_of "%s\t%s\n" id l_id
     | _ -> F.fprintf fmt.other_exp "%s\n" id
 
+let arg_count = ref 0
+
+let new_arg_id () =
+  let id = "ArgList-" ^ string_of_int !arg_count in
+  arg_count := !arg_count + 1;
+  id
+
+let pp_arg fmt arg =
+  let id = new_arg_id () in
+  List.iteri
+    (fun i e -> Hashtbl.find exp_map e |> F.fprintf fmt.arg "%s\t%d\t%s\n" id i)
+    arg;
+  id
+
 let pp_cmd fmt icfg n =
   if InterCfg.pred n icfg |> List.length = 2 then
     F.fprintf fmt.join "%a\n" Node.pp n;
@@ -219,17 +237,29 @@ let pp_cmd fmt icfg n =
       let lv_id = Hashtbl.find lv_map lv in
       F.fprintf fmt.salloc "%a\t%s\n" Node.pp n lv_id
   | Cfalloc (_, _, _) -> F.fprintf fmt.cmd "falloc\n"
-  | Ccall (_, (Lval (Var f, NoOffset) as e), el, _) when f.vstorage = Cil.Extern
-    ->
+  | Ccall (lv_opt, (Lval (Var f, NoOffset) as e), el, _)
+    when f.vstorage = Cil.Extern ->
+      let lv =
+        if Option.is_none lv_opt then donotcare_lv else Option.get lv_opt
+      in
+      pp_lv fmt lv;
       pp_exp fmt e;
       List.iter (pp_exp fmt) el;
+      let arg_id = pp_arg fmt el in
+      let lv_id = Hashtbl.find lv_map lv in
       let id = Hashtbl.find exp_map e in
-      F.fprintf fmt.libcall "%a\t%s\n" Node.pp n id
-  | Ccall (_, e, el, _) ->
+      F.fprintf fmt.libcall "%a\t%s\t%s\t%s\n" Node.pp n lv_id id arg_id
+  | Ccall (lv_opt, e, el, _) ->
+      let lv =
+        if Option.is_none lv_opt then donotcare_lv else Option.get lv_opt
+      in
+      pp_lv fmt lv;
       pp_exp fmt e;
       List.iter (pp_exp fmt) el;
+      let arg_id = pp_arg fmt el in
+      let lv_id = Hashtbl.find lv_map lv in
       let id = Hashtbl.find exp_map e in
-      F.fprintf fmt.call "%a\t%s\n" Node.pp n id
+      F.fprintf fmt.call "%a\t%s\t%s\t%s\n" Node.pp n lv_id id arg_id
   | Creturn (Some e, _) ->
       pp_exp fmt e;
       let id = Hashtbl.find exp_map e in
@@ -382,9 +412,12 @@ let make_formatters dirname =
   (fmt, channels)
 
 let close_formatters fmt channels =
+  (* Function body *)
   F.pp_print_flush fmt.func ();
+  (* Command *)
   F.pp_print_flush fmt.entry ();
   F.pp_print_flush fmt.exit ();
+  F.pp_print_flush fmt.join ();
   F.pp_print_flush fmt.skip ();
   F.pp_print_flush fmt.assign ();
   F.pp_print_flush fmt.assume ();
@@ -395,6 +428,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.arg ();
   F.pp_print_flush fmt.return ();
   F.pp_print_flush fmt.cmd ();
+  (* Expressions *)
   F.pp_print_flush fmt.const_exp ();
   F.pp_print_flush fmt.lval_exp ();
   F.pp_print_flush fmt.binop_exp ();
@@ -405,6 +439,8 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.local_var ();
   F.pp_print_flush fmt.field ();
   F.pp_print_flush fmt.lval ();
+  F.pp_print_flush fmt.mem ();
+  F.pp_print_flush fmt.start_of ();
   (* BinOp *)
   F.pp_print_flush fmt.plusa ();
   F.pp_print_flush fmt.pluspi ();
@@ -432,7 +468,6 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.bnot ();
   F.pp_print_flush fmt.lnot ();
   F.pp_print_flush fmt.neg ();
-  F.pp_print_flush fmt.mem ();
   List.iter close_out channels
 
 let print_relation dirname icfg =
