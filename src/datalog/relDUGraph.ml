@@ -177,12 +177,14 @@ let print analysis global dug alarms =
   in
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   let oc_edge = open_out (dirname ^ "/DUEdge.facts") in
+  let oc_path = open_out (dirname ^ "/DUPath.facts") in
   let oc_tc = open_out (dirname ^ "/TrueCond.facts") in
   let oc_tb = open_out (dirname ^ "/TrueBranch.facts") in
   let oc_fc = open_out (dirname ^ "/FalseCond.facts") in
   let oc_fb = open_out (dirname ^ "/FalseBranch.facts") in
   let oc_loophead = open_out (dirname ^ "/LoopHead.facts") in
   let fmt_edge = Format.formatter_of_out_channel oc_edge in
+  let fmt_path = Format.formatter_of_out_channel oc_path in
   let fmt_tc = Format.formatter_of_out_channel oc_tc in
   let fmt_tb = Format.formatter_of_out_channel oc_tb in
   let fmt_fc = Format.formatter_of_out_channel oc_fc in
@@ -203,10 +205,15 @@ let print analysis global dug alarms =
         F.fprintf fmt_fb "%a\t%a\n" Node.pp src Node.pp dst)
       else F.fprintf fmt_edge "%a\t%a\n" Node.pp src Node.pp dst)
     dug;
+  let tc = G.transitive_closure dug in
+  G.iter_edges
+    (fun src dst -> F.fprintf fmt_path "%a\t%a\n" Node.pp src Node.pp dst)
+    tc;
   List.iter
     (fun x -> F.pp_print_flush x ())
-    [ fmt_edge; fmt_tc; fmt_tb; fmt_fc; fmt_fb; fmt_loophead ];
+    [ fmt_edge; fmt_path; fmt_tc; fmt_tb; fmt_fc; fmt_fb; fmt_loophead ];
   close_out oc_edge;
+  close_out oc_path;
   close_out oc_tc;
   close_out oc_tb;
   close_out oc_fc;

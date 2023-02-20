@@ -78,6 +78,8 @@ module type S = sig
 
   val find_node_of_string : t -> string -> node option
 
+  val transitive_closure : ?reflexive:bool -> t -> t
+
   (** {2 Iterator } *)
 
   val fold_node : (node -> 'a -> 'a) -> t -> 'a -> 'a
@@ -136,6 +138,7 @@ module Make (Access : Access.S) = struct
 
     module Dijkstra = Graph.Path.Dijkstra (I) (W)
     module Check = Graph.Path.Check (I)
+    module Oper = Graph.Oper.I (I)
 
     type t = { graph : I.t; label : (node * node, locset) Hashtbl.t }
 
@@ -284,6 +287,9 @@ module Make (Access : Access.S) = struct
     let create_path_checker g = Check.create g.graph
 
     let check_path pc src dst = Check.check_path pc src dst
+
+    let transitive_closure ?(reflexive = false) g =
+      { g with graph = Oper.transitive_closure ~reflexive g.graph }
   end
 
   type t = {
@@ -426,6 +432,9 @@ module Make (Access : Access.S) = struct
         else if BasicDom.Node.to_string node = name then Some node
         else None)
       dug None
+
+  let transitive_closure ?(reflexive = false) g =
+    { g with graph = G.transitive_closure ~reflexive g.graph }
 
   let to_dot ?(color = []) dug =
     "digraph dugraph {\n"

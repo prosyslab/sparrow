@@ -79,6 +79,8 @@ module type S = sig
 
   val find_node_of_string : t -> string -> node option
 
+  val transitive_closure : ?reflexive:bool -> t -> t
+
   (** {2 Iterator } *)
 
   val fold_node : (node -> 'a -> 'a) -> t -> 'a -> 'a
