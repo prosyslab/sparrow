@@ -60,14 +60,6 @@ type formatter = {
   bnot : F.formatter;
   lnot : F.formatter;
   neg : F.formatter;
-  (* BinOp for Patron *)
-  binop : F.formatter;
-  (* UnOp for Patron *)
-  unop : F.formatter;
-  (* Patron Rels *)
-  evallv : F.formatter;
-  eval : F.formatter;
-  memory : F.formatter;
 }
 
 let binop_count = ref 0
@@ -217,20 +209,6 @@ let pp_arg fmt arg =
     arg;
   id
 
-let loc_count = ref 0
-
-let new_loc_id () =
-  let id = "Loc-" ^ string_of_int !loc_count in
-  incr loc_count;
-  id
-
-let val_count = ref 0
-
-let new_val_id () =
-  let id = "Val-" ^ string_of_int !val_count in
-  incr val_count;
-  id
-
 let pp_cmd fmt icfg n =
   if InterCfg.pred n icfg |> List.length = 2 then
     F.fprintf fmt.join "%a\n" Node.pp n;
@@ -245,34 +223,19 @@ let pp_cmd fmt icfg n =
       pp_exp fmt e;
       let lv_id = Hashtbl.find lv_map lv in
       let e_id = Hashtbl.find exp_map e in
-      let loc_id = new_loc_id () in
-      let val_id = new_val_id () in
-      F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id;
-      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
-      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id val_id;
-      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id
+      F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id
   | Cexternal (_, _) -> F.fprintf fmt.cmd "external\n"
   | Calloc (lv, Array e, _, _) ->
       pp_lv fmt lv;
       pp_exp fmt e;
       let lv_id = Hashtbl.find lv_map lv in
-      let e_id = Hashtbl.find exp_map e in
-      let loc_id = new_loc_id () in
-      let val_id = new_val_id () in
-      F.fprintf fmt.alloc "%a\t%s\t%s\n" Node.pp n lv_id e_id;
-      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
-      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id val_id;
-      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id
+      let size_e_id = Hashtbl.find exp_map e in
+      F.fprintf fmt.alloc "%a\t%s\t%s\n" Node.pp n lv_id size_e_id
   | Calloc (_, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
-  | Csalloc (lv, s, _) ->
+  | Csalloc (lv, _, _) ->
       pp_lv fmt lv;
       let lv_id = Hashtbl.find lv_map lv in
-      let loc_id = new_loc_id () in
-      let val_id = new_val_id () in
-      F.fprintf fmt.salloc "%a\t%s\n" Node.pp n lv_id;
-      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
-      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n s val_id;
-      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id
+      F.fprintf fmt.salloc "%a\t%s\n" Node.pp n lv_id
   | Cfalloc (_, _, _) -> F.fprintf fmt.cmd "falloc\n"
   | Ccall (lv_opt, (Lval (Var f, NoOffset) as e), el, _)
     when f.vstorage = Cil.Extern ->
@@ -285,12 +248,7 @@ let pp_cmd fmt icfg n =
       let arg_id = pp_arg fmt el in
       let lv_id = Hashtbl.find lv_map lv in
       let e_id = Hashtbl.find exp_map e in
-      let loc_id = new_loc_id () in
-      let val_id = new_val_id () in
-      F.fprintf fmt.libcall "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id;
-      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
-      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id val_id;
-      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id
+      F.fprintf fmt.libcall "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
   | Ccall (lv_opt, e, el, _) ->
       let lv =
         if Option.is_none lv_opt then donotcare_lv else Option.get lv_opt
@@ -301,12 +259,7 @@ let pp_cmd fmt icfg n =
       let arg_id = pp_arg fmt el in
       let lv_id = Hashtbl.find lv_map lv in
       let e_id = Hashtbl.find exp_map e in
-      let loc_id = new_loc_id () in
-      let val_id = new_val_id () in
-      F.fprintf fmt.call "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id;
-      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
-      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id val_id;
-      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id
+      F.fprintf fmt.call "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
   | Creturn (Some e, _) ->
       pp_exp fmt e;
       let id = Hashtbl.find exp_map e in
@@ -371,14 +324,6 @@ let make_formatters dirname =
   let oc_bnot = open_out (dirname ^ "/BNot.facts") in
   let oc_lnot = open_out (dirname ^ "/LNot.facts") in
   let oc_neg = open_out (dirname ^ "/Neg.facts") in
-  (* BinOp for Patron *)
-  let oc_binop = open_out (dirname ^ "/BinOp.facts") in
-  (* UnOp for Patron *)
-  let oc_unop = open_out (dirname ^ "/UnOp.facts") in
-  (* Patron Rels *)
-  let oc_evallv = open_out (dirname ^ "/EvalLv.facts") in
-  let oc_eval = open_out (dirname ^ "/Eval.facts") in
-  let oc_memory = open_out (dirname ^ "/Memory.facts") in
   let fmt =
     {
       func = F.formatter_of_out_channel oc_func;
@@ -434,14 +379,6 @@ let make_formatters dirname =
       bnot = F.formatter_of_out_channel oc_bnot;
       lnot = F.formatter_of_out_channel oc_lnot;
       neg = F.formatter_of_out_channel oc_neg;
-      (* BinOp for Patron *)
-      binop = F.formatter_of_out_channel oc_binop;
-      (* UnOp for Patron *)
-      unop = F.formatter_of_out_channel oc_unop;
-      (* Patron Rels *)
-      evallv = F.formatter_of_out_channel oc_evallv;
-      eval = F.formatter_of_out_channel oc_eval;
-      memory = F.formatter_of_out_channel oc_memory;
     }
   in
   let channels =
@@ -469,11 +406,6 @@ let make_formatters dirname =
       oc_lv;
       oc_mem;
       oc_start_of;
-      oc_binop;
-      oc_unop;
-      oc_evallv;
-      oc_eval;
-      oc_memory;
     ]
   in
   (fmt, channels)
@@ -535,14 +467,6 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.bnot ();
   F.pp_print_flush fmt.lnot ();
   F.pp_print_flush fmt.neg ();
-  (* BinOp for Patron *)
-  F.pp_print_flush fmt.binop ();
-  (* UnOp for Patron *)
-  F.pp_print_flush fmt.unop ();
-  (* Patron Rels *)
-  F.pp_print_flush fmt.evallv ();
-  F.pp_print_flush fmt.eval ();
-  F.pp_print_flush fmt.memory ();
   List.iter close_out channels
 
 let print_relation dirname icfg =

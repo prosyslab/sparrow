@@ -149,6 +149,143 @@ let cycle_elim dug =
            assert false));
   dug
 
+type formtter_of_patron = {
+  evallv : F.formatter;
+  eval : F.formatter;
+  memory : F.formatter;
+  arrayval : F.formatter;
+  conststr : F.formatter;
+  sprintf_err_cons : F.formatter;
+}
+
+let loc_map = Hashtbl.create 1000
+
+let loc_count = ref 0
+
+let new_loc_id loc =
+  let id = "Loc-" ^ string_of_int !loc_count in
+  incr loc_count;
+  Hashtbl.add loc_map loc id;
+  id
+
+let val_map = Hashtbl.create 1000
+
+let val_count = ref 0
+
+let new_val_id v =
+  let id = "Val-" ^ string_of_int !val_count in
+  incr val_count;
+  Hashtbl.add val_map v id;
+  id
+
+let str_map = Hashtbl.create 1000
+
+let str_count = ref 0
+
+let new_str_id str =
+  let id = "Str-" ^ string_of_int !str_count in
+  incr str_count;
+  Hashtbl.add str_map str id;
+  id
+
+let pp_cmd_sems fmt global n =
+  match InterCfg.cmdof global.Global.icfg n with
+  | Cset (lv, e, _) ->
+      let pid = Node.get_pid n in
+      let lv_id = Hashtbl.find RelSyntax.lv_map lv in
+      let e_id = Hashtbl.find RelSyntax.exp_map e in
+      let loc = ItvSem.eval_lv pid lv global.Global.mem in
+      let loc_id =
+        if Hashtbl.mem loc_map loc then Hashtbl.find loc_map loc
+        else new_loc_id loc
+      in
+      let v = ItvSem.eval pid e global.Global.mem in
+      let val_id =
+        if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
+      in
+      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
+      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id val_id;
+      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id
+  | Calloc (lv, Array size, _, _) ->
+      let pid = Node.get_pid n in
+      let lv_id = Hashtbl.find RelSyntax.lv_map lv in
+      let size_e_id = Hashtbl.find RelSyntax.exp_map size in
+      let loc = ItvSem.eval_lv pid lv global.Global.mem in
+      let loc_id =
+        if Hashtbl.mem loc_map loc then Hashtbl.find loc_map loc
+        else new_loc_id loc
+      in
+      let size_val = ItvSem.eval pid size global.Global.mem in
+      let size_val_id =
+        if Hashtbl.mem val_map size_val then Hashtbl.find val_map size_val
+        else new_val_id size_val
+      in
+      let array_val = ItvDom.Mem.lookup loc global.Global.mem in
+      let array_val_id =
+        if Hashtbl.mem val_map array_val then Hashtbl.find val_map array_val
+        else new_val_id array_val
+      in
+      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
+      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n size_e_id size_val_id;
+      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id array_val_id;
+      F.fprintf fmt.arrayval "%s\t%s\n" array_val_id size_val_id
+  | Csalloc (lv, s, _) ->
+      let pid = Node.get_pid n in
+      let lv_id = Hashtbl.find RelSyntax.lv_map lv in
+      let s_id =
+        if Hashtbl.mem str_map s then Hashtbl.find str_map s else new_str_id s
+      in
+      let loc = ItvSem.eval_lv pid lv global.Global.mem in
+      let loc_id =
+        if Hashtbl.mem loc_map loc then Hashtbl.find loc_map loc
+        else new_loc_id loc
+      in
+      let v = ItvDom.Mem.lookup loc global.Global.mem in
+      let val_id =
+        if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
+      in
+      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
+      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id;
+      F.fprintf fmt.conststr "%s\t%s\n" val_id s_id
+  | Ccall (lv_opt, (Lval (Var f, NoOffset) as e), el, _) ->
+      let pid = Node.get_pid n in
+      let e_id = Hashtbl.find RelSyntax.exp_map e in
+      if Option.is_some lv_opt then (
+        let lv = Option.get lv_opt in
+        let lv_id = Hashtbl.find RelSyntax.lv_map lv in
+        let loc = ItvSem.eval_lv pid lv global.Global.mem in
+        let loc_id =
+          if Hashtbl.mem loc_map loc then Hashtbl.find loc_map loc
+          else new_loc_id loc
+        in
+        let v = ItvSem.eval pid e global.Global.mem in
+        let val_id =
+          if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
+        in
+        F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
+        F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id val_id;
+        F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id);
+      if String.ends_with ~suffix:"sprintf" f.vname then
+        let arg0 = List.hd el in
+        let arr_arg0 = ItvSem.eval pid arg0 global.Global.mem in
+        let arr_val_id =
+          if Hashtbl.mem val_map arr_arg0 then Hashtbl.find val_map arr_arg0
+          else new_val_id arr_arg0
+        in
+        let strlen_exp =
+          List.tl el
+          |> List.map (fun arg ->
+                 ItvSem.eval pid arg global.Global.mem
+                 |> (fun v ->
+                      if Hashtbl.mem val_map v then Hashtbl.find val_map v
+                      else new_val_id v)
+                 |> F.sprintf "(StrLen %s)")
+          |> String.concat " "
+        in
+        F.fprintf fmt.sprintf_err_cons "(< (SizeOf %s) (+ %s))" arr_val_id
+          strlen_exp
+  | _ -> ()
+
 let print analysis global dug alarms =
   let dug = G.copy dug in
   let alarms = Report.get alarms Report.UnProven in
@@ -190,6 +327,25 @@ let print analysis global dug alarms =
   let fmt_fc = Format.formatter_of_out_channel oc_fc in
   let fmt_fb = Format.formatter_of_out_channel oc_fb in
   let fmt_loophead = Format.formatter_of_out_channel oc_loophead in
+  (* fmt for patron *)
+  let oc_evallv = open_out (dirname ^ "/EvalLv.facts") in
+  let oc_eval = open_out (dirname ^ "/Eval.facts") in
+  let oc_memory = open_out (dirname ^ "/Memory.facts") in
+  let oc_arrayval = open_out (dirname ^ "/ArrayVal.facts") in
+  let oc_conststr = open_out (dirname ^ "/ConstStr.facts") in
+  let oc_sprintf_err_cons =
+    open_out (dirname ^ "/SprintfErrorConstraint.facts")
+  in
+  let fmt =
+    {
+      evallv = F.formatter_of_out_channel oc_evallv;
+      eval = F.formatter_of_out_channel oc_eval;
+      memory = F.formatter_of_out_channel oc_memory;
+      arrayval = F.formatter_of_out_channel oc_arrayval;
+      conststr = F.formatter_of_out_channel oc_conststr;
+      sprintf_err_cons = F.formatter_of_out_channel oc_sprintf_err_cons;
+    }
+  in
   G.iter_edges
     (fun src dst ->
       if
@@ -205,6 +361,7 @@ let print analysis global dug alarms =
         F.fprintf fmt_fb "%a\t%a\n" Node.pp src Node.pp dst)
       else F.fprintf fmt_edge "%a\t%a\n" Node.pp src Node.pp dst)
     dug;
+  G.iter_node (fun n -> pp_cmd_sems fmt global n) dug;
   let tc = G.transitive_closure dug in
   G.iter_edges
     (fun src dst -> F.fprintf fmt_path "%a\t%a\n" Node.pp src Node.pp dst)
@@ -212,12 +369,24 @@ let print analysis global dug alarms =
   List.iter
     (fun x -> F.pp_print_flush x ())
     [ fmt_edge; fmt_path; fmt_tc; fmt_tb; fmt_fc; fmt_fb; fmt_loophead ];
+  F.pp_print_flush fmt.evallv ();
+  F.pp_print_flush fmt.eval ();
+  F.pp_print_flush fmt.memory ();
+  F.pp_print_flush fmt.arrayval ();
+  F.pp_print_flush fmt.conststr ();
+  F.pp_print_flush fmt.sprintf_err_cons ();
   close_out oc_edge;
   close_out oc_path;
   close_out oc_tc;
   close_out oc_tb;
   close_out oc_fc;
-  close_out oc_fb
+  close_out oc_fb;
+  close_out oc_evallv;
+  close_out oc_eval;
+  close_out oc_memory;
+  close_out oc_arrayval;
+  close_out oc_conststr;
+  close_out oc_sprintf_err_cons
 
 module AlarmSet = Set.Make (struct
   type t = Node.t * Node.t [@@deriving compare]
