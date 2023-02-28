@@ -156,6 +156,7 @@ type formtter_of_patron = {
   arrayval : F.formatter;
   conststr : F.formatter;
   sprintf_err_cons : F.formatter;
+  alarm_node : F.formatter;
 }
 
 let loc_map = Hashtbl.create 1000
@@ -199,7 +200,7 @@ let pp_cmd_sems fmt global n =
         if Hashtbl.mem loc_map loc then Hashtbl.find loc_map loc
         else new_loc_id loc
       in
-      let v = ItvSem.eval pid e global.Global.mem in
+      let v = ItvDom.Mem.lookup loc global.Global.mem in
       let val_id =
         if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
       in
@@ -258,14 +259,14 @@ let pp_cmd_sems fmt global n =
           if Hashtbl.mem loc_map loc then Hashtbl.find loc_map loc
           else new_loc_id loc
         in
-        let v = ItvSem.eval pid e global.Global.mem in
+        let v = ItvDom.Mem.lookup loc global.Global.mem in
         let val_id =
           if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
         in
         F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
         F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id val_id;
         F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id);
-      if String.ends_with ~suffix:"sprintf" f.vname then
+      if String.ends_with ~suffix:"sprintf" f.vname then (
         let arg0 = List.hd el in
         let arr_arg0 = ItvSem.eval pid arg0 global.Global.mem in
         let arr_val_id =
@@ -282,8 +283,9 @@ let pp_cmd_sems fmt global n =
                  |> F.sprintf "(StrLen %s)")
           |> String.concat " "
         in
-        F.fprintf fmt.sprintf_err_cons "(< (SizeOf %s) (+ %s))" arr_val_id
-          strlen_exp
+        F.fprintf fmt.sprintf_err_cons "(< (SizeOf %s) (+ %s))\n" arr_val_id
+          strlen_exp;
+        F.fprintf fmt.alarm_node "%a\n" Node.pp n)
   | _ -> ()
 
 let print analysis global dug alarms =
@@ -336,6 +338,7 @@ let print analysis global dug alarms =
   let oc_sprintf_err_cons =
     open_out (dirname ^ "/SprintfErrorConstraint.facts")
   in
+  let oc_alarm_node = open_out (dirname ^ "/AlarmNode.facts") in
   let fmt =
     {
       evallv = F.formatter_of_out_channel oc_evallv;
@@ -344,6 +347,7 @@ let print analysis global dug alarms =
       arrayval = F.formatter_of_out_channel oc_arrayval;
       conststr = F.formatter_of_out_channel oc_conststr;
       sprintf_err_cons = F.formatter_of_out_channel oc_sprintf_err_cons;
+      alarm_node = F.formatter_of_out_channel oc_alarm_node;
     }
   in
   G.iter_edges
@@ -375,6 +379,7 @@ let print analysis global dug alarms =
   F.pp_print_flush fmt.arrayval ();
   F.pp_print_flush fmt.conststr ();
   F.pp_print_flush fmt.sprintf_err_cons ();
+  F.pp_print_flush fmt.alarm_node ();
   close_out oc_edge;
   close_out oc_path;
   close_out oc_tc;
@@ -386,7 +391,8 @@ let print analysis global dug alarms =
   close_out oc_memory;
   close_out oc_arrayval;
   close_out oc_conststr;
-  close_out oc_sprintf_err_cons
+  close_out oc_sprintf_err_cons;
+  close_out oc_alarm_node
 
 module AlarmSet = Set.Make (struct
   type t = Node.t * Node.t [@@deriving compare]
