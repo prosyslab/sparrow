@@ -155,8 +155,6 @@ type formtter_of_patron = {
   memory : F.formatter;
   arrayval : F.formatter;
   conststr : F.formatter;
-  sprintf_err_cons : F.formatter;
-  alarm_node : F.formatter;
 }
 
 let loc_map = Hashtbl.create 1000
@@ -248,7 +246,7 @@ let pp_cmd_sems fmt global n =
       F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
       F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id;
       F.fprintf fmt.conststr "%s\t%s\n" val_id s_id
-  | Ccall (lv_opt, (Lval (Var f, NoOffset) as e), el, _) ->
+  | Ccall (lv_opt, (Lval (Var _, NoOffset) as e), _, _) ->
       let pid = Node.get_pid n in
       let e_id = Hashtbl.find RelSyntax.exp_map e in
       if Option.is_some lv_opt then (
@@ -265,27 +263,7 @@ let pp_cmd_sems fmt global n =
         in
         F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
         F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id val_id;
-        F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id);
-      if String.ends_with ~suffix:"sprintf" f.vname then (
-        let arg0 = List.hd el in
-        let arr_arg0 = ItvSem.eval pid arg0 global.Global.mem in
-        let arr_val_id =
-          if Hashtbl.mem val_map arr_arg0 then Hashtbl.find val_map arr_arg0
-          else new_val_id arr_arg0
-        in
-        let strlen_exp =
-          List.tl el
-          |> List.map (fun arg ->
-                 ItvSem.eval pid arg global.Global.mem
-                 |> (fun v ->
-                      if Hashtbl.mem val_map v then Hashtbl.find val_map v
-                      else new_val_id v)
-                 |> F.sprintf "(StrLen %s)")
-          |> String.concat " "
-        in
-        F.fprintf fmt.sprintf_err_cons "(< (SizeOf %s) (+ %s))\n" arr_val_id
-          strlen_exp;
-        F.fprintf fmt.alarm_node "%a\n" Node.pp n)
+        F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id)
   | _ -> ()
 
 let print analysis global dug alarms =
@@ -335,10 +313,6 @@ let print analysis global dug alarms =
   let oc_memory = open_out (dirname ^ "/Memory.facts") in
   let oc_arrayval = open_out (dirname ^ "/ArrayVal.facts") in
   let oc_conststr = open_out (dirname ^ "/ConstStr.facts") in
-  let oc_sprintf_err_cons =
-    open_out (dirname ^ "/SprintfErrorConstraint.facts")
-  in
-  let oc_alarm_node = open_out (dirname ^ "/AlarmNode.facts") in
   let fmt =
     {
       evallv = F.formatter_of_out_channel oc_evallv;
@@ -346,8 +320,6 @@ let print analysis global dug alarms =
       memory = F.formatter_of_out_channel oc_memory;
       arrayval = F.formatter_of_out_channel oc_arrayval;
       conststr = F.formatter_of_out_channel oc_conststr;
-      sprintf_err_cons = F.formatter_of_out_channel oc_sprintf_err_cons;
-      alarm_node = F.formatter_of_out_channel oc_alarm_node;
     }
   in
   G.iter_edges
@@ -378,8 +350,6 @@ let print analysis global dug alarms =
   F.pp_print_flush fmt.memory ();
   F.pp_print_flush fmt.arrayval ();
   F.pp_print_flush fmt.conststr ();
-  F.pp_print_flush fmt.sprintf_err_cons ();
-  F.pp_print_flush fmt.alarm_node ();
   close_out oc_edge;
   close_out oc_path;
   close_out oc_tc;
@@ -390,9 +360,7 @@ let print analysis global dug alarms =
   close_out oc_eval;
   close_out oc_memory;
   close_out oc_arrayval;
-  close_out oc_conststr;
-  close_out oc_sprintf_err_cons;
-  close_out oc_alarm_node
+  close_out oc_conststr
 
 module AlarmSet = Set.Make (struct
   type t = Node.t * Node.t [@@deriving compare]
@@ -403,6 +371,7 @@ type formatter = {
   alarm : F.formatter;
   array_exp : F.formatter;
   deref_exp : F.formatter;
+  mul_exp : F.formatter;
   div_exp : F.formatter;
   strcpy : F.formatter;
   strncpy : F.formatter;
@@ -411,6 +380,8 @@ type formatter = {
   memchr : F.formatter;
   strncmp : F.formatter;
   sprintf : F.formatter;
+  sprintf_err_cons : F.formatter;
+  io_err_cons : F.formatter;
   bufferoverrunlib : F.formatter;
   strcat : F.formatter;
   allocsize : F.formatter;
@@ -434,8 +405,11 @@ let find_lv lv_map l =
 let find_exp exp_map e =
   try Hashtbl.find exp_map e with _ -> "UnknownExp-" ^ CilHelper.s_exp e
 
-let pp_alarm_exp fmt aexp =
+let ikind_of_typ = function Cil.TInt (ik, _) -> Some ik | _ -> None
+
+let pp_alarm_exp global node fmt aexp =
   let id = new_alarm_exp_id aexp in
+  let pid = Node.get_pid node in
   match aexp with
   | AlarmExp.ArrayExp (l, e, _) ->
       let l_id = find_lv RelSyntax.lv_map l in
@@ -444,6 +418,38 @@ let pp_alarm_exp fmt aexp =
   | DerefExp (e, _) ->
       let e_id = find_exp RelSyntax.exp_map e in
       F.fprintf fmt.deref_exp "%s\t%s\n" id e_id
+  | MulExp (e1, e2, _) ->
+      let v1 = ItvSem.eval pid e1 global.Global.mem in
+      let v2 = ItvSem.eval pid e2 global.Global.mem in
+      let v1_id =
+        if Hashtbl.mem val_map v1 then Hashtbl.find val_map v1
+        else new_val_id v1
+      in
+      let v2_id =
+        if Hashtbl.mem val_map v2 then Hashtbl.find val_map v2
+        else new_val_id v2
+      in
+      let t1 =
+        Cil.typeOf e1 |> ikind_of_typ
+        |> Option.map Cil.bytesSizeOfInt
+        |> Option.value ~default:0
+      in
+      let t2 =
+        Cil.typeOf e2 |> ikind_of_typ
+        |> Option.map Cil.bytesSizeOfInt
+        |> Option.value ~default:0
+      in
+      (* TODO: unsigned long long *)
+      let int_max = max t1 t2 * 8 |> BatInt64.of_int |> BatInt64.pow 2L in
+      let int_max =
+        if int_max = 0L then Int64.max_int else BatInt64.(int_max - 1L)
+      in
+      F.fprintf fmt.io_err_cons "%a\t(> (* (IntVal %s) (IntVal %s)) %Ld)\n"
+        Node.pp node v1_id v2_id int_max;
+      let e1_id, e2_id =
+        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
+      in
+      F.fprintf fmt.mul_exp "%s\t%s\t%s\n" id e1_id e2_id
   | DivExp (e1, e2, _) ->
       let e1_id, e2_id =
         (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
@@ -492,6 +498,24 @@ let pp_alarm_exp fmt aexp =
       F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e0_id e1_id e2_id;
       F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
   | BufferOverrunLib (("sprintf" as name), el, _) ->
+      let arg0 = List.hd el in
+      let arr_arg0 = ItvSem.eval pid arg0 global.Global.mem in
+      let arr_val_id =
+        if Hashtbl.mem val_map arr_arg0 then Hashtbl.find val_map arr_arg0
+        else new_val_id arr_arg0
+      in
+      let strlen_exp =
+        List.tl el
+        |> List.map (fun arg ->
+               ItvSem.eval pid arg global.Global.mem
+               |> (fun v ->
+                    if Hashtbl.mem val_map v then Hashtbl.find val_map v
+                    else new_val_id v)
+               |> F.sprintf "(StrLen %s)")
+        |> String.concat " "
+      in
+      F.fprintf fmt.sprintf_err_cons "(< (SizeOf %s) (+ %s))\n" arr_val_id
+        strlen_exp;
       let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
       let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
       F.fprintf fmt.sprintf "%s\t%s\t%s\n" id e0_id e1_id;
@@ -511,6 +535,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.alarm ();
   F.pp_print_flush fmt.array_exp ();
   F.pp_print_flush fmt.deref_exp ();
+  F.pp_print_flush fmt.mul_exp ();
   F.pp_print_flush fmt.div_exp ();
   F.pp_print_flush fmt.strcpy ();
   F.pp_print_flush fmt.strncpy ();
@@ -520,19 +545,22 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.memchr ();
   F.pp_print_flush fmt.strncmp ();
   F.pp_print_flush fmt.sprintf ();
+  F.pp_print_flush fmt.sprintf_err_cons ();
+  F.pp_print_flush fmt.io_err_cons ();
   F.pp_print_flush fmt.bufferoverrunlib ();
   F.pp_print_flush fmt.allocsize ();
   F.pp_print_flush fmt.printf ();
   F.pp_print_flush fmt.taint ();
   List.iter close_out channels
 
-let print_alarm analysis alarms =
+let print_alarm analysis global alarms =
   let alarms = Report.get alarms Report.UnProven in
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   let oc_start = open_out (dirname ^ "/Start.facts") in
   let oc_alarm = open_out (dirname ^ "/SparrowAlarm.facts") in
   let oc_array_exp = open_out (dirname ^ "/AlarmArrayExp.facts") in
   let oc_deref_exp = open_out (dirname ^ "/AlarmDerefExp.facts") in
+  let oc_mul_exp = open_out (dirname ^ "/AlarmMulExp.facts") in
   let oc_div_exp = open_out (dirname ^ "/AlarmDivExp.facts") in
   let oc_strcpy = open_out (dirname ^ "/AlarmStrcpy.facts") in
   let oc_strncpy = open_out (dirname ^ "/AlarmStrncpy.facts") in
@@ -541,6 +569,10 @@ let print_alarm analysis alarms =
   let oc_memchr = open_out (dirname ^ "/AlarmMemchr.facts") in
   let oc_strncmp = open_out (dirname ^ "/AlarmStrncmp.facts") in
   let oc_sprintf = open_out (dirname ^ "/AlarmSprintf.facts") in
+  let oc_sprintf_err_cons =
+    open_out (dirname ^ "/SprintfErrorConstraint.facts")
+  in
+  let oc_io_err_cons = open_out (dirname ^ "/IOErrorConstraint.facts") in
   let oc_bufferoverrunlib =
     open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
   in
@@ -554,6 +586,7 @@ let print_alarm analysis alarms =
       alarm = F.formatter_of_out_channel oc_alarm;
       array_exp = F.formatter_of_out_channel oc_array_exp;
       deref_exp = F.formatter_of_out_channel oc_deref_exp;
+      mul_exp = F.formatter_of_out_channel oc_mul_exp;
       div_exp = F.formatter_of_out_channel oc_div_exp;
       strcpy = F.formatter_of_out_channel oc_strcpy;
       strncpy = F.formatter_of_out_channel oc_strncpy;
@@ -562,6 +595,8 @@ let print_alarm analysis alarms =
       memchr = F.formatter_of_out_channel oc_memchr;
       strncmp = F.formatter_of_out_channel oc_strncmp;
       sprintf = F.formatter_of_out_channel oc_sprintf;
+      sprintf_err_cons = F.formatter_of_out_channel oc_sprintf_err_cons;
+      io_err_cons = F.formatter_of_out_channel oc_io_err_cons;
       bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
       strcat = F.formatter_of_out_channel oc_strcat;
       allocsize = F.formatter_of_out_channel oc_allocsize;
@@ -576,7 +611,7 @@ let print_alarm analysis alarms =
          match alarm.Report.src with
          | Some (src_node, _) when not (AlarmSet.mem (src_node, alarm.node) set)
            ->
-             pp_alarm_exp fmt alarm.exp;
+             pp_alarm_exp global alarm.node fmt alarm.exp;
              let a_id = Hashtbl.find alarm_exp_map alarm.exp in
              F.fprintf fmt.alarm "%a\t%a\t%s\n" Node.pp src_node Node.pp
                alarm.node a_id;
@@ -589,6 +624,7 @@ let print_alarm analysis alarms =
       oc_alarm;
       oc_array_exp;
       oc_deref_exp;
+      oc_mul_exp;
       oc_div_exp;
       oc_strcpy;
       oc_strncpy;
@@ -597,6 +633,8 @@ let print_alarm analysis alarms =
       oc_memchr;
       oc_strncmp;
       oc_sprintf;
+      oc_sprintf_err_cons;
+      oc_io_err_cons;
       oc_bufferoverrunlib;
       oc_strcat;
       oc_allocsize;

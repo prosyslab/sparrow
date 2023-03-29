@@ -13,6 +13,7 @@
 type t =
   | ArrayExp of Cil.lval * Cil.exp * Cil.location
   | DerefExp of Cil.exp * Cil.location
+  | MulExp of Cil.exp * Cil.exp * Cil.location
   | DivExp of Cil.exp * Cil.exp * Cil.location
   | Strcpy of Cil.exp * Cil.exp * Cil.location
   | Strcat of Cil.exp * Cil.exp * Cil.location

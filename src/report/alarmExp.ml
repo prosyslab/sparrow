@@ -17,6 +17,7 @@ module F = Format
 type t =
   | ArrayExp of lval * exp * location
   | DerefExp of exp * location
+  | MulExp of exp * exp * location
   | DivExp of exp * exp * location
   | Strcpy of exp * exp * location
   | Strcat of exp * exp * location
@@ -31,6 +32,7 @@ let to_string t =
   match t with
   | ArrayExp (lv, e, _) -> CilHelper.s_lv lv ^ "[" ^ CilHelper.s_exp e ^ "]"
   | DerefExp (e, _) -> "*(" ^ CilHelper.s_exp e ^ ")"
+  | MulExp (e1, e2, _) -> CilHelper.s_exp e1 ^ " * " ^ CilHelper.s_exp e2
   | DivExp (e1, e2, _) -> CilHelper.s_exp e1 ^ " / " ^ CilHelper.s_exp e2
   | Strcpy (e1, e2, _) ->
       "strcpy (" ^ CilHelper.s_exp e1 ^ ", " ^ CilHelper.s_exp e2 ^ ")"
@@ -53,6 +55,7 @@ let to_string t =
 let location_of = function
   | ArrayExp (_, _, l)
   | DerefExp (_, l)
+  | MulExp (_, _, l)
   | DivExp (_, _, l)
   | Strcpy (_, _, l)
   | Strncpy (_, _, _, l)
@@ -98,6 +101,7 @@ and c_exp e loc =
   | UnOp (_, e, _) -> c_exp e loc
   | BinOp (bop, e1, e2, _) -> (
       match bop with
+      | Mult -> (MulExp (e1, e2, loc) :: c_exp e1 loc) @ c_exp e2 loc
       | Div | Mod -> (DivExp (e1, e2, loc) :: c_exp e1 loc) @ c_exp e2 loc
       | _ -> c_exp e1 loc @ c_exp e2 loc)
   | CastE (_, e) -> c_exp e loc
@@ -166,8 +170,14 @@ let collect_interval = function
   | _ -> []
 
 let collect_taint = function
-  | Cmd.Calloc (_, Array e, _, loc) -> [ AllocSize ("malloc", e, loc) ]
-  | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) -> c_lib_taint f es loc
+  | Cmd.Calloc (_, Array e, _, loc) ->
+      AllocSize ("malloc", e, loc) :: c_exp e loc
+  | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) ->
+      c_lib_taint f es loc @ c_exps es loc
+  | Cmd.Ccall (_, _, es, loc) -> c_exps es loc
+  | Cmd.Cset (_, e, loc) -> c_exp e loc
+  | Cmd.Cassume (e, _, loc) -> c_exp e loc
+  | Cmd.Creturn (Some e, loc) -> c_exp e loc
   | _ -> []
 
 let collect analysis cmd =

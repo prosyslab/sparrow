@@ -83,6 +83,37 @@ let inspect_aexp node aexp itvmem mem queries =
           }
           :: queries)
         taint queries
+  | MulExp (e1, e2, loc) ->
+      let pid = InterCfg.Node.get_pid node in
+      let tv =
+        TaintSem.eval pid
+          (Cil.BinOp (Cil.Mult, e1, e2, Cil.typeOf e1))
+          itvmem mem
+      in
+      let int_overflow, taint =
+        (TaintDom.Val.int_overflow tv, TaintDom.Val.user_input tv)
+      in
+      TaintDom.UserInput.fold
+        (fun (src_node, src_loc) queries ->
+          let desc =
+            "source = " ^ Node.to_string src_node ^ " @ "
+            ^ CilHelper.s_location src_loc
+          in
+          let status =
+            if int_overflow |> TaintDom.IntOverflow.is_bot |> not then UnProven
+            else Proven
+          in
+          {
+            node;
+            exp = aexp;
+            loc;
+            allocsite = None;
+            status;
+            desc;
+            src = Some (src_node, src_loc);
+          }
+          :: queries)
+        taint queries
   | _ -> queries
 
 let inspect_alarm global spec inputof =
@@ -96,11 +127,7 @@ let inspect_alarm global spec inputof =
       let cmd = InterCfg.cmdof global.icfg node in
       let aexps = AlarmExp.collect analysis cmd in
       let qs =
-        list_fold
-          (fun aexp ->
-            if ptrmem = ItvDom.Mem.bot then id (* dead code *)
-            else inspect_aexp node aexp ptrmem mem)
-          aexps qs
+        list_fold (fun aexp -> inspect_aexp node aexp ptrmem mem) aexps qs
       in
       (qs, k + 1))
     nodes ([], 0)
@@ -123,7 +150,7 @@ let print_datalog_fact _ global dug alarms =
   RelSyntax.print analysis global.icfg;
   Provenance.print analysis global.relations;
   RelDUGraph.print analysis global dug alarms;
-  RelDUGraph.print_alarm analysis alarms
+  RelDUGraph.print_alarm analysis global alarms
 
 let ignore_function node =
   BatSet.elements !Options.filter_function

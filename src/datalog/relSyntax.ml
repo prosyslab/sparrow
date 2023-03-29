@@ -21,6 +21,7 @@ type formatter = {
   return : F.formatter;
   cmd : F.formatter;
   (* Expressions *)
+  sub_exp : F.formatter;
   const_exp : F.formatter;
   lval_exp : F.formatter;
   binop_exp : F.formatter;
@@ -34,6 +35,7 @@ type formatter = {
   mem : F.formatter;
   start_of : F.formatter;
   (* BinOp *)
+  binop : F.formatter;
   plusa : F.formatter;
   pluspi : F.formatter;
   indexpi : F.formatter;
@@ -57,6 +59,7 @@ type formatter = {
   landd : F.formatter;
   lorr : F.formatter;
   (* UnOp *)
+  unop : F.formatter;
   bnot : F.formatter;
   lnot : F.formatter;
   neg : F.formatter;
@@ -106,10 +109,35 @@ let donotcare_lv =
   let vi = Cil.makeGlobalVar "__DONOTCARE__" Cil.voidType in
   (Cil.Var vi, Cil.NoOffset)
 
+let string_of_bop = function
+  | Cil.PlusA -> "PlusA"
+  | PlusPI -> "PlusPI"
+  | IndexPI -> "IndexPI"
+  | MinusA -> "MinusA"
+  | MinusPI -> "MinusPI"
+  | MinusPP -> "MinusPP"
+  | Mult -> "Mult"
+  | Div -> "Div"
+  | Mod -> "Mod"
+  | Shiftlt -> "Shiftlt"
+  | Shiftrt -> "Shiftrt"
+  | Lt -> "Lt"
+  | Gt -> "Gt"
+  | Le -> "Le"
+  | Ge -> "Ge"
+  | Eq -> "Eq"
+  | Ne -> "Ne"
+  | BAnd -> "BAnd"
+  | BXor -> "BXor"
+  | BOr -> "BOr"
+  | LAnd -> "LAnd"
+  | LOr -> "LOr"
+
 let pp_binop fmt bop =
   if Hashtbl.mem binop_map bop then ()
   else
     let id = new_binop_id bop in
+    F.fprintf fmt.binop "%s\t%s\n" id (string_of_bop bop);
     match bop with
     | Cil.PlusA -> F.fprintf fmt.plusa "%s\n" id
     | PlusPI -> F.fprintf fmt.pluspi "%s\n" id
@@ -134,10 +162,16 @@ let pp_binop fmt bop =
     | LAnd -> F.fprintf fmt.landd "%s\n" id
     | LOr -> F.fprintf fmt.lorr "%s\n" id
 
+let string_of_uop = function
+  | Cil.BNot -> "BNot"
+  | LNot -> "LNot"
+  | Neg -> "Neg"
+
 let pp_unop fmt uop =
   if Hashtbl.mem unop_map uop then ()
   else
     let id = new_unop_id uop in
+    F.fprintf fmt.unop "%s\t%s\n" id (string_of_uop uop);
     match uop with
     | Cil.BNot -> F.fprintf fmt.bnot "%s\n" id
     | LNot -> F.fprintf fmt.lnot "%s\n" id
@@ -161,10 +195,13 @@ let rec pp_lv fmt lv =
         F.fprintf fmt.mem "%s\t%s\n" id e_id
     | _, _ -> F.fprintf fmt.lval "%s\tOther\n" id
 
-and pp_exp fmt e =
-  if Hashtbl.mem exp_map e then ()
+and pp_exp fmt ?(ancestor = []) e =
+  if Hashtbl.mem exp_map e then
+    let id = Hashtbl.find exp_map e in
+    List.iter (fun a -> F.fprintf fmt.sub_exp "%s\t%s\n" a id) ancestor
   else
     let id = new_exp_id e in
+    List.iter (fun a -> F.fprintf fmt.sub_exp "%s\t%s\n" a id) ancestor;
     match e with
     | Cil.Const _ -> F.fprintf fmt.const_exp "%s\n" id
     | Cil.Lval lv ->
@@ -173,20 +210,20 @@ and pp_exp fmt e =
         F.fprintf fmt.lval_exp "%s\t%s\n" id lv_id
     | Cil.BinOp (bop, e1, e2, _) ->
         pp_binop fmt bop;
-        pp_exp fmt e1;
-        pp_exp fmt e2;
+        pp_exp fmt ~ancestor:(id :: ancestor) e1;
+        pp_exp fmt ~ancestor:(id :: ancestor) e2;
         let e1_id = Hashtbl.find exp_map e1 in
         let e2_id = Hashtbl.find exp_map e2 in
         let bop_id = Hashtbl.find binop_map bop in
         F.fprintf fmt.binop_exp "%s\t%s\t%s\t%s\n" id bop_id e1_id e2_id
     | Cil.UnOp (unop, e, _) ->
-        pp_exp fmt e;
+        pp_exp fmt ~ancestor:(id :: ancestor) e;
         pp_unop fmt unop;
         let e_id = Hashtbl.find exp_map e in
         let unop_id = Hashtbl.find unop_map unop in
         F.fprintf fmt.unop_exp "%s\t%s\t%s\n" id unop_id e_id
     | Cil.CastE (_, e1) ->
-        pp_exp fmt e1;
+        pp_exp ~ancestor:(id :: ancestor) fmt e1;
         let e1_id = Hashtbl.find exp_map e1 in
         F.fprintf fmt.cast_exp "%s\t%s\n" id e1_id
     | Cil.StartOf l ->
@@ -274,11 +311,12 @@ let make_formatters dirname =
   let oc_func = open_out (dirname ^ "/Func.facts") in
   let oc_const = open_out (dirname ^ "/ConstExp.facts") in
   let oc_lval = open_out (dirname ^ "/LvalExp.facts") in
-  let oc_binop = open_out (dirname ^ "/BinOpExp.facts") in
-  let oc_unop = open_out (dirname ^ "/UnOpExp.facts") in
+  let oc_binop_exp = open_out (dirname ^ "/BinOpExp.facts") in
+  let oc_unop_exp = open_out (dirname ^ "/UnOpExp.facts") in
   let oc_cast = open_out (dirname ^ "/CastExp.facts") in
   let oc_exp = open_out (dirname ^ "/OtherExp.facts") in
   let oc_cmd = open_out (dirname ^ "/Cmd.facts") in
+  let oc_sub = open_out (dirname ^ "/SubExp.facts") in
   let oc_entry = open_out (dirname ^ "/Entry.facts") in
   let oc_exit = open_out (dirname ^ "/Exit.facts") in
   let oc_skip = open_out (dirname ^ "/Skip.facts") in
@@ -298,6 +336,7 @@ let make_formatters dirname =
   let oc_mem = open_out (dirname ^ "/Mem.facts") in
   let oc_start_of = open_out (dirname ^ "/StartOf.facts") in
   (* BinOp *)
+  let oc_binop = open_out (dirname ^ "/Bop.map") in
   let oc_plusa = open_out (dirname ^ "/PlusA.facts") in
   let oc_pluspi = open_out (dirname ^ "/PlusPI.facts") in
   let oc_indexpi = open_out (dirname ^ "/IndexPI.facts") in
@@ -321,6 +360,7 @@ let make_formatters dirname =
   let oc_landd = open_out (dirname ^ "/LAnd.facts") in
   let oc_lorr = open_out (dirname ^ "/LOr.facts") in
   (* UnOp *)
+  let oc_unop = open_out (dirname ^ "/Uop.map") in
   let oc_bnot = open_out (dirname ^ "/BNot.facts") in
   let oc_lnot = open_out (dirname ^ "/LNot.facts") in
   let oc_neg = open_out (dirname ^ "/Neg.facts") in
@@ -340,10 +380,11 @@ let make_formatters dirname =
       arg = F.formatter_of_out_channel oc_arg;
       return = F.formatter_of_out_channel oc_return;
       cmd = F.formatter_of_out_channel oc_cmd;
+      sub_exp = F.formatter_of_out_channel oc_sub;
       const_exp = F.formatter_of_out_channel oc_const;
       lval_exp = F.formatter_of_out_channel oc_lval;
-      binop_exp = F.formatter_of_out_channel oc_binop;
-      unop_exp = F.formatter_of_out_channel oc_unop;
+      binop_exp = F.formatter_of_out_channel oc_binop_exp;
+      unop_exp = F.formatter_of_out_channel oc_unop_exp;
       cast_exp = F.formatter_of_out_channel oc_cast;
       other_exp = F.formatter_of_out_channel oc_exp;
       global_var = F.formatter_of_out_channel oc_global_var;
@@ -353,6 +394,7 @@ let make_formatters dirname =
       mem = F.formatter_of_out_channel oc_mem;
       start_of = F.formatter_of_out_channel oc_start_of;
       (* BinOp *)
+      binop = F.formatter_of_out_channel oc_binop;
       plusa = F.formatter_of_out_channel oc_plusa;
       pluspi = F.formatter_of_out_channel oc_pluspi;
       indexpi = F.formatter_of_out_channel oc_indexpi;
@@ -375,7 +417,8 @@ let make_formatters dirname =
       bor = F.formatter_of_out_channel oc_bor;
       landd = F.formatter_of_out_channel oc_landd;
       lorr = F.formatter_of_out_channel oc_lorr;
-      (* BinOp *)
+      (* UnOp *)
+      unop = F.formatter_of_out_channel oc_unop;
       bnot = F.formatter_of_out_channel oc_bnot;
       lnot = F.formatter_of_out_channel oc_lnot;
       neg = F.formatter_of_out_channel oc_neg;
@@ -386,18 +429,22 @@ let make_formatters dirname =
       oc_func;
       oc_const;
       oc_lval;
+      oc_binop_exp;
+      oc_unop_exp;
       oc_cast;
       oc_exp;
       oc_cmd;
+      oc_sub;
       oc_entry;
       oc_exit;
       oc_skip;
+      oc_join;
       oc_assign;
       oc_assume;
       oc_alloc;
       oc_salloc;
-      oc_call;
       oc_libcall;
+      oc_call;
       oc_arg;
       oc_return;
       oc_global_var;
@@ -406,6 +453,33 @@ let make_formatters dirname =
       oc_lv;
       oc_mem;
       oc_start_of;
+      oc_binop;
+      oc_plusa;
+      oc_pluspi;
+      oc_indexpi;
+      oc_minusa;
+      oc_minuspi;
+      oc_minuspp;
+      oc_mult;
+      oc_div;
+      oc_modd;
+      oc_shiftlt;
+      oc_shiftrt;
+      oc_lt;
+      oc_gt;
+      oc_le;
+      oc_ge;
+      oc_eq;
+      oc_ne;
+      oc_band;
+      oc_bxor;
+      oc_bor;
+      oc_landd;
+      oc_lorr;
+      oc_unop;
+      oc_bnot;
+      oc_lnot;
+      oc_neg;
     ]
   in
   (fmt, channels)
@@ -428,6 +502,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.return ();
   F.pp_print_flush fmt.cmd ();
   (* Expressions *)
+  F.pp_print_flush fmt.sub_exp ();
   F.pp_print_flush fmt.const_exp ();
   F.pp_print_flush fmt.lval_exp ();
   F.pp_print_flush fmt.binop_exp ();
@@ -441,6 +516,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.mem ();
   F.pp_print_flush fmt.start_of ();
   (* BinOp *)
+  F.pp_print_flush fmt.binop ();
   F.pp_print_flush fmt.plusa ();
   F.pp_print_flush fmt.pluspi ();
   F.pp_print_flush fmt.indexpi ();
@@ -464,6 +540,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.landd ();
   F.pp_print_flush fmt.lorr ();
   (* UnOp *)
+  F.pp_print_flush fmt.unop ();
   F.pp_print_flush fmt.bnot ();
   F.pp_print_flush fmt.lnot ();
   F.pp_print_flush fmt.neg ();
@@ -516,6 +593,7 @@ let print analysis icfg =
   Hashtbl.reset exp_map;
   Hashtbl.reset lv_map;
   Hashtbl.reset binop_map;
+  Hashtbl.reset unop_map;
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   print_relation dirname icfg;
   print_raw dirname
