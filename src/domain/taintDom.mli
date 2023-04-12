@@ -28,14 +28,30 @@ module UserInput : sig
   val is_taint : t -> bool
 end
 
+module Symbolic : sig
+  module Symbol : sig
+    type t = Sym of int | Const of int
+  end
+
+  include PowDom.CPO with type elt = Symbol.t
+
+  val make : unit -> t
+end
+
 module Val : sig
-  type t = { int_overflow : IntOverflow.t; user_input : UserInput.t }
+  type t = {
+    int_overflow : IntOverflow.t;
+    user_input : UserInput.t;
+    symbolic : Symbolic.t;
+  }
 
   include AbsDom.LAT with type t := t
 
   val int_overflow : t -> IntOverflow.t
 
   val user_input : t -> UserInput.t
+
+  val symbolic : t -> Symbolic.t
 
   val input_value : BasicDom.Node.t -> Cil.location -> t
 end
