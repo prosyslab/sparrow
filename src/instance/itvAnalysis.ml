@@ -399,7 +399,7 @@ let print_datalog_fact _ global dug alarms =
   in
   RelSyntax.print analysis global.icfg;
   RelDUGraph.print analysis global dug alarms;
-  RelDUGraph.print_alarm analysis global alarms
+  RelDUGraph.print_alarm analysis alarms
 
 let ignore_file file =
   BatSet.elements !Options.filter_file

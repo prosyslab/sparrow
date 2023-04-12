@@ -146,11 +146,12 @@ let get_locset mem =
 let make_top_mem locset =
   PowLoc.fold (fun l mem -> Mem.add l TaintDom.Val.top mem) locset Mem.bot
 
-let print_datalog_fact _ global dug alarms =
+let print_datalog_fact _ global inputof outputof dug alarms =
   RelSyntax.print analysis global.icfg;
   Provenance.print analysis global.relations;
   RelDUGraph.print analysis global dug alarms;
-  RelDUGraph.print_alarm analysis global alarms
+  RelDUGraph.print_sems analysis global inputof outputof dug alarms;
+  RelDUGraph.print_taint_alarm analysis global inputof alarms
 
 let ignore_function node =
   BatSet.elements !Options.filter_function
@@ -175,7 +176,7 @@ let post_process spec itvdug (global, _, inputof, outputof) =
   Report.print ~fmt:(Some fmt) global alarms;
   close_out report_file;
   if !Options.extract_datalog_fact_full then
-    print_datalog_fact spec global itvdug alarms;
+    print_datalog_fact spec global inputof outputof itvdug alarms;
   (global, inputof, outputof, alarms)
 
 let do_analysis (global, itvdug, itvinputof) =
