@@ -21,7 +21,6 @@ type formatter = {
   return : F.formatter;
   cmd : F.formatter;
   (* Expressions *)
-  sub_exp : F.formatter;
   const_exp : F.formatter;
   lval_exp : F.formatter;
   binop_exp : F.formatter;
@@ -195,13 +194,10 @@ let rec pp_lv fmt lv =
         F.fprintf fmt.mem "%s\t%s\n" id e_id
     | _, _ -> F.fprintf fmt.lval "%s\tOther\n" id
 
-and pp_exp fmt ?(ancestor = []) e =
-  if Hashtbl.mem exp_map e then
-    let id = Hashtbl.find exp_map e in
-    List.iter (fun a -> F.fprintf fmt.sub_exp "%s\t%s\n" a id) ancestor
+and pp_exp fmt e =
+  if Hashtbl.mem exp_map e then ()
   else
     let id = new_exp_id e in
-    List.iter (fun a -> F.fprintf fmt.sub_exp "%s\t%s\n" a id) ancestor;
     match e with
     | Cil.Const _ -> F.fprintf fmt.const_exp "%s\n" id
     | Cil.Lval lv ->
@@ -210,20 +206,20 @@ and pp_exp fmt ?(ancestor = []) e =
         F.fprintf fmt.lval_exp "%s\t%s\n" id lv_id
     | Cil.BinOp (bop, e1, e2, _) ->
         pp_binop fmt bop;
-        pp_exp fmt ~ancestor:(id :: ancestor) e1;
-        pp_exp fmt ~ancestor:(id :: ancestor) e2;
+        pp_exp fmt e1;
+        pp_exp fmt e2;
         let e1_id = Hashtbl.find exp_map e1 in
         let e2_id = Hashtbl.find exp_map e2 in
         let bop_id = Hashtbl.find binop_map bop in
         F.fprintf fmt.binop_exp "%s\t%s\t%s\t%s\n" id bop_id e1_id e2_id
     | Cil.UnOp (unop, e, _) ->
-        pp_exp fmt ~ancestor:(id :: ancestor) e;
+        pp_exp fmt e;
         pp_unop fmt unop;
         let e_id = Hashtbl.find exp_map e in
         let unop_id = Hashtbl.find unop_map unop in
         F.fprintf fmt.unop_exp "%s\t%s\t%s\n" id unop_id e_id
     | Cil.CastE (_, e1) ->
-        pp_exp ~ancestor:(id :: ancestor) fmt e1;
+        pp_exp fmt e1;
         let e1_id = Hashtbl.find exp_map e1 in
         F.fprintf fmt.cast_exp "%s\t%s\n" id e1_id
     | Cil.StartOf l ->
@@ -231,6 +227,18 @@ and pp_exp fmt ?(ancestor = []) e =
         let l_id = Hashtbl.find lv_map l in
         F.fprintf fmt.start_of "%s\t%s\n" id l_id
     | _ -> F.fprintf fmt.other_exp "%s\n" id
+
+let rec remove_cast = function
+  | ( Cil.Const _ | Cil.Lval _ | Cil.SizeOf _ | Cil.SizeOfStr _ | Cil.AlignOf _
+    | Cil.AddrOf _ | Cil.AddrOfLabel _ | Cil.StartOf _ ) as e ->
+      e
+  | Cil.SizeOfE e -> Cil.SizeOfE (remove_cast e)
+  | Cil.AlignOfE e -> Cil.AlignOfE (remove_cast e)
+  | Cil.UnOp (o, e, t) -> Cil.UnOp (o, remove_cast e, t)
+  | Cil.BinOp (o, e1, e2, t) -> Cil.BinOp (o, remove_cast e1, remove_cast e2, t)
+  | Cil.Question (e1, e2, e3, t) ->
+      Cil.Question (remove_cast e1, remove_cast e2, remove_cast e3, t)
+  | Cil.CastE (_, e) -> remove_cast e
 
 let arg_count = ref 0
 
@@ -242,7 +250,9 @@ let new_arg_id () =
 let pp_arg fmt arg =
   let id = new_arg_id () in
   List.iteri
-    (fun i e -> Hashtbl.find exp_map e |> F.fprintf fmt.arg "%s\t%d\t%s\n" id i)
+    (fun i e ->
+      let e' = if !Options.remove_cast then remove_cast e else e in
+      Hashtbl.find exp_map e' |> F.fprintf fmt.arg "%s\t%d\t%s\n" id i)
     arg;
   id
 
@@ -257,16 +267,18 @@ let pp_cmd fmt icfg n =
       else F.fprintf fmt.skip "%a\n" Node.pp n
   | Cset (lv, e, _) ->
       pp_lv fmt lv;
-      pp_exp fmt e;
+      let e' = if !Options.remove_cast then remove_cast e else e in
+      pp_exp fmt e';
       let lv_id = Hashtbl.find lv_map lv in
-      let e_id = Hashtbl.find exp_map e in
+      let e_id = Hashtbl.find exp_map e' in
       F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id
   | Cexternal (_, _) -> F.fprintf fmt.cmd "external\n"
   | Calloc (lv, Array e, _, _) ->
       pp_lv fmt lv;
-      pp_exp fmt e;
+      let e' = if !Options.remove_cast then remove_cast e else e in
+      pp_exp fmt e';
       let lv_id = Hashtbl.find lv_map lv in
-      let size_e_id = Hashtbl.find exp_map e in
+      let size_e_id = Hashtbl.find exp_map e' in
       F.fprintf fmt.alloc "%a\t%s\t%s\n" Node.pp n lv_id size_e_id
   | Calloc (_, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
   | Csalloc (lv, _, _) ->
@@ -280,30 +292,38 @@ let pp_cmd fmt icfg n =
         if Option.is_none lv_opt then donotcare_lv else Option.get lv_opt
       in
       pp_lv fmt lv;
-      pp_exp fmt e;
-      List.iter (pp_exp fmt) el;
+      let e' = if !Options.remove_cast then remove_cast e else e in
+      pp_exp fmt e';
+      List.iter
+        (fun e ->
+          let e' = if !Options.remove_cast then remove_cast e else e in
+          pp_exp fmt e')
+        el;
       let arg_id = pp_arg fmt el in
       let lv_id = Hashtbl.find lv_map lv in
-      let e_id = Hashtbl.find exp_map e in
+      let e_id = Hashtbl.find exp_map e' in
       F.fprintf fmt.libcall "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
   | Ccall (lv_opt, e, el, _) ->
       let lv =
         if Option.is_none lv_opt then donotcare_lv else Option.get lv_opt
       in
       pp_lv fmt lv;
-      pp_exp fmt e;
+      let e' = if !Options.remove_cast then remove_cast e else e in
+      pp_exp fmt e';
       List.iter (pp_exp fmt) el;
       let arg_id = pp_arg fmt el in
       let lv_id = Hashtbl.find lv_map lv in
-      let e_id = Hashtbl.find exp_map e in
+      let e_id = Hashtbl.find exp_map e' in
       F.fprintf fmt.call "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
   | Creturn (Some e, _) ->
-      pp_exp fmt e;
-      let id = Hashtbl.find exp_map e in
+      let e' = if !Options.remove_cast then remove_cast e else e in
+      pp_exp fmt e';
+      let id = Hashtbl.find exp_map e' in
       F.fprintf fmt.return "%a\t%s\n" Node.pp n id
   | Cassume (e, _, _) ->
-      pp_exp fmt e;
-      let e_id = Hashtbl.find exp_map e in
+      let e' = if !Options.remove_cast then remove_cast e else e in
+      pp_exp fmt e';
+      let e_id = Hashtbl.find exp_map e' in
       F.fprintf fmt.assume "%a\t%s\n" Node.pp n e_id
   | _ -> F.fprintf fmt.cmd "unknown"
 
@@ -316,7 +336,6 @@ let make_formatters dirname =
   let oc_cast = open_out (dirname ^ "/CastExp.facts") in
   let oc_exp = open_out (dirname ^ "/OtherExp.facts") in
   let oc_cmd = open_out (dirname ^ "/Cmd.facts") in
-  let oc_sub = open_out (dirname ^ "/SubExp.facts") in
   let oc_entry = open_out (dirname ^ "/Entry.facts") in
   let oc_exit = open_out (dirname ^ "/Exit.facts") in
   let oc_skip = open_out (dirname ^ "/Skip.facts") in
@@ -380,7 +399,6 @@ let make_formatters dirname =
       arg = F.formatter_of_out_channel oc_arg;
       return = F.formatter_of_out_channel oc_return;
       cmd = F.formatter_of_out_channel oc_cmd;
-      sub_exp = F.formatter_of_out_channel oc_sub;
       const_exp = F.formatter_of_out_channel oc_const;
       lval_exp = F.formatter_of_out_channel oc_lval;
       binop_exp = F.formatter_of_out_channel oc_binop_exp;
@@ -434,7 +452,6 @@ let make_formatters dirname =
       oc_cast;
       oc_exp;
       oc_cmd;
-      oc_sub;
       oc_entry;
       oc_exit;
       oc_skip;
@@ -502,7 +519,6 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.return ();
   F.pp_print_flush fmt.cmd ();
   (* Expressions *)
-  F.pp_print_flush fmt.sub_exp ();
   F.pp_print_flush fmt.const_exp ();
   F.pp_print_flush fmt.lval_exp ();
   F.pp_print_flush fmt.binop_exp ();

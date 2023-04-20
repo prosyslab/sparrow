@@ -174,6 +174,7 @@ type node = Node.t
 type cmd = Cmd.t
 
 module G = Graph.Persistent.Digraph.ConcreteBidirectional (Node)
+module Oper = Graph.Oper.P (G)
 module Merge = Graph.Merge.P (G)
 module Topo = Graph.Topological.Make (G)
 module Scc = Graph.Components.Make (G)
@@ -239,6 +240,12 @@ let get_formals_lval g = List.map Cil.var g.fd.sformals
 
 let get_scc_list g = g.scc_list
 
+let transitive_closure ?(reflexive = false) g =
+  { g with graph = Oper.transitive_closure ~reflexive g.graph }
+
+let pp_node_like_interCfg g fmt node =
+  Format.fprintf fmt "%s-%s" (get_pid g) (Node.to_string node)
+
 let children_of_dom_tree node g =
   NodeSet.remove node (NodeSet.of_list (G.succ g.dom_tree node))
 
@@ -297,6 +304,8 @@ let fold_edges f g a = G.fold_edges f g.graph a
 let iter_node f g = G.iter_vertex f g.graph
 
 let iter_vertex f g = G.iter_vertex f g.graph
+
+let iter_edges f g = G.iter_edges f g.graph
 
 let is_entry = function Node.ENTRY -> true | _ -> false
 
@@ -825,8 +834,6 @@ let insert_return_before_exit g =
     | _ -> add_new_node node (Cmd.Creturn (None, locUnknown)) Node.EXIT acc
   in
   list_fold add_return (pred Node.EXIT g) g
-
-module Oper = Graph.Oper.P (G)
 
 let compute_dom g =
   let dom_functions = Dom.compute_all (GDom.fromG g.graph) Node.ENTRY in

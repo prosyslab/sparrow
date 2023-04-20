@@ -101,7 +101,8 @@ and c_exp e loc =
   | UnOp (_, e, _) -> c_exp e loc
   | BinOp (bop, e1, e2, _) -> (
       match bop with
-      | Mult -> (MulExp (e1, e2, loc) :: c_exp e1 loc) @ c_exp e2 loc
+      | Mult when !Options.mul ->
+          (MulExp (e1, e2, loc) :: c_exp e1 loc) @ c_exp e2 loc
       | Div | Mod -> (DivExp (e1, e2, loc) :: c_exp e1 loc) @ c_exp e2 loc
       | _ -> c_exp e1 loc @ c_exp e2 loc)
   | CastE (_, e) -> c_exp e loc

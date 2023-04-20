@@ -148,7 +148,7 @@ let make_top_mem locset =
 
 let print_datalog_fact _ global inputof outputof dug alarms =
   RelSyntax.print analysis global.icfg;
-  Provenance.print analysis global.relations;
+  if not !Options.patron then Provenance.print analysis global.relations;
   RelDUGraph.print analysis global dug alarms;
   RelDUGraph.print_sems analysis global inputof outputof dug alarms;
   RelDUGraph.print_taint_alarm analysis global inputof alarms

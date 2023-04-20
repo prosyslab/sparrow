@@ -77,6 +77,10 @@ val get_formals : t -> Cil.varinfo list
 
 val get_scc_list : t -> node list list
 
+val transitive_closure : ?reflexive:bool -> t -> t
+
+val pp_node_like_interCfg : t -> Format.formatter -> node -> unit
+
 val nodesof : t -> node list
 
 val entryof : t -> node
@@ -112,6 +116,8 @@ val fold_edges : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
 val iter_node : (node -> unit) -> t -> unit
 
 val iter_vertex : (node -> unit) -> t -> unit
+
+val iter_edges : (node -> node -> unit) -> t -> unit
 
 (** {2 Predecessors and Successors } *)
 
