@@ -114,12 +114,20 @@ let extract_datalog_fact_full = ref false
 
 let extract_datalog_fact_full_no_opt = ref false
 
+(* for patron *)
+let patron = ref false
+
+(* remove cast exp for patron *)
+let remove_cast = ref false
+
 (* Alarm Report *)
 let noalarm = ref false
 
 let bo = ref true
 
 let nd = ref false
+
+let mul = ref false
 
 let dz = ref false
 
@@ -219,6 +227,7 @@ let datalog_opts =
           extract_datalog_fact_full := true;
           extract_datalog_fact_full_no_opt := true),
       "Extract extensive datalog facts" );
+    ("-remove_cast", Arg.Set remove_cast, "Remove cast expression for encoding");
   ]
 
 let opts =
@@ -251,6 +260,20 @@ let opts =
     ("-pack_manual", Arg.Set pack_manual, "Pacing by manual annotation");
     ("-nd", Arg.Set nd, "Print Null-dereference alarms");
     ("-bo", Arg.Set bo, "Print Buffer-overrun alarms");
+    ( "-mul",
+      Arg.Set mul,
+      "Print Integer-overflow alarms from multiply expressions" );
+    ( "-patron",
+      Arg.Unit
+        (fun () ->
+          patron := true;
+          taint := true;
+          extract_datalog_fact := true;
+          extract_datalog_fact_full := true;
+          extract_datalog_fact_full_no_opt := true;
+          mul := true;
+          remove_cast := true),
+      "Anlyze for Patron" );
     ("-dz", Arg.Set dz, "Print Divide-by-zero alarms");
     ( "-bugfinder",
       Arg.Set_int bugfinder,

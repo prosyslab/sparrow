@@ -108,6 +108,8 @@ val bo : bool ref
 
 val nd : bool ref
 
+val mul : bool ref
+
 val dz : bool ref
 
 val show_all_query : bool ref
@@ -135,6 +137,10 @@ val extract_datalog_fact : bool ref
 val extract_datalog_fact_full : bool ref
 
 val extract_datalog_fact_full_no_opt : bool ref
+
+val remove_cast : bool ref
+
+val patron : bool ref
 
 (** {2 Pretty Printer & Debugging } *)
 
