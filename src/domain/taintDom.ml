@@ -131,6 +131,7 @@ module Val = struct
     IntOverflow.le x.int_overflow y.int_overflow
     && UserInput.le x.user_input y.user_input
     && Symbolic.is_bot x.symbolic
+  (* NOTE: slightly different from general ordering for symbolic domain, just check whether the value is bot *)
 
   let eq x y =
     IntOverflow.eq x.int_overflow y.int_overflow
