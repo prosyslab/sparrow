@@ -20,6 +20,12 @@ type formatter = {
   arg : F.formatter;
   return : F.formatter;
   cmd : F.formatter;
+  (* Cmd for Patron *)
+  set : F.formatter;
+  alloc_exp : F.formatter;
+  salloc_exp : F.formatter;
+  call_exp : F.formatter;
+  libcall_exp : F.formatter;
   (* Expressions *)
   const_exp : F.formatter;
   lval_exp : F.formatter;
@@ -92,6 +98,46 @@ let new_exp_id e =
   let id = "Exp-" ^ string_of_int !exp_count in
   exp_count := !exp_count + 1;
   Hashtbl.add exp_map e id;
+  id
+
+let alloc_count = ref 0
+
+let alloc_map = Hashtbl.create 1000
+
+let new_alloc_id e =
+  let id = "AllocExp-" ^ string_of_int !alloc_count in
+  alloc_count := !alloc_count + 1;
+  Hashtbl.add alloc_map e id;
+  id
+
+let salloc_count = ref 0
+
+let salloc_map = Hashtbl.create 1000
+
+let new_salloc_id e =
+  let id = "SallocExp-" ^ string_of_int !salloc_count in
+  salloc_count := !salloc_count + 1;
+  Hashtbl.add salloc_map e id;
+  id
+
+let call_count = ref 0
+
+let call_map = Hashtbl.create 1000
+
+let new_call_id e =
+  let id = "CallExp-" ^ string_of_int !call_count in
+  call_count := !call_count + 1;
+  Hashtbl.add call_map e id;
+  id
+
+let libcall_count = ref 0
+
+let libcall_map = Hashtbl.create 1000
+
+let new_libcall_id e =
+  let id = "LibCallExp-" ^ string_of_int !libcall_count in
+  libcall_count := !libcall_count + 1;
+  Hashtbl.add libcall_map e id;
   id
 
 let lv_count = ref 0
@@ -271,19 +317,32 @@ let pp_cmd fmt icfg n =
       pp_exp fmt e';
       let lv_id = Hashtbl.find lv_map lv in
       let e_id = Hashtbl.find exp_map e' in
+      F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id e_id;
       F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id
   | Cexternal (_, _) -> F.fprintf fmt.cmd "external\n"
-  | Calloc (lv, Array e, _, _) ->
+  | Calloc (lv, (Array e as alloc), _, _) ->
       pp_lv fmt lv;
       let e' = if !Options.remove_cast then remove_cast e else e in
       pp_exp fmt e';
       let lv_id = Hashtbl.find lv_map lv in
       let size_e_id = Hashtbl.find exp_map e' in
+      let alloc_id =
+        if Hashtbl.mem alloc_map alloc then Hashtbl.find alloc_map alloc
+        else new_alloc_id alloc
+      in
+      F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id alloc_id;
+      F.fprintf fmt.alloc_exp "%s\t%s\n" alloc_id size_e_id;
       F.fprintf fmt.alloc "%a\t%s\t%s\n" Node.pp n lv_id size_e_id
   | Calloc (_, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
-  | Csalloc (lv, _, _) ->
+  | Csalloc (lv, str, _) ->
       pp_lv fmt lv;
       let lv_id = Hashtbl.find lv_map lv in
+      let salloc_id =
+        if Hashtbl.mem salloc_map str then Hashtbl.find salloc_map str
+        else new_salloc_id str
+      in
+      F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id salloc_id;
+      F.fprintf fmt.salloc_exp "%s\t%s\n" salloc_id str;
       F.fprintf fmt.salloc "%a\t%s\n" Node.pp n lv_id
   | Cfalloc (_, _, _) -> F.fprintf fmt.cmd "falloc\n"
   | Ccall (lv_opt, (Lval (Var f, NoOffset) as e), el, _)
@@ -302,6 +361,13 @@ let pp_cmd fmt icfg n =
       let arg_id = pp_arg fmt el in
       let lv_id = Hashtbl.find lv_map lv in
       let e_id = Hashtbl.find exp_map e' in
+      let libcall_id =
+        if Hashtbl.mem libcall_map (e', el) then
+          Hashtbl.find libcall_map (e', el)
+        else new_libcall_id (e', el)
+      in
+      F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id libcall_id;
+      F.fprintf fmt.libcall_exp "%s\t%s\t%s\n" libcall_id e_id arg_id;
       F.fprintf fmt.libcall "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
   | Ccall (lv_opt, e, el, _) ->
       let lv =
@@ -314,6 +380,12 @@ let pp_cmd fmt icfg n =
       let arg_id = pp_arg fmt el in
       let lv_id = Hashtbl.find lv_map lv in
       let e_id = Hashtbl.find exp_map e' in
+      let call_id =
+        if Hashtbl.mem call_map (e', el) then Hashtbl.find call_map (e', el)
+        else new_call_id (e', el)
+      in
+      F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id call_id;
+      F.fprintf fmt.call_exp "%s\t%s\t%s\n" call_id e_id arg_id;
       F.fprintf fmt.call "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
   | Creturn (Some e, _) ->
       let e' = if !Options.remove_cast then remove_cast e else e in
@@ -348,6 +420,11 @@ let make_formatters dirname =
   let oc_call = open_out (dirname ^ "/Call.facts") in
   let oc_arg = open_out (dirname ^ "/Arg.facts") in
   let oc_return = open_out (dirname ^ "/Return.facts") in
+  let oc_set = open_out (dirname ^ "/Set.facts") in
+  let oc_alloc_exp = open_out (dirname ^ "/AllocExp.facts") in
+  let oc_salloc_exp = open_out (dirname ^ "/SAllocExp.facts") in
+  let oc_call_exp = open_out (dirname ^ "/CallExp.facts") in
+  let oc_libcall_exp = open_out (dirname ^ "/LibCallExp.facts") in
   let oc_global_var = open_out (dirname ^ "/GlobalVar.facts") in
   let oc_local_var = open_out (dirname ^ "/LocalVar.facts") in
   let oc_field = open_out (dirname ^ "/Field.facts") in
@@ -399,6 +476,11 @@ let make_formatters dirname =
       arg = F.formatter_of_out_channel oc_arg;
       return = F.formatter_of_out_channel oc_return;
       cmd = F.formatter_of_out_channel oc_cmd;
+      set = F.formatter_of_out_channel oc_set;
+      alloc_exp = F.formatter_of_out_channel oc_alloc_exp;
+      salloc_exp = F.formatter_of_out_channel oc_salloc_exp;
+      call_exp = F.formatter_of_out_channel oc_call_exp;
+      libcall_exp = F.formatter_of_out_channel oc_libcall_exp;
       const_exp = F.formatter_of_out_channel oc_const;
       lval_exp = F.formatter_of_out_channel oc_lval;
       binop_exp = F.formatter_of_out_channel oc_binop_exp;
@@ -464,6 +546,11 @@ let make_formatters dirname =
       oc_call;
       oc_arg;
       oc_return;
+      oc_set;
+      oc_alloc_exp;
+      oc_salloc_exp;
+      oc_call_exp;
+      oc_libcall_exp;
       oc_global_var;
       oc_local_var;
       oc_field;
@@ -518,6 +605,12 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.arg ();
   F.pp_print_flush fmt.return ();
   F.pp_print_flush fmt.cmd ();
+  (* Cmd for Patron *)
+  F.pp_print_flush fmt.set ();
+  F.pp_print_flush fmt.alloc_exp ();
+  F.pp_print_flush fmt.salloc_exp ();
+  F.pp_print_flush fmt.call_exp ();
+  F.pp_print_flush fmt.libcall_exp ();
   (* Expressions *)
   F.pp_print_flush fmt.const_exp ();
   F.pp_print_flush fmt.lval_exp ();

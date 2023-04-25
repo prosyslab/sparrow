@@ -198,15 +198,14 @@ let rec pp_exp_sems fmt global inputmem node e =
   let v_id =
     if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
   in
+  F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp node e_id v_id;
   match e with
   | Cil.BinOp (_, e1, e2, _) ->
       pp_exp_sems fmt global inputmem node e1;
-      pp_exp_sems fmt global inputmem node e2;
-      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp node e_id v_id
+      pp_exp_sems fmt global inputmem node e2
   | Cil.UnOp (_, e, _) | Cil.CastE (_, e) ->
-      pp_exp_sems fmt global inputmem node e;
-      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp node e_id v_id
-  | _ -> F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp node e_id v_id
+      pp_exp_sems fmt global inputmem node e
+  | _ -> ()
 
 let pp_cmd_sems fmt global inputmem outputmem n =
   match InterCfg.cmdof global.Global.icfg n with
@@ -226,7 +225,7 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       in
       F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
       F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id
-  | Calloc (lv, Array size, _, _) ->
+  | Calloc (lv, (Array size as e), _, _) ->
       let size' =
         if !Options.remove_cast then RelSyntax.remove_cast size else size
       in
@@ -248,6 +247,8 @@ let pp_cmd_sems fmt global inputmem outputmem n =
         if Hashtbl.mem val_map array_val then Hashtbl.find val_map array_val
         else new_val_id array_val
       in
+      let e_id = Hashtbl.find RelSyntax.alloc_map e in
+      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id array_val_id;
       F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
       F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id array_val_id;
       F.fprintf fmt.arrayval "%s\t%s\n" array_val_id size_val_id
@@ -266,6 +267,8 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       let val_id =
         if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
       in
+      let e_id = Hashtbl.find RelSyntax.salloc_map s in
+      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id val_id;
       F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
       F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id;
       F.fprintf fmt.conststr "%s\t%s\n" val_id s_id
@@ -292,6 +295,12 @@ let pp_cmd_sems fmt global inputmem outputmem n =
         let val_id =
           if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
         in
+        let e_id =
+          if Hashtbl.mem RelSyntax.call_map (e', el) then
+            Hashtbl.find RelSyntax.call_map (e', el)
+          else Hashtbl.find RelSyntax.libcall_map (e', el)
+        in
+        F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id val_id;
         F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
         F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id val_id)
   | _ -> ()
