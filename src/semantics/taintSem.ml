@@ -378,10 +378,10 @@ let run_cmd mode node itvmem (mem, global) =
       (* for inspection *)
       update mode global lv { Val.bot with symbolic = Symbolic.make () } mem
   | IntraCfg.Cmd.Calloc (_, IntraCfg.Cmd.Struct _, _, _) -> mem
-  | IntraCfg.Cmd.Csalloc (_, _, _)
-  | IntraCfg.Cmd.Cfalloc (_, _, _)
-  | IntraCfg.Cmd.Cassume (_, _, _) ->
-      mem
+  | IntraCfg.Cmd.Csalloc (l, _, _) ->
+      let lv = ItvSem.eval_lv pid l itvmem in
+      update mode global lv { Val.bot with symbolic = Symbolic.make () } mem
+  | IntraCfg.Cmd.Cfalloc (_, _, _) | IntraCfg.Cmd.Cassume (_, _, _) -> mem
   | IntraCfg.Cmd.Ccall (lvo, Cil.Lval (Cil.Var f, Cil.NoOffset), arg_exps, loc)
     when Global.is_undef f.vname global ->
       (* undefined library functions *)

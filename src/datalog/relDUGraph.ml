@@ -263,7 +263,7 @@ let pp_cmd_sems fmt global inputmem outputmem n =
         if Hashtbl.mem loc_map loc then Hashtbl.find loc_map loc
         else new_loc_id loc
       in
-      let v = TaintDom.Mem.lookup loc inputmem in
+      let v = TaintDom.Mem.lookup loc outputmem in
       let val_id =
         if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
       in
@@ -274,7 +274,6 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       F.fprintf fmt.conststr "%s\t%s\n" val_id s_id
   | Ccall (lv_opt, (Lval (Var _, NoOffset) as e), el, _) ->
       let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
-      pp_exp_sems fmt global inputmem n e';
       List.iter
         (fun e ->
           let e' =
