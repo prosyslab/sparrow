@@ -157,6 +157,7 @@ type formtter_of_patron = {
   evallv : F.formatter;
   eval : F.formatter;
   memory : F.formatter;
+  sem_rule : F.formatter;
   arrayval : F.formatter;
   conststr : F.formatter;
 }
@@ -191,27 +192,127 @@ let new_str_id str =
   Hashtbl.add str_map str id;
   id
 
-let rec pp_exp_sems fmt global inputmem node e =
+let val2x v = "x" ^ (String.split_on_char '-' v |> List.tl |> List.hd)
+
+let app_reach n = F.asprintf "(Reach %a)" Node.pp n
+
+let app_eval n e v = F.asprintf "(Eval %a %s %s)" Node.pp n e v
+
+let app_evallv n lv loc = F.asprintf "(EvalLv %a %s %s)" Node.pp n lv loc
+
+let app_memory n loc v = F.asprintf "(Memory %a %s %s)" Node.pp n loc v
+
+let app_val v x = F.sprintf "(Val %s %s)" v x
+
+let app_arr v x = F.sprintf "(ArrVal %s %s)" v x
+
+let add_rule fmt r = String.concat " " r |> F.fprintf fmt.sem_rule "(%s)\n"
+
+let val_of_const = function
+  | Cil.CInt64 (i, _, _) -> i
+  | Cil.CChr c -> Char.code c |> Int64.of_int
+  | _ -> 0L (* TODO: add String, Real domain *)
+
+let pp_lv_sems fmt global node lv =
+  let lv_id = Hashtbl.find RelSyntax.lv_map lv in
+  let pid = Node.get_pid node in
+  let loc = ItvSem.eval_lv pid lv global.Global.mem in
+  let loc_id =
+    if Hashtbl.mem loc_map loc then Hashtbl.find loc_map loc else new_loc_id loc
+  in
+  (match lv with
+  | Cil.Var _, Cil.NoOffset ->
+      let evallv = app_evallv node lv_id loc_id in
+      let reach = app_reach node in
+      (* Head :: Body *)
+      add_rule fmt [ evallv; reach ]
+      (* Reach(n) -> EvalLv(n lv loc) *)
+  | _ -> (* TODO: array indexing *) ());
+  (lv_id, loc_id)
+
+let rec pp_exp_sems fmt global inputmem outputmem node e =
   let pid = Node.get_pid node in
   let e_id = Hashtbl.find RelSyntax.exp_map e in
   let v = TaintSem.eval pid e global.Global.mem inputmem in
   let v_id =
     if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
   in
+  let eval_e = app_eval node e_id v_id in
+  let v_rel = app_val v_id "y" in
+  (match e with
+  | Cil.Const c ->
+      let reach = F.asprintf "(Reach %a)" Node.pp node in
+      let i = val_of_const c in
+      let int2bv = F.asprintf "((_ int2bv 64) %Ld)" i in
+      let val_cons = F.sprintf "(= y %s)" int2bv in
+      add_rule fmt [ eval_e; reach; val_cons ];
+      (* Reach(n) /\ (y == c) -> Eval(n e v) *)
+      add_rule fmt [ v_rel; reach; val_cons ]
+      (* Reach(n) /\ (y == c) -> Val(v y) *)
+  | Cil.Lval l | Cil.StartOf l ->
+      let lv_id, loc_id = pp_lv_sems fmt global node l in
+      let evallv = app_evallv node lv_id loc_id in
+      let loc = ItvSem.eval_lv pid l global.Global.mem in
+      let v = TaintDom.Mem.lookup loc outputmem in
+      let v_id =
+        if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
+      in
+      let memory = app_memory node loc_id v_id in
+      add_rule fmt [ eval_e; evallv; memory ]
+      (* EvalLv(n lv loc) /\ Memory(n loc v) -> Eval(n e v) *)
+  | Cil.SizeOf t ->
+      let reach = app_reach node in
+      let size = CilHelper.byteSizeOf t in
+      let int2bv = F.asprintf "((_ int2bv 64) %d)" size in
+      let val_cons = F.sprintf "(= y %s)" int2bv in
+      add_rule fmt [ eval_e; reach; val_cons ];
+      (* Reach(n) /\ (y == sizeof(t)) -> Eval(n e v) *)
+      add_rule fmt [ v_rel; reach; val_cons ]
+      (* Reach(n) /\ (y == sizeof(t)) -> Val(v y) *)
+  | Cil.SizeOfE e1 ->
+      let e1_id, v1_id = pp_exp_sems fmt global inputmem outputmem node e1 in
+      let eval_e1 = app_eval node e1_id v1_id in
+      let v1_rel = app_arr v1_id "x_size" in
+      let val_cons = "(= y x_size)" in
+      (* Head :: Body *)
+      add_rule fmt [ eval_e; eval_e1; v1_rel; val_cons ];
+      (* Eval(n e1 v1) /\ ArrVal(v1 x_size) /\ (y == x_size) -> Eval(n e v) *)
+      add_rule fmt [ v_rel; eval_e1; v1_rel; val_cons ]
+      (* Eval(n e1 v1) /\ ArrVal(v1 x_size) /\ (y == x_size) -> Val(v y) *)
+  | Cil.BinOp (op, e1, e2, _) ->
+      let e1_id, v1_id = pp_exp_sems fmt global inputmem outputmem node e1 in
+      let e2_id, v2_id = pp_exp_sems fmt global inputmem outputmem node e2 in
+      let eval_e1 = app_eval node e1_id v1_id in
+      let eval_e2 = app_eval node e2_id v2_id in
+      let v1_rel = app_val v1_id "x1" in
+      let v2_rel = app_val v2_id "x2" in
+      let val_cons =
+        F.asprintf "(= y (%s x1 x2))" (RelSyntax.string_of_bop op)
+      in
+      (* Head :: Body *)
+      add_rule fmt [ eval_e; eval_e1; eval_e2; v1_rel; v2_rel; val_cons ];
+      (* Eval(n e1 v1) /\ Eval(n e2 v2) /\ Val(v1 x1) /\ Val(v2 x2) /\ (y == f(x1 x2)) -> Eval(n e v) *)
+      add_rule fmt [ v_rel; eval_e1; eval_e2; v1_rel; v2_rel; val_cons ]
+      (* Eval(n e1 v1) /\ Eval(n e2 v2) /\ Val(v1 x1) /\ Val(v2 x2) /\ (y == f(x1 x2)) -> Val(v y) *)
+  | Cil.UnOp (op, e1, _) ->
+      let e1_id, v1_id = pp_exp_sems fmt global inputmem outputmem node e1 in
+      let eval_e1 = app_eval node e1_id v1_id in
+      let v1_rel = app_val v1_id "x1" in
+      let val_cons = F.asprintf "(= y (%s x1))" (RelSyntax.string_of_uop op) in
+      (* Head :: Body *)
+      add_rule fmt [ eval_e; eval_e1; v1_rel; val_cons ];
+      (* Eval(n e1 v1) /\ Val(v1 x1) /\ (y == f(x1)) -> Eval(n e v) *)
+      add_rule fmt [ v_rel; eval_e1; v1_rel; val_cons ]
+      (* Eval(n e1 v1) /\ Val(v1 x1) /\ (y == f(x1)) -> Val(v y) *)
+  | _ -> (* TODO: Question, AlignOf *) ());
   F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp node e_id v_id;
-  match e with
-  | Cil.BinOp (_, e1, e2, _) ->
-      pp_exp_sems fmt global inputmem node e1;
-      pp_exp_sems fmt global inputmem node e2
-  | Cil.UnOp (_, e, _) | Cil.CastE (_, e) ->
-      pp_exp_sems fmt global inputmem node e
-  | _ -> ()
+  (e_id, v_id)
 
 let pp_cmd_sems fmt global inputmem outputmem n =
   match InterCfg.cmdof global.Global.icfg n with
   | Cset (lv, e, _) ->
       let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
-      pp_exp_sems fmt global inputmem n e';
+      pp_exp_sems fmt global inputmem outputmem n e' |> ignore;
       let pid = Node.get_pid n in
       let lv_id = Hashtbl.find RelSyntax.lv_map lv in
       let loc = ItvSem.eval_lv pid lv global.Global.mem in
@@ -229,7 +330,7 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       let size' =
         if !Options.remove_cast then RelSyntax.remove_cast size else size
       in
-      pp_exp_sems fmt global inputmem n size';
+      pp_exp_sems fmt global inputmem outputmem n size' |> ignore;
       let pid = Node.get_pid n in
       let lv_id = Hashtbl.find RelSyntax.lv_map lv in
       let loc = ItvSem.eval_lv pid lv global.Global.mem in
@@ -279,7 +380,7 @@ let pp_cmd_sems fmt global inputmem outputmem n =
           let e' =
             if !Options.remove_cast then RelSyntax.remove_cast e else e
           in
-          pp_exp_sems fmt global inputmem n e')
+          pp_exp_sems fmt global inputmem outputmem n e' |> ignore)
         el;
       let pid = Node.get_pid n in
       if Option.is_some lv_opt then (
@@ -409,6 +510,7 @@ let print_sems analysis global inputof outputof dug alarms =
   let oc_evallv = open_out (dirname ^ "/EvalLv.facts") in
   let oc_eval = open_out (dirname ^ "/Eval.facts") in
   let oc_memory = open_out (dirname ^ "/Memory.facts") in
+  let oc_sem_rule = open_out (dirname ^ "/Sem.Rules") in
   let oc_arrayval = open_out (dirname ^ "/ArrayVal.facts") in
   let oc_conststr = open_out (dirname ^ "/ConstStr.facts") in
   let fmt =
@@ -418,6 +520,7 @@ let print_sems analysis global inputof outputof dug alarms =
       evallv = F.formatter_of_out_channel oc_evallv;
       eval = F.formatter_of_out_channel oc_eval;
       memory = F.formatter_of_out_channel oc_memory;
+      sem_rule = F.formatter_of_out_channel oc_sem_rule;
       arrayval = F.formatter_of_out_channel oc_arrayval;
       conststr = F.formatter_of_out_channel oc_conststr;
     }
@@ -425,17 +528,19 @@ let print_sems analysis global inputof outputof dug alarms =
   Hashtbl.reset loc_map;
   Hashtbl.reset val_map;
   Hashtbl.reset str_map;
-  G.iter_node
-    (fun n ->
-      pp_cmd_sems fmt global (Table.find n inputof) (Table.find n outputof) n)
-    dug;
   let tc = G.transitive_closure dug in
   G.iter_edges
     (fun src dst -> F.fprintf fmt.dupath "%a\t%a\n" Node.pp src Node.pp dst)
     tc;
   let icfg = global.Global.icfg in
   InterCfg.iter
-    (fun _ cfg ->
+    (fun pid cfg ->
+      IntraCfg.iter_node
+        (fun n ->
+          let node = Node.make pid n in
+          pp_cmd_sems fmt global (Table.find node inputof)
+            (Table.find node outputof) node)
+        cfg;
       let tc = IntraCfg.transitive_closure cfg in
       IntraCfg.iter_edges
         (fun src dst ->
@@ -449,6 +554,7 @@ let print_sems analysis global inputof outputof dug alarms =
   F.pp_print_flush fmt.evallv ();
   F.pp_print_flush fmt.eval ();
   F.pp_print_flush fmt.memory ();
+  F.pp_print_flush fmt.sem_rule ();
   F.pp_print_flush fmt.arrayval ();
   F.pp_print_flush fmt.conststr ();
   close_out oc_dupath;
@@ -456,6 +562,7 @@ let print_sems analysis global inputof outputof dug alarms =
   close_out oc_evallv;
   close_out oc_eval;
   close_out oc_memory;
+  close_out oc_sem_rule;
   close_out oc_arrayval;
   close_out oc_conststr
 

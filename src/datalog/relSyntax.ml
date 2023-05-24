@@ -271,7 +271,8 @@ and pp_exp fmt e =
     | Cil.StartOf l ->
         pp_lv fmt l;
         let l_id = Hashtbl.find lv_map l in
-        F.fprintf fmt.start_of "%s\t%s\n" id l_id
+        F.fprintf fmt.start_of "%s\t%s\n" id l_id;
+        if !Options.patron then F.fprintf fmt.lval_exp "%s\t%s\n" id l_id
     | _ -> F.fprintf fmt.other_exp "%s\n" id
 
 let rec remove_cast = function
