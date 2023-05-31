@@ -83,13 +83,9 @@ let inspect_aexp node aexp itvmem mem queries =
           }
           :: queries)
         taint queries
-  | MulExp (e1, e2, loc) ->
+  | MulExp (e, loc) ->
       let pid = InterCfg.Node.get_pid node in
-      let tv =
-        TaintSem.eval pid
-          (Cil.BinOp (Cil.Mult, e1, e2, Cil.typeOf e1))
-          itvmem mem
-      in
+      let tv = TaintSem.eval pid e itvmem mem in
       let int_overflow, taint =
         (TaintDom.Val.int_overflow tv, TaintDom.Val.user_input tv)
       in

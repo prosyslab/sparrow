@@ -172,6 +172,10 @@ let pred (pid, node) g =
   let intra_cfg = cfgof g pid in
   IntraCfg.pred node intra_cfg |> List.map (Node.make pid)
 
+let succ (pid, node) g =
+  let intra_cfg = cfgof g pid in
+  IntraCfg.succ node intra_cfg |> List.map (Node.make pid)
+
 let unreachable_node_pid pid icfg =
   IntraNodeSet.fold
     (fun node -> NodeSet.add (pid, node))
