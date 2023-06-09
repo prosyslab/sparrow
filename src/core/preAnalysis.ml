@@ -66,7 +66,7 @@ let draw_callgraph nodes mem global =
             CallGraph.add_edge (InterCfg.Node.get_pid node) callee callgraph)
           callees callgraph)
       global.callgraph nodes
-    |> CallGraph.compute_trans_calls
+    |> CallGraph.compute_transitive
   in
   { global with callgraph }
 
@@ -75,5 +75,5 @@ let perform global =
   let mem, global = fixpt nodes 1 (Mem.bot, global) in
   L.info ~level:1 "mem size : %d\n\n" (Mem.cardinal mem);
   { global with mem } |> draw_call_edges nodes mem |> draw_callgraph nodes mem
-  |>
-  if !Options.keep_unreachable then id else Global.remove_unreachable_functions
+  |> opt (not !Options.keep_unreachable) Global.remove_unreachable_functions
+  |> opt !Options.cut_cyclic_call Global.handle_cyclic_call

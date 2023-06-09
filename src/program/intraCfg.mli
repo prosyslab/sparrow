@@ -30,7 +30,7 @@ module Cmd : sig
     (* final graph has the following cmds only *)
     | Cset of Cil.lval * Cil.exp * Cil.location
     | Cexternal of Cil.lval * Cil.location
-    | Calloc of Cil.lval * alloc * static * Cil.location
+    | Calloc of Cil.lval * alloc * local * static * Cil.location
     | Csalloc of Cil.lval * string * Cil.location
     | Cfalloc of Cil.lval * Cil.fundec * Cil.location
     | Cassume of Cil.exp * branch * Cil.location
@@ -46,6 +46,8 @@ module Cmd : sig
     | Cskip of tag * Cil.location
 
   and alloc = Array of Cil.exp | Struct of Cil.compinfo
+
+  and local = bool
 
   and static = bool
 
@@ -143,6 +145,8 @@ val compute_dom : t -> t
 
 val dom_fronts : node -> t -> NodeSet.t
 (** [dom_fronts n g] returns dominance frontiers of node [n] in graph [g] *)
+
+val post_dom_fronts : node -> t -> NodeSet.t
 
 val children_of_dom_tree : node -> t -> NodeSet.t
 

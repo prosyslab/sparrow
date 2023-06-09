@@ -32,6 +32,8 @@ val dug : bool ref
 
 val optil : bool ref
 
+val cut_cyclic_call : bool ref
+
 val keep_unreachable : bool ref
 
 val keep_unreachable_from : string BatSet.t ref
@@ -102,6 +104,10 @@ val int_overflow : bool ref
 
 val memtrace : bool ref
 
+(* Transformation *)
+
+val unwrap_alloc : bool ref
+
 (** {2 Alarm Report } *)
 
 val bo : bool ref
@@ -168,7 +174,9 @@ val marshal_out : bool ref
 
 (* {2 DUG slice } *)
 
-val dug_slice_target : string ref
+val slice_target_map : (string, string) BatMap.t ref
+
+val full_slice : bool ref
 
 (** {2 Options lists } *)
 

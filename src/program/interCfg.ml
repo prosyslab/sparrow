@@ -68,6 +68,14 @@ let add_call_edge call_node pid g =
   in
   { g with call_edges = BatMap.add call_node callees g.call_edges }
 
+let remove_call_edge call_node pid g =
+  let callees =
+    (try BatMap.find call_node g.call_edges with _ -> ProcSet.empty)
+    |> ProcSet.remove pid
+  in
+  if ProcSet.is_empty callees then g
+  else { g with call_edges = BatMap.add call_node callees g.call_edges }
+
 let get_callees call_node g =
   try BatMap.find call_node g.call_edges with _ -> ProcSet.empty
 
@@ -143,6 +151,8 @@ let nodesof g =
 
 let pidsof g = BatMap.foldi (fun pid _ acc -> pid :: acc) g.cfgs []
 
+let is_def pid g = BatMap.mem pid g.cfgs
+
 let is_undef pid g = not (BatMap.mem pid g.cfgs)
 
 let is_entry = function _, node -> IntraCfg.is_entry node
@@ -194,6 +204,8 @@ let remove_node (pid, intra_node) g =
   { g with cfgs = BatMap.add pid intra_cfg g.cfgs }
 
 let print chan g = BatMap.iter (fun _ cfg -> IntraCfg.print_dot chan cfg) g.cfgs
+
+let node_to_lstr icfg node = cmdof icfg node |> IntraCfg.Cmd.location_of |> CilHelper.s_location
 
 let to_json g =
   `Assoc

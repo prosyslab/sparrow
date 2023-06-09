@@ -47,10 +47,13 @@ end
 
 module Allocsite = struct
   type t =
+    | Local of Node.t
     | Internal of IntAllocsite.t
     | External of ExtAllocsite.t
     | Super of string
   [@@deriving compare]
+
+  let allocsite_of_local n = Local n
 
   let allocsite_of_node n = Internal (n, false)
 
@@ -79,11 +82,13 @@ module Allocsite = struct
     | Some fid -> External (ExtAllocsite.unknown fid)
 
   let to_string = function
+    | Local n -> Node.to_string n
     | Internal i -> IntAllocsite.to_string i
     | External e -> ExtAllocsite.to_string e
     | Super s -> s
 
   let pp fmt = function
+    | Local n -> Format.fprintf fmt "%a" Node.pp n
     | Internal i -> Format.fprintf fmt "%a" IntAllocsite.pp i
     | External e -> Format.fprintf fmt "%a" ExtAllocsite.pp e
     | Super s -> Format.fprintf fmt "%s" s
@@ -135,6 +140,8 @@ module Loc = struct
 
   let pp fmt x = Format.fprintf fmt "%s" (to_string x)
 
+  let return_var_name = "__return__"
+
   let dummy = GVar ("__dummy__", Cil.voidType)
 
   let null = GVar ("NULL", Cil.voidPtrType)
@@ -163,8 +170,24 @@ module Loc = struct
 
   let is_field = function Field _ -> true | _ -> false
 
-  let is_local_of p x =
-    match x with LVar (p', _, _) -> Proc.equal p p' | _ -> false
+let rec is_global = function
+  | GVar _ -> true
+  | LVar _ -> false
+  | Allocsite _ -> false
+  | Field (l, _, _) -> is_global l
+let rec is_heap = function
+  | GVar _ -> false
+  | LVar _ -> false
+  | Allocsite (Local _) -> false
+  | Allocsite _ -> true
+  | Field (l, _, _) -> is_heap l
+let rec is_local_of pid = function
+  | GVar _ -> false
+  | LVar (p, _, _) -> p = pid
+  (* Allocation converted from local variable declarations *)
+  | Allocsite (Local n) -> Node.get_pid n = pid
+  | Allocsite _ -> false
+  | Field (l, _, _) -> is_local_of pid l
 
   let get_proc = function LVar (p, _, _) -> p | _ -> raise Not_found
 
@@ -174,7 +197,7 @@ module Loc = struct
 
   let of_allocsite x = Allocsite x
 
-  let return_var pid typ = LVar (pid, "__return__", typ)
+  let return_var pid typ = LVar (pid, return_var_name, typ)
 
   let append_field x f typ = Field (x, f, typ)
 end

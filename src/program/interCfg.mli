@@ -76,7 +76,11 @@ val callnodesof : t -> node list
 
 val add_call_edge : Node.t -> Proc.t -> t -> t
 
+val remove_call_edge : Node.t -> Proc.t -> t -> t
+
 val get_callees : Node.t -> t -> ProcSet.t
+
+val is_def : pid -> t -> bool
 
 val is_undef : pid -> t -> bool
 
@@ -91,6 +95,8 @@ val fold_cfgs : (Proc.t -> IntraCfg.t -> 'a -> 'a) -> t -> 'a -> 'a
 val iter : (Proc.t -> IntraCfg.t -> unit) -> t -> unit
 
 val nodes_of_pid : t -> pid -> Node.t list
+
+val node_to_lstr : t -> Node.t -> pid
 
 (** {2 Print } *)
 

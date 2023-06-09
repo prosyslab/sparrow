@@ -372,12 +372,12 @@ let run_cmd mode node itvmem (mem, global) =
       let lv = ItvSem.eval_lv pid l itvmem in
       update mode global lv (eval pid e itvmem mem) mem
   | IntraCfg.Cmd.Cexternal (_, _) -> mem
-  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, _, _) ->
+  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, _, _, _) ->
       let lv = ItvSem.eval_lv pid l itvmem in
       let _ = eval pid e itvmem mem in
       (* for inspection *)
       update mode global lv { Val.bot with symbolic = Symbolic.make () } mem
-  | IntraCfg.Cmd.Calloc (_, IntraCfg.Cmd.Struct _, _, _) -> mem
+  | IntraCfg.Cmd.Calloc (_, IntraCfg.Cmd.Struct _, _, _, _) -> mem
   | IntraCfg.Cmd.Csalloc (l, _, _) ->
       let lv = ItvSem.eval_lv pid l itvmem in
       update mode global lv { Val.bot with symbolic = Symbolic.make () } mem
@@ -391,7 +391,7 @@ let run_cmd mode node itvmem (mem, global) =
         (mem, global) loc
   | IntraCfg.Cmd.Ccall (_, f, arg_exps, _) ->
       (* user functions *)
-      let fs = ItvDom.Val.pow_proc_of_val (ItvSem.eval pid f itvmem) in
+      let fs = ItvSem.eval_callees pid f global itvmem in
       if PowProc.eq fs PowProc.bot then mem
       else
         let arg_lvars_of_proc f acc =
@@ -413,7 +413,7 @@ let run_cmd mode node itvmem (mem, global) =
       let callnode = InterCfg.callof node global.icfg in
       match InterCfg.cmdof global.icfg callnode with
       | IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
-          let callees = ItvDom.Val.pow_proc_of_val (ItvSem.eval pid f itvmem) in
+          let callees = ItvSem.eval_callees pid f global itvmem in
           let retvar_set =
             PowProc.fold
               (fun f ->

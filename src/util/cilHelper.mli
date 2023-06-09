@@ -37,7 +37,11 @@ val s_instr : Cil.instr -> string
 
 val s_instrs : Cil.instr list -> string
 
+val get_loc_filename : Cil.location -> string
+
 val s_location : Cil.location -> string
+
+val s_location_abs : Cil.location -> string
 
 val eq_lval : Cil.lval -> Cil.lval -> bool
 

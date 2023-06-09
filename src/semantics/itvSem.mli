@@ -16,6 +16,8 @@ include
      and type Dom.A.t = BasicDom.Loc.t
      and type Dom.PowA.t = BasicDom.PowLoc.t
 
+val var_of_varinfo : Cil.varinfo -> BasicDom.Proc.t -> BasicDom.Loc.t
+
 val eval_lv :
   ?spec:Spec.t ->
   BasicDom.Proc.t ->
@@ -27,6 +29,9 @@ val eval :
   ?spec:Spec.t -> BasicDom.Proc.t -> Cil.exp -> ItvDom.Mem.t -> ItvDom.Val.t
 
 val eval_array_alloc :
-  ?spec:Spec.t -> BasicDom.Node.t -> Cil.exp -> bool -> Dom.t -> ItvDom.Val.t
+  ?spec:Spec.t -> BasicDom.Node.t -> Cil.exp -> bool -> bool -> Dom.t -> ItvDom.Val.t
 
 val eval_string_alloc : BasicDom.Node.t -> string -> ItvDom.Val.t
+
+val eval_callees :
+  ?spec:Spec.t -> BasicDom.Proc.t -> Cil.exp -> Global.t -> ItvDom.Mem.t -> BasicDom.PowProc.t

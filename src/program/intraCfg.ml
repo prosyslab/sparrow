@@ -62,7 +62,7 @@ module Cmd = struct
     (* final graph has the following cmds only *)
     | Cset of lval * exp * location
     | Cexternal of lval * location
-    | Calloc of lval * alloc * static * location
+    | Calloc of lval * alloc * local * static * location
     | Csalloc of lval * string * location
     | Cfalloc of lval * fundec * location
     | Cassume of exp * branch * location
@@ -78,6 +78,8 @@ module Cmd = struct
     | Cskip of tag * location
 
   and alloc = Array of exp | Struct of compinfo
+
+  and local = bool
 
   and static = bool
 
@@ -102,8 +104,8 @@ module Cmd = struct
     | Cinstr (instrs, _) -> s_instrs instrs
     | Cset (lv, e, _) -> "set(" ^ s_lv lv ^ "," ^ s_exp e ^ ")"
     | Cexternal (lv, _) -> "extern(" ^ s_lv lv ^ ")"
-    | Calloc (lv, Array e, _, _) -> "alloc(" ^ s_lv lv ^ ",[" ^ s_exp e ^ "])"
-    | Calloc (lv, Struct compinfo, _, _) ->
+    | Calloc (lv, Array e, _, _, _) -> "alloc(" ^ s_lv lv ^ ",[" ^ s_exp e ^ "])"
+    | Calloc (lv, Struct compinfo, _, _, _) ->
         "alloc(" ^ s_lv lv ^ ",{" ^ compinfo.cname ^ "})"
     | Csalloc (lv, s, _) -> "salloc(" ^ s_lv lv ^ ", \"" ^ s ^ "\")"
     | Cfalloc (lv, f, _) -> "falloc(" ^ s_lv lv ^ ", " ^ f.svar.vname ^ ")"
@@ -124,9 +126,9 @@ module Cmd = struct
     | Cset (lv, e, _) ->
         `List [ `String "set"; `String (s_lv lv); `String (s_exp e) ]
     | Cexternal (lv, _) -> `List [ `String "extern"; `String (s_lv lv) ]
-    | Calloc (lv, Array e, _, _) ->
+    | Calloc (lv, Array e, _, _, _) ->
         `List [ `String "alloc"; `String (s_lv lv); `String (s_exp e) ]
-    | Calloc (lv, Struct compinfo, _, _) ->
+    | Calloc (lv, Struct compinfo, _, _, _) ->
         `List [ `String "alloc"; `String (s_lv lv); `String compinfo.cname ]
     | Csalloc (lv, s, _) ->
         `List [ `String "salloc"; `String (s_lv lv); `String ("\"" ^ s ^ "\"") ]
@@ -158,7 +160,7 @@ module Cmd = struct
     | CLoop l
     | Cset (_, _, l)
     | Cexternal (_, l)
-    | Calloc (_, _, _, l)
+    | Calloc (_, _, _, _, l)
     | Csalloc (_, _, l)
     | Cfalloc (_, _, l)
     | Ccall (_, _, _, l)
@@ -257,6 +259,8 @@ let parent_of_dom_tree node g =
 
 let dom_fronts node g = BatMap.find node g.dom_fronts
 
+let post_dom_fronts node g = BatMap.find node g.post_dom_fronts
+
 let nodesof g = G.fold_vertex (fun x l -> x :: l) g.graph []
 
 let add_edge n1 n2 g = { g with graph = G.add_edge g.graph n1 n2 }
@@ -268,7 +272,9 @@ let find_cmd n g =
   with _ ->
     if n = Node.ENTRY || n = Node.EXIT then
       Cmd.Cskip (Cmd.Unknown, Cil.locUnknown)
-    else raise (Failure ("Can't find cmd of " ^ Node.to_string n))
+    else 
+      Cmd.Cskip (Cmd.Unknown, Cil.locUnknown)
+    (* else raise (Failure ("Can't find cmd of " ^ Node.to_string n)) *)
 
 let add_cmd n c g = { g with cmd_map = BatMap.add n c g.cmd_map }
 
@@ -314,8 +320,8 @@ let is_exit = function Node.EXIT -> true | _ -> false
 let is_callnode n g = match find_cmd n g with Cmd.Ccall _ -> true | _ -> false
 
 let is_returnnode n g =
-  List.length (pred n g) = 1 && is_callnode (List.hd (pred n g)) g
-
+  let preds = pred n g in
+  List.length preds = 1 && is_callnode (List.hd preds) g
 let entryof _ = Node.ENTRY
 
 let exitof _ = Node.EXIT
@@ -330,8 +336,9 @@ let is_inside_loop n g =
   List.exists (fun scc -> List.length scc > 1 && List.mem n scc) g.scc_list
 
 let callof r g =
-  try List.find (fun c -> is_callnode c g && returnof c g = r) (nodesof g)
-  with _ -> failwith "IntraCfg.callof: given node may not be a return-node"
+  let preds = pred r g in
+  assert (List.length preds = 1);
+  List.hd preds
 
 let generate_assumes g =
   try
@@ -435,15 +442,15 @@ let flatten_instructions g =
       | _ -> g)
     g g
 
-let make_array lv typ exp loc entry g =
+let make_array lv typ exp local loc entry g =
   let alloc_node = Node.make () in
   let size = Cil.BinOp (Cil.Mult, Cil.SizeOf typ, exp, Cil.intType) in
-  let alloc_cmd = Cmd.Calloc (lv, Cmd.Array size, true, loc) in
+  let alloc_cmd = Cmd.Calloc (lv, Cmd.Array size, local, true, loc) in
   (alloc_node, g |> add_cmd alloc_node alloc_cmd |> add_edge entry alloc_node)
 
-let make_struct lv comp loc entry g =
+let make_struct lv comp local loc entry g =
   let alloc_node = Node.make () in
-  let alloc_cmd = Cmd.Calloc (lv, Cmd.Struct comp, true, loc) in
+  let alloc_cmd = Cmd.Calloc (lv, Cmd.Struct comp, local, true, loc) in
   (alloc_node, g |> add_cmd alloc_node alloc_cmd |> add_edge entry alloc_node)
 
 let make_init_loop fd lv exp loc entry f g =
@@ -492,7 +499,7 @@ let make_init_loop fd lv exp loc entry f g =
   let g = add_edge incr_node skip_node g in
   (nassume_node, g)
 
-let rec make_nested_array fd lv typ exp loc entry initialize g =
+let rec make_nested_array fd lv typ exp local loc entry initialize g =
   let typ = unrollTypeDeep typ in
   match typ with
   | TArray (t, Some size, _) ->
@@ -502,20 +509,20 @@ let rec make_nested_array fd lv typ exp loc entry initialize g =
           ( Cil.Var (Cil.makeTempVar fd (Cil.TPtr (Cil.TVoid [], []))),
             Cil.NoOffset )
         in
-        let term, g = make_array tmp t size loc assume_node g in
+        let term, g = make_array tmp t size local loc assume_node g in
         let cast_node = Node.make () in
         let cast_cmd =
           Cmd.Cset (element, Cil.CastE (TPtr (t, []), Cil.Lval tmp), loc)
         in
         let g = g |> add_cmd cast_node cast_cmd |> add_edge term cast_node in
-        make_nested_array fd element t size loc cast_node initialize g
+        make_nested_array fd element t size local loc cast_node initialize g
       in
       make_init_loop fd lv exp loc entry f g
   | TComp (comp, _) ->
       let f assume_node element g =
         (* tmp = malloc(size); lv[i] = tmp *)
-        let term, g = make_struct element comp loc assume_node g in
-        generate_allocs_field comp.cfields element fd term g
+        let term, g = make_struct element comp local loc assume_node g in
+        generate_allocs_field comp.cfields element local fd term g
       in
       make_init_loop fd lv exp loc entry f g
   | _ when initialize ->
@@ -529,7 +536,7 @@ let rec make_nested_array fd lv typ exp loc entry initialize g =
       make_init_loop fd lv exp loc entry f g
   | _ -> (entry, g)
 
-and generate_allocs_field fl lv fd entry g =
+and generate_allocs_field fl lv local fd entry g =
   match fl with
   | [] -> (entry, g)
   | fieldinfo :: t -> (
@@ -539,7 +546,7 @@ and generate_allocs_field fl lv fd entry g =
           let tmp =
             (Cil.Var (Cil.makeTempVar fd Cil.voidPtrType), Cil.NoOffset)
           in
-          let term, g = make_array tmp typ exp fieldinfo.floc entry g in
+          let term, g = make_array tmp typ exp local fieldinfo.floc entry g in
           let cast_node = Node.make () in
           let cast_cmd =
             Cmd.Cset
@@ -549,21 +556,21 @@ and generate_allocs_field fl lv fd entry g =
           in
           let g = g |> add_cmd cast_node cast_cmd |> add_edge term cast_node in
           let term, g =
-            make_nested_array fd field typ exp fieldinfo.floc cast_node false g
+            make_nested_array fd field typ exp local fieldinfo.floc cast_node false g
           in
-          generate_allocs_field t lv fd term g
+          generate_allocs_field t lv local fd term g
       | TComp (comp, _) ->
           let field = addOffsetLval (Cil.Field (fieldinfo, Cil.NoOffset)) lv in
-          let term, g = make_struct field comp fieldinfo.floc entry g in
-          let term, g = generate_allocs_field comp.cfields field fd term g in
-          generate_allocs_field t lv fd term g
-      | _ -> generate_allocs_field t lv fd entry g)
+          let term, g = make_struct field comp local fieldinfo.floc entry g in
+          let term, g = generate_allocs_field comp.cfields field local fd term g in
+          generate_allocs_field t lv local fd term g
+      | _ -> generate_allocs_field t lv local fd entry g)
 
 and get_base_type = function
   | TArray (t, _, _) | TPtr (t, _) -> get_base_type t
   | typ -> typ
 
-let rec generate_allocs fd vl entry g =
+let rec generate_local_allocs fd vl entry g =
   match vl with
   | [] -> (entry, g)
   | varinfo :: t -> (
@@ -573,7 +580,7 @@ let rec generate_allocs fd vl entry g =
           let tmp =
             (Cil.Var (Cil.makeTempVar fd Cil.voidPtrType), Cil.NoOffset)
           in
-          let term, g = make_array tmp typ exp varinfo.vdecl entry g in
+          let term, g = make_array tmp typ exp true varinfo.vdecl entry g in
           let cast_node = Node.make () in
           let cast_cmd =
             Cmd.Cset
@@ -583,15 +590,15 @@ let rec generate_allocs fd vl entry g =
           in
           let g = g |> add_cmd cast_node cast_cmd |> add_edge term cast_node in
           let term, g =
-            make_nested_array fd lv typ exp varinfo.vdecl cast_node false g
+            make_nested_array fd lv typ exp true varinfo.vdecl cast_node false g
           in
-          generate_allocs fd t term g
+          generate_local_allocs fd t term g
       | TComp (comp, _) ->
           let lv = (Cil.Var varinfo, Cil.NoOffset) in
-          let term, g = make_struct lv comp varinfo.vdecl entry g in
-          let term, g = generate_allocs_field comp.cfields lv fd term g in
-          generate_allocs fd t term g
-      | _ -> generate_allocs fd t entry g)
+          let term, g = make_struct lv comp true varinfo.vdecl entry g in
+          let term, g = generate_allocs_field comp.cfields lv true fd term g in
+          generate_local_allocs fd t term g
+      | _ -> generate_local_allocs fd t entry g)
 
 let replace_node_graph old entry exit g =
   let preds = pred old g in
@@ -732,33 +739,40 @@ let transform_string_allocs fd g =
     g g
 
 (** transform malloc to Calloc *)
-let transform_allocs fd g =
+let transform_malloc fd g =
   let rec transform lv exp loc node g =
     match exp with
-    | BinOp (Mult, SizeOf typ, e, _) | BinOp (Mult, e, SizeOf typ, _) -> (
+    (* TODO: For tricky PlusA patterns, fall back to the lvalue type. Note that
+     * a simple code transformation must be preceded. This is because CIL first
+     * assigns the return of malloc() into a temorary variable with void pointer
+     * and then casts it to the actual pointer variable in the program. *)
+    | BinOp (Mult, SizeOf typ, e, _)
+    | BinOp (Mult, e, SizeOf typ, _)
+    | BinOp (Mult, CastE (_, SizeOf typ), e, _)
+    | BinOp (Mult, e, CastE (_, SizeOf typ), _) -> (
         let typ = Cil.unrollTypeDeep typ in
         match (lv, typ) with
         | (Var _, NoOffset), TComp (_, _) ->
             (* dynamic struct array alloc *)
-            let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
+            let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, false, loc) in
             let g = add_cmd node cmd g in
-            make_nested_array fd lv typ e loc node false g
+            make_nested_array fd lv typ e false loc node false g
         | _ ->
-            let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
+            let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, false, loc) in
             let g = add_cmd node cmd g in
             (node, g))
-    | BinOp (Mult, SizeOfE ex1, ex2, _) | BinOp (Mult, ex2, SizeOfE ex1, _) -> (
-        let typ = Cil.typeOf ex1 in
-        match (lv, typ) with
-        | (Var _, NoOffset), TComp (_, _) ->
-            (* dynamic struct array alloc *)
-            let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
-            let g = add_cmd node cmd g in
-            make_nested_array fd lv typ ex2 loc node false g
-        | _ ->
-            let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
-            let g = add_cmd node cmd g in
-            (node, g))
+    | BinOp (Mult, SizeOfE ex1, ex2, t)
+    | BinOp (Mult, ex2, SizeOfE ex1, t)
+    | BinOp (Mult, CastE (_, SizeOfE ex1), ex2, t)
+    | BinOp (Mult, ex2, CastE (_, SizeOfE ex1), t) ->
+        transform lv (BinOp (Mult, SizeOf (Cil.typeOf ex1), ex2, t)) loc node g
+    (* We often observe the case of "S* s = malloc(sizeof(S) + n)" *)
+    | BinOp (PlusA, SizeOf typ, _, _)
+    | BinOp (PlusA, CastE (_, SizeOf typ), _, _) ->
+        transform lv (SizeOf typ) loc node g
+    | BinOp (PlusA, SizeOfE ex1, _, _)
+    | BinOp (PlusA, CastE (_, SizeOfE ex1), _, _) ->
+        transform lv (SizeOf (Cil.typeOf ex1)) loc node g
     | SizeOf typ | CastE (_, SizeOf typ) -> (
         let typ = Cil.unrollTypeDeep typ in
         match (lv, typ) with
@@ -768,42 +782,54 @@ let transform_allocs fd g =
             let cast_cmd =
               Cmd.Cset (lv, Cil.CastE (Cil.TPtr (typ, []), Cil.Lval lv), loc)
             in
-            g
-            |> add_cmd node (Cmd.Calloc (lv, Cmd.Array exp, false, loc))
-            |> add_cmd cast_node cast_cmd |> add_edge node cast_node
-            |> generate_allocs_field comp.cfields (Mem (Lval lv), NoOffset) fd
-                 cast_node
+            let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, false, loc) in
+            g |> add_cmd node cmd |> add_cmd cast_node cast_cmd
+            |> add_edge node cast_node
+            |> generate_allocs_field comp.cfields (Mem (Lval lv), NoOffset)
+                 false fd cast_node
         | _, _ ->
-            let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
+            let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, false, loc) in
             let g = add_cmd node cmd g in
             (node, g))
     | SizeOfE e | CastE (_, SizeOfE e) ->
         transform lv (SizeOf (Cil.typeOf e)) loc node g
+    | CastE (_, e) -> transform lv e loc node g
     | _ ->
-        let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, loc) in
+        let cmd = Cmd.Calloc (lv, Cmd.Array exp, false, false, loc) in
         let g = add_cmd node cmd g in
         (node, g)
+  in
+  let try_resolve_alloc_size fname args =
+    match (fname, args) with
+    | "malloc", size :: _ | "__builtin_alloca", size :: _ -> Some size
+    | "realloc", _ :: size :: _ -> Some size
+    | "calloc", n :: size :: _ -> Some (BinOp (Mult, n, size, Cil.uintType))
+    | _, _ -> None
   in
   fold_node
     (fun n g ->
       match find_cmd n g with
-      | Cmd.Ccall (Some lv, Lval (Var varinfo, _), args, loc) ->
-          if varinfo.vname = "malloc" || varinfo.vname = "__builtin_alloca" then
-            let new_node = Node.make () in
-            let preds = pred n g in
-            let succs = succ n g in
-            let g = List.fold_left (fun g s -> remove_edge n s g) g succs in
-            let g = List.fold_left (fun g p -> remove_edge p n g) g preds in
-            let g = remove_node n g in
-            let g = List.fold_left (fun g p -> add_edge p new_node g) g preds in
-            let lv =
-              match lv with
-              | Var v, NoOffset -> (Var { v with vtype = voidPtrType }, NoOffset)
-              | _ -> lv
-            in
-            let term, g = transform lv (List.hd args) loc new_node g in
-            List.fold_left (fun g s -> add_edge term s g) g succs
-          else g
+      | Cmd.Ccall (Some lv, Lval (Var varinfo, NoOffset), args, loc) -> (
+          match try_resolve_alloc_size varinfo.vname args with
+          | Some arg ->
+              let new_node = Node.make () in
+              let preds = pred n g in
+              let succs = succ n g in
+              let g = List.fold_left (fun g s -> remove_edge n s g) g succs in
+              let g = List.fold_left (fun g p -> remove_edge p n g) g preds in
+              let g = remove_node n g in
+              let g =
+                List.fold_left (fun g p -> add_edge p new_node g) g preds
+              in
+              let lv =
+                match lv with
+                | Var v, NoOffset ->
+                    (Var { v with vtype = voidPtrType }, NoOffset)
+                | _ -> lv
+              in
+              let term, g = transform lv arg loc new_node g in
+              List.fold_left (fun g s -> add_edge term s g) g succs
+          | None -> g)
       | _ -> g)
     g g
 
@@ -871,33 +897,33 @@ let process_gvardecl fd lv init_opt loc entry g =
   match (Cil.unrollTypeDeep (Cil.typeOfLval lv), init_opt) with
   | TArray (typ, Some exp, _), _ ->
       let tmp = (Cil.Var (Cil.makeTempVar fd Cil.voidPtrType), Cil.NoOffset) in
-      let term, g = make_array tmp typ exp loc entry g in
+      let term, g = make_array tmp typ exp false loc entry g in
       let cast_node = Node.make () in
       let cast_cmd =
         Cmd.Cset (lv, Cil.CastE (Cil.TPtr (typ, []), Cil.Lval tmp), loc)
       in
       let g = g |> add_cmd cast_node cast_cmd |> add_edge term cast_node in
-      let term, g = make_nested_array fd lv typ exp loc cast_node true g in
+      let term, g = make_nested_array fd lv typ exp false loc cast_node true g in
       (term, g)
   | TArray (typ, None, _), Some ilist ->
       (* For example, int arr[] = {1,2,3}. CIL generates "int arr[3] = ..." while Clang generates "int arr[] = ..." *)
       let tmp = (Cil.Var (Cil.makeTempVar fd Cil.voidPtrType), Cil.NoOffset) in
       let exp = List.length ilist |> Cil.integer in
-      let term, g = make_array tmp typ exp loc entry g in
+      let term, g = make_array tmp typ exp false loc entry g in
       let cast_node = Node.make () in
       let cast_cmd =
         Cmd.Cset (lv, Cil.CastE (Cil.TPtr (typ, []), Cil.Lval tmp), loc)
       in
       let g = g |> add_cmd cast_node cast_cmd |> add_edge term cast_node in
-      let term, g = make_nested_array fd lv typ exp loc cast_node true g in
+      let term, g = make_nested_array fd lv typ exp false loc cast_node true g in
       (term, g)
   | TInt (_, _), _ | TFloat (_, _), _ ->
       let node = Node.make () in
       let cmd = Cmd.Cset (lv, Cil.zero, loc) in
       (node, g |> add_cmd node cmd |> add_edge entry node)
   | TComp (comp, _), _ ->
-      let term, g = make_struct lv comp loc entry g in
-      let term, g = generate_allocs_field comp.cfields lv fd term g in
+      let term, g = make_struct lv comp false loc entry g in
+      let term, g = generate_allocs_field comp.cfields lv false fd term g in
       (term, g)
   | _ -> (entry, g)
 
@@ -1023,7 +1049,7 @@ let init fd loc =
       else (Node.ENTRY, g)
     in
     (* generate alloc cmds for static allocations *)
-    let term, g = generate_allocs fd fd.slocals term g in
+    let term, g = generate_local_allocs fd fd.slocals term g in
     let g = add_edge term entry g in
     let nodes = nodesof g in
     let lasts = List.filter (fun n -> succ n g = []) nodes in
@@ -1032,7 +1058,7 @@ let init fd loc =
          (function Node.EXIT -> id | last -> add_edge last Node.EXIT)
          lasts
     |> generate_assumes |> flatten_instructions |> remove_if_loop
-    |> transform_allocs fd
+    |> transform_malloc fd
     (* generate alloc cmds for dynamic allocations *)
     |> transform_string_allocs fd
     (* generate salloc (string alloc) cmds *)

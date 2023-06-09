@@ -103,9 +103,10 @@ let api_map =
   (* XXX *)
   |> ApiMap.add "memcmp"
        { arg_typs = [ arr_src; arr_src; Size ]; ret_typ = ones }
-  |> ApiMap.add "strcmp" { arg_typs = [ Skip; Skip ]; ret_typ = ones }
-  |> ApiMap.add "strcoll" { arg_typs = [ Skip; Skip ]; ret_typ = ones }
-  |> ApiMap.add "strncmp" { arg_typs = [ Skip; Skip; Skip ]; ret_typ = ones }
+  |> ApiMap.add "strcmp" { arg_typs = [ arr_src; arr_src ]; ret_typ = ones }
+  |> ApiMap.add "strcoll" { arg_typs = [ arr_src; arr_src ]; ret_typ = ones }
+  |> ApiMap.add "strncmp"
+       { arg_typs = [ arr_src; arr_src; Size ]; ret_typ = ones }
   (* Searching *)
   |> ApiMap.add "memchr"
        { arg_typs = [ arr_src; Skip; Skip ]; ret_typ = SrcArg }

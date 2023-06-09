@@ -12,22 +12,27 @@
 open Global
 open Vocab
 module L = Logging
+module Node = InterCfg.Node
 
 (* transformation based on syntactic heuristics *)
 let transform_simple file =
   opt !Options.unsound_alloc UnsoundAlloc.transform file
+  |> opt !Options.unwrap_alloc UnwrapAlloc.transform
 
 (* transformation based on semantic heuristics *)
 let transform global =
   let loop_transformed = UnsoundLoop.transform global in
   let inlined = Frontend.inline global in
-  if (not !Options.il) && (loop_transformed || inlined) then
-    (* NOTE: CFG must be re-computed after transformation *)
-    Frontend.makeCFGinfo global.file
-    |> StepManager.stepf true "Translation to graphs (after inline)" Global.init
-    |> StepManager.stepf true "Pre-analysis (after inline)" PreAnalysis.perform
-  else (* nothing changed *)
-    global
+  let global = 
+    if (not !Options.il) && (loop_transformed || inlined) then
+      (* NOTE: CFG must be re-computed after transformation *)
+      Frontend.makeCFGinfo global.file
+      |> StepManager.stepf true "Translation to graphs (after transform)" Global.init
+      |> StepManager.stepf true "Pre-processing (after transform)" PreProcess.perform
+    else (* nothing changed *)
+      global
+  in
+  opt !Options.cut_cyclic_call Global.handle_cyclic_call global
 
 let marshal_in file =
   let filename = Filename.basename file.Cil.fileName in
@@ -42,9 +47,11 @@ let init_analysis file =
   if !Options.marshal_in then marshal_in file
   else
     file |> transform_simple
-    |> StepManager.stepf true "Translation to graphs" Global.init
-    |> StepManager.stepf true "Pre-analysis" PreAnalysis.perform
+    |> StepManager.stepf true "Graph construction" Global.init
+    |> Global.build_line_to_func_map
+    |> StepManager.stepf true "Pre-processing" PreProcess.perform
     |> transform
+    |> StepManager.stepf true "Pre-analysis" PreAnalysis.perform
     |> opt !Options.marshal_out (marshal_out file)
 
 let print_pgm_info global =
@@ -59,7 +66,7 @@ let print_pgm_info global =
   global
 
 let print_il file =
-  (if !Options.inline = [] && BatSet.is_empty !Options.unsound_loop then
+  (if !Options.inline = [] && BatSet.is_empty !Options.unsound_loop && not !Options.cut_cyclic_call then
    Cil.dumpFile !Cil.printerForMaincil stdout "" (transform_simple file)
   else
     let global = init_analysis file in
@@ -102,6 +109,12 @@ let extract_feature global =
     exit 0
   else global
 
+let run_slicing global =
+  if BatMap.is_empty !Options.slice_target_map then global
+  else (
+    DugSlicer.run global;
+    exit 0)
+
 let initialize () =
   Printexc.record_backtrace true;
   (* process arguments *)
@@ -127,6 +140,7 @@ let main () =
       ( StepManager.stepf true "Front-end" Frontend.parse ()
       |> Frontend.makeCFGinfo |> opt !Options.il print_il |> init_analysis
       |> print_pgm_info |> opt !Options.cfg print_cfg |> extract_feature
+      |> run_slicing
       |> StepManager.stepf true "Itv Sparse Analysis" ItvAnalysis.do_analysis
       |> case
            [

@@ -279,6 +279,7 @@ let trans_int_kind : C.Ast.builtin_type -> Cil.ikind = function
   | C.Short -> Cil.IShort
   | C.Long -> Cil.ILong
   | C.LongLong -> Cil.ILongLong
+  | C.UInt128 -> Cil.IULong
   | _ -> invalid_arg "int kind"
 
 let trans_float_kind : C.Ast.builtin_type -> Cil.fkind = function
@@ -518,7 +519,7 @@ and trans_builtin_type ?(compinfo = None) scope t =
   match k with
   | C.Void -> Cil.TVoid attr
   (* integer types *)
-  | C.Int | C.Bool | C.Char_U | C.UChar | C.UShort | C.UInt | C.ULong
+  | C.Int | C.Bool | C.Char_U | C.UChar | C.UShort | C.UInt | UInt128 | C.ULong
   | C.ULongLong | C.Char_S | C.SChar | C.Short | C.Long | C.LongLong ->
       Cil.TInt (trans_int_kind (k : C.Ast.builtin_type), attr)
   | C.Float | C.Double | C.LongDouble -> Cil.TFloat (trans_float_kind k, attr)
@@ -551,7 +552,7 @@ and trans_builtin_type ?(compinfo = None) scope t =
   | Invalid -> failwith "type Invalid"
   | Char16 -> failwith "type Char16"
   | Char32 -> failwith "type Char32"
-  | UInt128 | WChar | Int128 | NullPtr | Overload | Dependent | ObjCId ->
+  | WChar | Int128 | NullPtr | Overload | Dependent | ObjCId ->
       failwith "9"
   | ObjCClass -> failwith "objc class"
   | ObjCSel -> failwith "objc sel"
@@ -681,14 +682,12 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
   | C.Ast.Member mem ->
       ([], Some (trans_member scope fundec_opt loc mem.base mem.arrow mem.field))
   | C.Ast.ArraySubscript arr -> (
-      let sl1, lexp = trans_expr scope fundec_opt loc action arr.base in
-      let sl2, rexp = trans_expr scope fundec_opt loc action arr.index in
+      let sl1, base = trans_expr scope fundec_opt loc action arr.base in
+      let sl2, idx = trans_expr scope fundec_opt loc action arr.index in
+      let base = Option.get base in
+      let idx = Option.get idx in
+      (* base may contain casting such as (char * ) 0. But we have to preserve such important castings. Otherwise, CIL will crash  *)
 
-      (* for array subscription, lexp and rexp must be exist *)
-      let lexp = Option.get lexp in
-      let rexp = Option.get rexp in
-
-      (* distinguish base and index *)
       let distinguish e1 e2 =
         if e1 |> Cil.typeOf |> Cil.isPointerType then (e1, e2)
         else
@@ -699,7 +698,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
           | _ -> (e2, e1)
       in
 
-      let base, idx = distinguish lexp rexp in
+      let base, idx = distinguish base idx in
 
       match CilHelper.remove_cast base with
       (* base = arr *)
@@ -722,7 +721,15 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
               Cil.NoOffset )
           in
           (sl1 @ sl2, Some (Cil.Lval new_lval))
-      | _ -> failwith "ArraySubscript")
+          | _ ->
+            let temp =
+              (Cil.Var (Cil.makeTempVar (Option.get fundec_opt) Cil.intPtrType), Cil.NoOffset)
+            in
+            let new_lval =
+                ( Cil.Mem (Cil.BinOp (Cil.PlusPI, (Cil.AddrOf temp), idx, Cil.typeOf (Cil.AddrOf temp))),
+                  Cil.NoOffset )
+              in
+              (sl1 @ sl2, Some (Cil.Lval new_lval)))
   | C.Ast.ConditionalOperator co ->
       trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
   | C.Ast.UnaryExpr ue ->
@@ -761,7 +768,16 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       ([], Some const)
   | _ ->
       L.warn ~to_consol:false "Unknown at %s\n" (CilHelper.s_location loc);
-      failwith "unknown trans_expr"
+      if default_ptr then
+        match fundec_opt with
+        | Some fundec ->
+            let temp =
+              (Cil.Var (Cil.makeTempVar fundec Cil.intPtrType), Cil.NoOffset)
+            in
+            ([], Some (Cil.Lval temp))
+        | None -> ([], Some Cil.zero)
+      else ([], Some Cil.zero)
+      (* failwith "unknown trans_expr" *)
 
 and trans_unary_operator scope fundec_opt loc action kind expr =
   let get_var var_opt =
@@ -827,7 +843,16 @@ and trans_unary_operator scope fundec_opt loc action kind expr =
   | C.AddrOf ->
       let sl, var_opt = trans_expr scope fundec_opt loc action expr in
       let var = get_var var_opt in
-      (sl, Some (Cil.AddrOf (lval_of_expr var)))
+      if Cil.isZero var then
+        match fundec_opt with
+        | Some fundec ->
+            let temp =
+              (Cil.Var (Cil.makeTempVar fundec Cil.intPtrType), Cil.NoOffset)
+            in
+            ([], Some (Cil.AddrOf (temp)))
+        | None -> ([], Some Cil.zero)
+      else
+        (sl, Some (Cil.AddrOf (lval_of_expr var)))
   | C.Deref ->
       let sl, var_opt =
         trans_expr ~default_ptr:true scope fundec_opt loc action expr
@@ -1650,13 +1675,15 @@ and mk_local_struct_init scope cfields fundec action loc lv expr_list =
               ((idx + 1) :: idx_list) (idx + 1)
           else
             let field, i, is_find = grab_matching_field origin_cfields f e in
-            let f = List.hd field in
-            let i = if is_find >= 0 then i else idx + 1 in
-            let stmts', expr_remainders, scope =
-              mk_init_stmt scope loc fundec action f lv expr_list
-            in
-            loop scope union_flag fl expr_remainders (f :: fis) (stmts @ stmts')
-              (i :: idx_list) (idx + 1)
+            match field with
+            | [f] ->
+              let i = if is_find >= 0 then i else idx + 1 in
+              let stmts', expr_remainders, scope =
+                mk_init_stmt scope loc fundec action f lv expr_list
+              in
+              loop scope union_flag fl expr_remainders (f :: fis) (stmts @ stmts')
+                (i :: idx_list) (idx + 1)
+            | _ -> loop scope union_flag fl [] fis stmts idx_list idx
         else if is_init_list e then
           let lv = Cil.addOffsetLval (Cil.Field (f, Cil.NoOffset)) lv in
           let stmts', scope =
@@ -2469,23 +2496,26 @@ and mk_global_struct_init scope loc typ cfields expr_list =
               ((idx + 1) :: idx_list) (idx + 1)
           else
             let field, find, i = grab_matching_field origin_cfields f e in
-            let f = List.hd field in
-            let i = if i >= 0 then find else idx + 1 in
-            let expr_list =
-              if i >= 0 then
-                match expr_list with
-                | e :: el -> (
-                    match e.C.Ast.desc with
-                    | C.Ast.DesignatedInit d -> d.init :: el
-                    | _ -> expr_list)
-                | _ -> expr_list
-              else expr_list
-            in
-            let init, expr_remainders =
-              mk_init scope loc f.Cil.ftype expr_list
-            in
-            loop union_flag fl expr_remainders (f :: fis) (init :: inits)
-              (i :: idx_list) (idx + 1)
+            match field with
+            | [f] ->
+                let i = if i >= 0 then find else idx + 1 in
+                let expr_list =
+                  if i >= 0 then
+                    match expr_list with
+                    | e :: el -> (
+                        match e.C.Ast.desc with
+                        | C.Ast.DesignatedInit d -> d.init :: el
+                        | _ -> expr_list)
+                    | _ -> expr_list
+                  else expr_list
+                in
+                let init, expr_remainders =
+                  mk_init scope loc f.Cil.ftype expr_list
+                in
+                loop union_flag fl expr_remainders (f :: fis) (init :: inits)
+                (i :: idx_list) (idx + 1)
+            | _ ->
+                loop union_flag fl [] fis inits idx_list idx
         else if is_init_list e then
           let init = trans_global_init scope loc f.ftype e in
           loop true fl el (f :: fis) (init :: inits) ((idx + 1) :: idx_list)

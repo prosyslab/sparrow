@@ -229,9 +229,12 @@ let eval_list spec pid exps mem =
       v)
     exps
 
-let eval_array_alloc ?(spec = Spec.empty) node e is_static mem =
+let eval_array_alloc ?(spec = Spec.empty) node e is_local is_static mem =
   let pid = Node.get_pid node in
-  let allocsite = Allocsite.allocsite_of_node node in
+  let allocsite = 
+    if is_local then Allocsite.allocsite_of_local node
+    else Allocsite.allocsite_of_node node
+  in
   let o = Itv.of_int 0 in
   let sz = Val.itv_of_val (eval ~spec pid e mem) in
   (* NOTE: stride is always one when allocating memory. *)
@@ -365,7 +368,7 @@ let model_realloc mode spec node (lvo, exps) (mem, global) =
       match exps with
       | _ :: size :: _ ->
           ( update mode spec global (eval_lv ~spec pid lv mem)
-              (eval_array_alloc ~spec node size false mem)
+              (eval_array_alloc ~spec node size false false mem)
               mem,
             global )
       | _ -> raise (Failure "Error: arguments of realloc are not given"))
@@ -379,7 +382,7 @@ let model_calloc mode spec node (lvo, exps) (mem, global) =
       | n :: size :: _ ->
           let new_size = Cil.BinOp (Cil.Mult, n, size, Cil.uintType) in
           ( update mode spec global (eval_lv ~spec pid lv mem)
-              (eval_array_alloc ~spec node new_size false mem)
+              (eval_array_alloc ~spec node new_size false false mem)
               mem,
             global )
       | _ -> raise (Failure "Error: arguments of realloc are not given"))
@@ -571,7 +574,7 @@ let model_getpwent mode spec node pid lvo f (mem, global) =
         ((Cil.TPtr ((Cil.TComp (comp, _) as elem_t), _) as ptr_t), _, _, _) ) ->
       let struct_loc = eval_lv ~spec pid lv mem in
       let struct_v =
-        eval_array_alloc ~spec node (Cil.SizeOf elem_t) false mem
+        eval_array_alloc ~spec node (Cil.SizeOf elem_t) false false mem
         |> Val.cast ptr_t (Cil.typeOfLval lv)
       in
       let field_loc =
@@ -775,9 +778,7 @@ let process_dst mode spec node pid src_vals global alloc mem dst_e =
 let process_buf mode spec node global mem dst_e =
   let pid = Node.get_pid node in
   let buf_loc = Val.all_locs (eval pid dst_e mem) in
-  let allocsite = Allocsite.allocsite_of_node node in
-  let input_v = Val.external_value allocsite in
-  update mode spec global buf_loc input_v mem
+  update mode spec global buf_loc Val.itv_top mem
 
 let process_struct_ptr mode spec node global mem ptr_e =
   let pid = Node.get_pid node in
@@ -974,6 +975,12 @@ let bind_arg_lvars_set mode spec global arg_ids_set vs mem =
   let mode = if BatSet.cardinal arg_ids_set > 1 then AbsSem.Weak else mode in
   BatSet.fold (bind_arg_ids mode spec global vs) arg_ids_set mem
 
+let eval_callees ?(spec = Spec.empty) pid fexp global mem =
+  let fs = Val.pow_proc_of_val (eval ~spec pid fexp mem) in
+  if !Options.cut_cyclic_call then
+    PowProc.filter (fun f -> not (BatSet.mem (pid, f) global.cyclic_calls)) fs
+  else fs
+
 (* Default update option is weak update. *)
 let run mode spec node (mem, global) =
   let pid = Node.get_pid node in
@@ -1006,15 +1013,15 @@ let run mode spec node (mem, global) =
           in
           let mem = update mode spec global ext_loc ext_v mem in
           (mem, global))
-  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, is_static, _) ->
+  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, is_local, is_static, _) ->
       let ploc = eval_lv ~spec pid l mem in
-      let v = eval_array_alloc ~spec node e is_static mem in
+      let v = eval_array_alloc ~spec node e is_local is_static mem in
       let mem = update mode spec global ploc v mem in
       let relations =
         Provenance.alloc spec.analysis node l e ploc v global.relations
       in
       (mem, { global with relations })
-  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Struct s, _, _) ->
+  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Struct s, _, _, _) ->
       let lv = eval_lv ~spec pid l mem in
       (update mode spec global lv (eval_struct_alloc lv s) mem, global)
   | IntraCfg.Cmd.Csalloc (l, s, _) ->
@@ -1052,20 +1059,21 @@ let run mode spec node (mem, global) =
           (mem, global) loc
   | IntraCfg.Cmd.Ccall (lvo, f, arg_exps, _) ->
       (* user functions *)
-      let fs = Val.pow_proc_of_val (eval ~spec pid f mem) in
+      let fs = eval_callees ~spec pid f global mem in
+      let arg_lvars_of_proc f acc =
+        let args = InterCfg.argsof global.icfg f in
+        let lvars =
+          List.map (fun x -> Loc.of_lvar f x.Cil.vname x.Cil.vtype) args
+        in
+        BatSet.add lvars acc
+      in
+      let arg_lvars_set = PowProc.fold arg_lvars_of_proc fs BatSet.empty in
+      start_provenance_list ();
+      let arg_vals = eval_list spec pid arg_exps mem in
+      let prov_list = finish_provenance_list () in
+      (* Even if 'fs' is empty, evaluate argument values to draw a sound DUG *)
       if PowProc.eq fs PowProc.bot then (mem, global)
       else
-        let arg_lvars_of_proc f acc =
-          let args = InterCfg.argsof global.icfg f in
-          let lvars =
-            List.map (fun x -> Loc.of_lvar f x.Cil.vname x.Cil.vtype) args
-          in
-          BatSet.add lvars acc
-        in
-        let arg_lvars_set = PowProc.fold arg_lvars_of_proc fs BatSet.empty in
-        start_provenance_list ();
-        let arg_vals = eval_list spec pid arg_exps mem in
-        let prov_list = finish_provenance_list () in
         let dump =
           match lvo with
           | None -> global.dump
@@ -1103,7 +1111,7 @@ let run mode spec node (mem, global) =
       let callnode = InterCfg.callof node global.icfg in
       (match InterCfg.cmdof global.icfg callnode with
       | IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
-          let callees = Val.pow_proc_of_val (eval ~spec pid f mem) in
+          let callees = eval_callees ~spec pid f global mem in
           (* TODO: optimize this. memory access and du edges *)
           let retvar_set =
             PowProc.fold

@@ -31,3 +31,11 @@ module Make (Sem : AbsSem.S) :
      and type Dom.PowA.t = Sem.Dom.PowA.t
      and type Dom.Access.t = Sem.Dom.Access.t
      and type Dom.Access.Info.t = Sem.Dom.Access.Info.t
+
+module SlicingSem :
+  S
+    with type Dom.t = ItvSem.Dom.t
+     and type Dom.A.t = ItvSem.Dom.A.t
+     and type Dom.PowA.t = ItvSem.Dom.PowA.t
+     and type Dom.Access.t = ItvSem.Dom.Access.t
+     and type Dom.Access.Info.t = ItvSem.Dom.Access.Info.t

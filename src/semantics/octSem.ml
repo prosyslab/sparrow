@@ -354,7 +354,7 @@ let model_realloc mode packconf node pid lvo exps ptrmem (mem, global) =
   | Some l, _ :: size :: _ ->
       let lv = ItvSem.eval_lv pid l ptrmem |> PowOctLoc.of_locs in
       let ptrs =
-        ItvSem.eval_array_alloc node size false ptrmem
+        ItvSem.eval_array_alloc node size false false ptrmem
         |> ItvDom.Val.allocsites_of_val |> PowOctLoc.of_sizes
       in
       alloc mode global ptrmem packconf pid lv ptrs size mem
@@ -365,7 +365,7 @@ let model_calloc mode packconf node pid lvo exps ptrmem (mem, global) =
   | Some l, size :: _ ->
       let lv = ItvSem.eval_lv pid l ptrmem |> PowOctLoc.of_locs in
       let ptrs =
-        ItvSem.eval_array_alloc node size false ptrmem
+        ItvSem.eval_array_alloc node size false false ptrmem
         |> ItvDom.Val.allocsites_of_val |> PowOctLoc.of_sizes
       in
       alloc mode global ptrmem packconf pid lv ptrs size mem
@@ -480,10 +480,10 @@ let run_cmd mode packconf node cmd ptrmem (mem, global) =
       |> forget mode global packconf pid oct_lv
       |> forget mode global packconf pid arr_val
       |> forget mode global packconf pid arr_size
-  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, is_static, _) ->
+  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, is_local, is_static, _) ->
       let lv = ItvSem.eval_lv pid l ptrmem |> PowOctLoc.of_locs in
       let ptrs =
-        ItvSem.eval_array_alloc node e is_static ptrmem
+        ItvSem.eval_array_alloc node e is_local is_static ptrmem
         |> ItvDom.Val.allocsites_of_val |> PowOctLoc.of_sizes
       in
       alloc mode global ptrmem packconf pid lv ptrs e mem
@@ -503,7 +503,7 @@ let run_cmd mode packconf node cmd ptrmem (mem, global) =
       handle_undefined_functions mode packconf node pid (lvo, f, arg_exps)
         ptrmem (mem, global) loc
   | IntraCfg.Cmd.Ccall (_, f, arg_exps, _) ->
-      let fs = ItvDom.Val.pow_proc_of_val (ItvSem.eval pid f ptrmem) in
+      let fs = ItvSem.eval_callees pid f global ptrmem in
       if PowProc.eq fs PowProc.bot then mem
       else
         let arg_lvars_of_proc f acc =

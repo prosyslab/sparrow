@@ -22,25 +22,31 @@ type t = {
   mem : ItvDom.Mem.t;
   table : ItvDom.Table.t;
   relations : RelSemantics.Set.t;
+  line_to_func : (string, string) BatMap.t;
+  cyclic_calls : (pid * pid) BatSet.t;
 }
 
-let remove_node node global =
-  { global with icfg = InterCfg.remove_node node global.icfg }
+let remove_nodes nodes global =
+  { global with icfg = NodeSet.fold InterCfg.remove_node nodes global.icfg }
 
-let remove_function pid global =
-  {
-    global with
-    icfg = InterCfg.remove_function pid global.icfg;
-    callgraph = CallGraph.remove_function pid global.callgraph;
-    dump = Dump.remove pid global.dump;
-  }
+let remove_functions pids global =
+  let folder pid glob =
+    {
+      glob with
+      icfg = InterCfg.remove_function pid glob.icfg;
+      callgraph = CallGraph.remove_function pid glob.callgraph;
+      dump = Dump.remove pid glob.dump;
+    }
+  in
+  let global = PowProc.fold folder pids global in
+  { global with callgraph = CallGraph.compute_transitive global.callgraph }
 
 let is_rec pid global = CallGraph.is_rec global.callgraph pid
 
 let remove_unreachable_nodes global =
   let nodes_all = InterCfg.nodesof global.icfg in
   let unreachable = InterCfg.unreachable_node global.icfg in
-  let global = NodeSet.fold remove_node unreachable global in
+  let global = remove_nodes unreachable global in
   L.info ~level:1 "\n%-14s: %d\n" "#nodes all" (List.length nodes_all);
   L.info ~level:1 "%-14s: %d\n" "#unreachable" (NodeSet.cardinal unreachable);
   global
@@ -61,16 +67,45 @@ let remove_unreachable_functions global =
   let recursive = PowProc.filter (fun pid -> is_rec pid global) reachable in
   let global =
     if !Options.bugfinder >= 2 then global
-    else PowProc.fold remove_function unreachable global
+    else remove_functions unreachable global
   in
   L.info ~level:1 "%-16s: %d\n" "#functions all" (PowProc.cardinal pids_all);
-  L.info ~level:1 "%-16s: %d\n" "#recursive" (PowProc.cardinal recursive);
-  if PowProc.cardinal recursive > 0 then
-    L.info ~level:1 "%a\n" PowProc.pp recursive;
+  L.info ~level:1 "%-16s: %d\n" "#reachable"
+    (PowProc.cardinal pids_all - PowProc.cardinal unreachable);
   L.info ~level:1 "%-16s: %d\n" "#unreachable" (PowProc.cardinal unreachable);
   if PowProc.cardinal unreachable > 0 then
     L.info ~level:1 "%a\n" PowProc.pp unreachable;
+  L.info ~level:1 "%-16s: %d\n" "#recursive" (PowProc.cardinal recursive);
+  if PowProc.cardinal recursive > 0 then
+    L.info ~level:1 "%a\n" PowProc.pp recursive;
   global
+
+let handle_cyclic_call global =
+  let cyclic_calls = CallGraph.find_back_edges global.callgraph |> list2set in
+  L.info "List of cyclic call edges:\n";
+  BatSet.iter (fun (src, dst) -> L.info "%s -> %s\n" src dst) cyclic_calls;
+  let folder (src, dst) acc_cg = CallGraph.remove_edge src dst acc_cg in
+  let callgraph = BatSet.fold folder cyclic_calls global.callgraph in
+  let callgraph = CallGraph.compute_transitive callgraph in
+  let icfg = global.icfg in
+  let folder (src, dst) acc_icfg =
+    let src_nodes =
+      InterCfg.nodes_of_pid icfg src
+      |> List.filter (fun n -> InterCfg.is_callnode n icfg)
+    in
+    list_fold (fun n g -> InterCfg.remove_call_edge n dst g) src_nodes acc_icfg
+  in
+  let icfg = BatSet.fold folder cyclic_calls icfg in
+  { global with cyclic_calls; callgraph; icfg }
+
+(* Record the original function names so we can retrieve them after inline *)
+let build_line_to_func_map global =
+  let nodes = InterCfg.nodesof global.icfg in
+  let folder acc n =
+    BatMap.add (InterCfg.node_to_lstr global.icfg n) (Node.get_pid n) acc
+  in
+  let line_to_func = List.fold_left folder BatMap.empty nodes in
+  { global with line_to_func }
 
 let init file =
   {
@@ -81,6 +116,8 @@ let init file =
     mem = ItvDom.Mem.bot;
     table = ItvDom.Table.bot;
     relations = RelSemantics.Set.empty;
+    line_to_func = BatMap.empty;
+    cyclic_calls = BatSet.empty;
   }
   |> if !Options.keep_unreachable then id else remove_unreachable_nodes
 

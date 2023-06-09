@@ -63,6 +63,8 @@ let list_rev l =
   in
   list_rev_rec l []
 
+let is_list_empty = function [] -> true | _ -> false
+
 let append_opt x l = match x with None -> l | Some x -> x :: l
 
 let find_opt k m = try Some (BatMap.find k m) with Not_found -> None
@@ -134,3 +136,8 @@ let prerr_memory_usage () =
     let kB_of_word w = w * Sys.word_size / 1024 / 8 in
     let live_mb = kB_of_word stat.Gc.live_words / 1024 in
     Logging.info ~level:1 "live memory : %d MB\n" live_mb
+
+let t_start = Sys.time ()
+
+let print_elapsed_time ~level =
+  Logging.info ~level "%f\n" (Sys.time () -. t_start)

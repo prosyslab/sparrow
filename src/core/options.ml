@@ -35,6 +35,8 @@ let dug = ref false
 
 let optil = ref true
 
+let cut_cyclic_call = ref false
+
 let keep_unreachable = ref false
 
 let keep_unreachable_from = ref BatSet.empty
@@ -77,6 +79,10 @@ let narrow = ref false
 let profile = ref false
 
 let scaffold = ref true
+
+(* Transformation *)
+
+let unwrap_alloc = ref false
 
 (* Unsoundness *)
 let max_pre_iter = ref 0
@@ -159,7 +165,17 @@ let marshal_in = ref false
 let marshal_out = ref false
 
 (* DUG slice *)
-let dug_slice_target = ref ""
+let slice_target_map = ref BatMap.empty
+
+let add_slice_target s =
+  match String.split_on_char '=' s with
+  | [ targ_id; targ_point ] ->
+      slice_target_map := BatMap.add targ_id targ_point !slice_target_map
+  | _ ->
+      print_endline "Invalid slice option (must be '-slice X=file:line')";
+      exit 1
+
+let full_slice = ref false
 
 (* Debug *)
 let debug = ref false
@@ -242,9 +258,10 @@ let opts =
     ("-il", Arg.Set il, "Show the input program in IL");
     ("-cfg", Arg.Set cfg, "Print Cfg");
     ("-dug", Arg.Set dug, "Print Def-Use graph");
-    ( "-dug_slice",
-      Arg.Set_string dug_slice_target,
-      "Slice DUG w.r.t a given target" );
+    ( "-slice",
+       Arg.String (fun s -> add_slice_target s),
+       "Slice w.r.t a given target" );
+     ("-full_slice", Arg.Set full_slice, "Perform full (not thin) slicing");
     ("-skip_main_analysis", Arg.Set skip_main_analysis, "Skip main analysis");
     ("-entry_point", Arg.Set_string entry_point, "Entry point (default: main)");
     ("-noalarm", Arg.Set noalarm, "Do not print alarms");
@@ -347,6 +364,7 @@ let opts =
       "Filter alarms from recursive call cycles" );
     ("-optil", Arg.Set optil, "Optimize IL (default)");
     ("-no_optil", Arg.Clear optil, "Do not optimize IL");
+    ("-cut_cyclic_call", Arg.Set cut_cyclic_call, "Remove cyclic call edges");
     ( "-keep_unreachable",
       Arg.Set keep_unreachable,
       "Keep all unreachable functions" );
@@ -363,6 +381,7 @@ let opts =
     ("-outdir", Arg.Set_string outdir, "Output directory (default: sparrow-out)");
     ("-int_overflow", Arg.Set int_overflow, "Consider integer overflow");
     ("-memtrace", Arg.Set memtrace, "Profile with memtrace");
+    ("-unwrap_alloc", Arg.Set unwrap_alloc, "Unwrap alloc functions");
   ]
   @ unsoundness_opts @ datalog_opts
 

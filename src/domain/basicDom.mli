@@ -20,8 +20,24 @@ module Proc = InterCfg.Proc
 module PowProc :
   PowDom.CPO with type t = PowDom.MakeCPO(Proc).t and type elt = Proc.t
 
+module IntAllocsite : sig
+  type t
+end
+
+module ExtAllocsite : sig
+  type t
+end
+
 module Allocsite : sig
-  include AbsDom.SET
+  type t =
+  | Local of Node.t
+  | Internal of IntAllocsite.t
+  | External of ExtAllocsite.t
+  | Super of string
+
+  include AbsDom.SET with type t := t
+
+  val allocsite_of_local : Node.t -> t
 
   val allocsite_of_node : Node.t -> t
 
@@ -51,6 +67,8 @@ module Loc : sig
 
   include AbsDom.HASHABLE_SET with type t := t
 
+  val return_var_name : string
+
   val null : t
 
   val dummy : t
@@ -71,6 +89,8 @@ module Loc : sig
 
   val is_field : t -> bool
 
+  val is_heap : t -> bool
+
   val of_gvar : string -> Cil.typ -> t
 
   val of_lvar : Proc.t -> string -> Cil.typ -> t
@@ -80,6 +100,8 @@ module Loc : sig
   val of_allocsite : Allocsite.t -> t
 
   val return_var : Proc.t -> Cil.typ -> t
+
+  val is_global : t -> bool
 
   val is_local_of : Proc.t -> t -> bool
 

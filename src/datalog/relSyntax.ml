@@ -321,7 +321,7 @@ let pp_cmd fmt icfg n =
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id e_id;
       F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id
   | Cexternal (_, _) -> F.fprintf fmt.cmd "external\n"
-  | Calloc (lv, (Array e as alloc), _, _) ->
+  | Calloc (lv, (Array e as alloc), _, _, _) ->
       pp_lv fmt lv;
       let e' = if !Options.remove_cast then remove_cast e else e in
       pp_exp fmt e';
@@ -334,7 +334,7 @@ let pp_cmd fmt icfg n =
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id alloc_id;
       F.fprintf fmt.alloc_exp "%s\t%s\n" alloc_id size_e_id;
       F.fprintf fmt.alloc "%a\t%s\t%s\n" Node.pp n lv_id size_e_id
-  | Calloc (_, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
+  | Calloc (_, _, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
   | Csalloc (lv, str, _) ->
       pp_lv fmt lv;
       let lv_id = Hashtbl.find lv_map lv in

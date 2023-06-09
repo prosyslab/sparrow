@@ -335,7 +335,7 @@ let pp_cmd_sems fmt global inputmem outputmem n =
         succ;
       F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
       F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id v_id
-  | Calloc (lv, (Array size as e), _, _) ->
+  | Calloc (lv, (Array size as e), _, _, _) ->
       let pid = Node.get_pid n in
       let loc = ItvSem.eval_lv pid lv global.Global.mem in
       let arr_v = TaintDom.Mem.lookup loc outputmem in

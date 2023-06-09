@@ -80,15 +80,16 @@ and s_instr i =
 
 and s_instrs instrs = List.fold_left (fun s i -> s ^ s_instr i) "" instrs
 
-let s_location loc =
-  let file =
-    try
-      let idx = String.rindex loc.file '/' in
-      let len = String.length loc.file in
-      String.sub loc.file (idx + 1) (len - idx - 1)
-    with _ -> loc.file
-  in
-  file ^ ":" ^ string_of_int loc.line
+let get_loc_filename loc =
+  try
+    let idx = String.rindex loc.file '/' in
+    let len = String.length loc.file in
+    String.sub loc.file (idx + 1) (len - idx - 1)
+  with _ -> loc.file
+
+let s_location loc = get_loc_filename loc ^ ":" ^ string_of_int loc.line
+
+let s_location_abs loc = loc.file ^ ":" ^ string_of_int loc.line
 
 let eq_lval l1 l2 = s_lv l1 = s_lv l2
 

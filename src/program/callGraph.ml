@@ -64,25 +64,76 @@ module G = struct
   let succ g pid = try succ g pid with _ -> []
 end
 
-type t = { graph : G.t; trans_calls : G.t }
+module Oper = Graph.Oper.I (G)
 
-let empty () = { graph = G.create (); trans_calls = G.create () }
+type t = { graph : G.t; trans_callees : G.t; trans_callers : G.t }
+
+let empty () =
+  {
+    graph = G.create ();
+    trans_callees = G.create ();
+    trans_callers = G.create ();
+  }
+
+let size g = G.fold_vertex (fun _ acc -> acc + 1) g.graph 0
 
 let add_edge src dst g =
   G.add_edge g.graph src dst;
   g
 
+let remove_edge src dst g =
+  G.remove_edge g.graph src dst;
+  g
+
 let callees pid g = G.succ g.graph pid |> PowProc.of_list
 
-let trans_callees pid g = G.succ g.trans_calls pid |> PowProc.of_list
+let trans_callees pid g = G.succ g.trans_callees pid |> PowProc.of_list
 
-let compute_trans_calls callgraph =
-  let trans_calls = G.transitive_closure callgraph.graph in
-  { callgraph with trans_calls }
+let trans_callers pid g = G.succ g.trans_callers pid |> PowProc.of_list
+
+let compute_transitive callgraph =
+  let trans_callees = G.transitive_closure callgraph.graph in
+  let trans_callers =
+    G.copy callgraph.graph |> Oper.mirror |> G.transitive_closure
+  in
+  { callgraph with trans_callees; trans_callers }
+
+let rec find_back_edges_aux g stack (back_edges, visited) cur_node =
+  (* Update visited node set and the current stack. *)
+  let visited = PowProc.add cur_node visited in
+  let stack = cur_node :: stack in
+  let succs = G.succ g.graph cur_node in
+  let back_edges =
+    List.filter (fun s -> List.mem s stack) succs
+    |> List.map (fun s -> (cur_node, s))
+    |> List.append back_edges
+  in
+  (* Filter out already visited successors and recurse into them. *)
+  List.filter (fun s -> not (PowProc.mem s visited)) succs
+  |> List.fold_left (find_back_edges_aux g stack) (back_edges, visited)
+
+let find_back_edges g =
+  (* TODO: review  if it's okay to use 'global_proc' as the entry. *)
+  find_back_edges_aux g [] ([], PowProc.empty) InterCfg.global_proc |> fst
+
+let rec add_until n g acc entries =
+  match entries with
+  | [] -> acc
+  | head_entry :: tail_entries when PowProc.mem head_entry acc ->
+      add_until n g acc tail_entries
+  | head_entry :: tail_entries ->
+      let to_add = PowProc.add head_entry (trans_callees head_entry g) in
+      let new_acc = PowProc.union to_add acc in
+      let cur_n = PowProc.cardinal acc in
+      let new_n = PowProc.cardinal new_acc in
+      if new_n > n then (
+        Logging.info "Stopped before %s (%d -> %d)\n" head_entry cur_n new_n;
+        acc)
+      else add_until n g new_acc tail_entries
 
 let is_rec callgraph pid =
-  if G.mem_vertex callgraph.trans_calls pid then
-    let trans = G.succ callgraph.trans_calls pid in
+  if G.mem_vertex callgraph.trans_callees pid then
+    let trans = G.succ callgraph.trans_callees pid in
     List.mem pid trans
   else
     (* conservative answer for exceptional cases (e.g., unreachable functions) *)
@@ -107,5 +158,4 @@ let to_json g =
 
 let remove_function pid callgraph =
   G.remove_vertex callgraph.graph pid;
-  G.remove_vertex callgraph.trans_calls pid;
   callgraph

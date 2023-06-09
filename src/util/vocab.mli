@@ -48,6 +48,8 @@ val list_fold2_prefix : ('a -> 'b -> 'c -> 'c) -> 'a list -> 'b list -> 'c -> 'c
 
 val list_rev : 'a list -> 'a list
 
+val is_list_empty : 'a list -> bool
+
 val append_opt : 'a option -> 'a list -> 'a list
 
 val find_opt : 'a -> ('a, 'b) BatMap.t -> 'b option
@@ -101,3 +103,5 @@ val my_prerr_newline : unit -> unit
 val my_prerr_string : string -> unit
 
 val prerr_memory_usage : unit -> unit
+
+val print_elapsed_time : level:int -> unit
