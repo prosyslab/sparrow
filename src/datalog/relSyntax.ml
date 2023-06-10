@@ -100,6 +100,16 @@ let new_exp_id e =
   Hashtbl.add exp_map e id;
   id
 
+let exp_patron_count = ref 0
+
+let exp_patron_map = Hashtbl.create 1000
+
+let new_exp_patron_id (n, e) =
+  let id = "Exp-" ^ string_of_int !exp_patron_count in
+  incr exp_patron_count;
+  Hashtbl.add exp_patron_map (n, e) id;
+  id
+
 let alloc_count = ref 0
 
 let alloc_map = Hashtbl.create 1000
@@ -222,7 +232,7 @@ let pp_unop fmt uop =
     | LNot -> F.fprintf fmt.lnot "%s\n" id
     | Neg -> F.fprintf fmt.neg "%s\n" id
 
-let rec pp_lv fmt lv =
+let rec pp_lv fmt n lv =
   if Hashtbl.mem lv_map lv then ()
   else
     let id = new_lv_id lv in
@@ -232,44 +242,63 @@ let rec pp_lv fmt lv =
         else F.fprintf fmt.local_var "%s\t%s\n" id vi.vname
     | Cil.Var _, Cil.Field (_, _) -> F.fprintf fmt.field "%s\n" id
     | Cil.Mem e, offset ->
-        pp_exp fmt e;
+        pp_exp fmt n e;
         (match offset with
         | Cil.Field (_, _) -> F.fprintf fmt.field "%s\n" id
         | _ -> ());
-        let e_id = Hashtbl.find exp_map e in
+        let e_id =
+          if !Options.patron then Hashtbl.find exp_patron_map (n, e)
+          else Hashtbl.find exp_map e
+        in
         F.fprintf fmt.mem "%s\t%s\n" id e_id
     | _, _ -> F.fprintf fmt.lval "%s\tOther\n" id
 
-and pp_exp fmt e =
-  if Hashtbl.mem exp_map e then ()
+and pp_exp fmt n e =
+  if
+    if !Options.patron then Hashtbl.mem exp_patron_map (n, e)
+    else Hashtbl.mem exp_map e
+  then ()
   else
-    let id = new_exp_id e in
+    let id =
+      if !Options.patron then new_exp_patron_id (n, e) else new_exp_id e
+    in
     match e with
     | Cil.Const _ -> F.fprintf fmt.const_exp "%s\n" id
     | Cil.Lval lv ->
-        pp_lv fmt lv;
+        pp_lv fmt n lv;
         let lv_id = Hashtbl.find lv_map lv in
         F.fprintf fmt.lval_exp "%s\t%s\n" id lv_id
     | Cil.BinOp (bop, e1, e2, _) ->
         pp_binop fmt bop;
-        pp_exp fmt e1;
-        pp_exp fmt e2;
-        let e1_id = Hashtbl.find exp_map e1 in
-        let e2_id = Hashtbl.find exp_map e2 in
-        let bop_id = Hashtbl.find binop_map bop in
-        F.fprintf fmt.binop_exp "%s\t%s\t%s\t%s\n" id bop_id e1_id e2_id
+        pp_exp fmt n e1;
+        pp_exp fmt n e2;
+        let e1_id =
+          if !Options.patron then Hashtbl.find exp_patron_map (n, e1)
+          else Hashtbl.find exp_map e1
+        in
+        let e2_id =
+          if !Options.patron then Hashtbl.find exp_patron_map (n, e2)
+          else Hashtbl.find exp_map e2
+        in
+        F.fprintf fmt.binop_exp "%s\t%s\t%s\t%s\n" id (string_of_bop bop) e1_id
+          e2_id
     | Cil.UnOp (unop, e, _) ->
-        pp_exp fmt e;
+        pp_exp fmt n e;
         pp_unop fmt unop;
-        let e_id = Hashtbl.find exp_map e in
-        let unop_id = Hashtbl.find unop_map unop in
-        F.fprintf fmt.unop_exp "%s\t%s\t%s\n" id unop_id e_id
-    | Cil.CastE (_, e1) ->
-        pp_exp fmt e1;
-        let e1_id = Hashtbl.find exp_map e1 in
-        F.fprintf fmt.cast_exp "%s\t%s\n" id e1_id
+        let e_id =
+          if !Options.patron then Hashtbl.find exp_patron_map (n, e)
+          else Hashtbl.find exp_map e
+        in
+        F.fprintf fmt.unop_exp "%s\t%s\t%s\n" id (string_of_uop unop) e_id
+    | Cil.CastE (_, e) ->
+        pp_exp fmt n e;
+        let e_id =
+          if !Options.patron then Hashtbl.find exp_patron_map (n, e)
+          else Hashtbl.find exp_map e
+        in
+        F.fprintf fmt.cast_exp "%s\t%s\n" id e_id
     | Cil.StartOf l ->
-        pp_lv fmt l;
+        pp_lv fmt n l;
         let l_id = Hashtbl.find lv_map l in
         F.fprintf fmt.start_of "%s\t%s\n" id l_id;
         if !Options.patron then F.fprintf fmt.lval_exp "%s\t%s\n" id l_id
@@ -294,12 +323,14 @@ let new_arg_id () =
   incr arg_count;
   id
 
-let pp_arg fmt arg =
+let pp_arg fmt n arg =
   let id = new_arg_id () in
   List.iteri
     (fun i e ->
       let e' = if !Options.remove_cast then remove_cast e else e in
-      Hashtbl.find exp_map e' |> F.fprintf fmt.arg "%s\t%d\t%s\n" id i)
+      (if !Options.patron then Hashtbl.find exp_patron_map (n, e')
+      else Hashtbl.find exp_map e')
+      |> F.fprintf fmt.arg "%s\t%d\t%s\n" id i)
     arg;
   id
 
@@ -313,20 +344,26 @@ let pp_cmd fmt icfg n =
       else if InterCfg.is_exit n then F.fprintf fmt.exit "%a\n" Node.pp n
       else F.fprintf fmt.skip "%a\n" Node.pp n
   | Cset (lv, e, _) ->
-      pp_lv fmt lv;
+      pp_lv fmt n lv;
       let e' = if !Options.remove_cast then remove_cast e else e in
-      pp_exp fmt e';
+      pp_exp fmt n e';
       let lv_id = Hashtbl.find lv_map lv in
-      let e_id = Hashtbl.find exp_map e' in
+      let e_id =
+        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
+        else Hashtbl.find exp_map e'
+      in
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id e_id;
       F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id
   | Cexternal (_, _) -> F.fprintf fmt.cmd "external\n"
   | Calloc (lv, (Array e as alloc), _, _, _) ->
-      pp_lv fmt lv;
+      pp_lv fmt n lv;
       let e' = if !Options.remove_cast then remove_cast e else e in
-      pp_exp fmt e';
+      pp_exp fmt n e';
       let lv_id = Hashtbl.find lv_map lv in
-      let size_e_id = Hashtbl.find exp_map e' in
+      let size_e_id =
+        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
+        else Hashtbl.find exp_map e'
+      in
       let alloc_id =
         if Hashtbl.mem alloc_map alloc then Hashtbl.find alloc_map alloc
         else new_alloc_id alloc
@@ -336,7 +373,7 @@ let pp_cmd fmt icfg n =
       F.fprintf fmt.alloc "%a\t%s\t%s\n" Node.pp n lv_id size_e_id
   | Calloc (_, _, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
   | Csalloc (lv, str, _) ->
-      pp_lv fmt lv;
+      pp_lv fmt n lv;
       let lv_id = Hashtbl.find lv_map lv in
       let salloc_id =
         if Hashtbl.mem salloc_map str then Hashtbl.find salloc_map str
@@ -351,17 +388,20 @@ let pp_cmd fmt icfg n =
       let lv =
         if Option.is_none lv_opt then donotcare_lv else Option.get lv_opt
       in
-      pp_lv fmt lv;
+      pp_lv fmt n lv;
       let e' = if !Options.remove_cast then remove_cast e else e in
-      pp_exp fmt e';
+      pp_exp fmt n e';
       List.iter
         (fun e ->
           let e' = if !Options.remove_cast then remove_cast e else e in
-          pp_exp fmt e')
+          pp_exp fmt n e')
         el;
-      let arg_id = pp_arg fmt el in
+      let arg_id = pp_arg fmt n el in
       let lv_id = Hashtbl.find lv_map lv in
-      let e_id = Hashtbl.find exp_map e' in
+      let e_id =
+        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
+        else Hashtbl.find exp_map e'
+      in
       let libcall_id =
         if Hashtbl.mem libcall_map (e', el) then
           Hashtbl.find libcall_map (e', el)
@@ -374,13 +414,16 @@ let pp_cmd fmt icfg n =
       let lv =
         if Option.is_none lv_opt then donotcare_lv else Option.get lv_opt
       in
-      pp_lv fmt lv;
+      pp_lv fmt n lv;
       let e' = if !Options.remove_cast then remove_cast e else e in
-      pp_exp fmt e';
-      List.iter (pp_exp fmt) el;
-      let arg_id = pp_arg fmt el in
+      pp_exp fmt n e';
+      List.iter (pp_exp fmt n) el;
+      let arg_id = pp_arg fmt n el in
       let lv_id = Hashtbl.find lv_map lv in
-      let e_id = Hashtbl.find exp_map e' in
+      let e_id =
+        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
+        else Hashtbl.find exp_map e'
+      in
       let call_id =
         if Hashtbl.mem call_map (e', el) then Hashtbl.find call_map (e', el)
         else new_call_id (e', el)
@@ -390,13 +433,19 @@ let pp_cmd fmt icfg n =
       F.fprintf fmt.call "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
   | Creturn (Some e, _) ->
       let e' = if !Options.remove_cast then remove_cast e else e in
-      pp_exp fmt e';
-      let id = Hashtbl.find exp_map e' in
+      pp_exp fmt n e';
+      let id =
+        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
+        else Hashtbl.find exp_map e'
+      in
       F.fprintf fmt.return "%a\t%s\n" Node.pp n id
   | Cassume (e, _, _) ->
       let e' = if !Options.remove_cast then remove_cast e else e in
-      pp_exp fmt e';
-      let e_id = Hashtbl.find exp_map e' in
+      pp_exp fmt n e';
+      let e_id =
+        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
+        else Hashtbl.find exp_map e'
+      in
       F.fprintf fmt.assume "%a\t%s\n" Node.pp n e_id
   | _ -> F.fprintf fmt.cmd "unknown"
 
@@ -699,11 +748,37 @@ let print_raw dirname =
   close_out oc_exp_json;
   close_out oc_exp_text
 
+let print_raw_patron dirname =
+  let oc_exp_json = open_out (dirname ^ "/Exp.json") in
+  let oc_exp_text = open_out (dirname ^ "/Exp.map") in
+  let text_fmt = F.formatter_of_out_channel oc_exp_text in
+  let l =
+    Hashtbl.fold
+      (fun (_, exp) id l ->
+        F.fprintf text_fmt "%s\t%s\n" id (CilHelper.s_exp exp);
+        let json_exp = CilJson.of_exp exp in
+        let exp =
+          `Assoc
+            [
+              ("tree", json_exp);
+              ("text", `String (CilHelper.s_exp exp));
+              ("abs_text", `String (string_of_abstract_exp exp));
+            ]
+        in
+        (id, exp) :: l)
+      exp_patron_map []
+  in
+  let json = `Assoc l in
+  Yojson.Safe.to_channel oc_exp_json json;
+  close_out oc_exp_json;
+  close_out oc_exp_text
+
 let print analysis icfg =
   Hashtbl.reset exp_map;
+  Hashtbl.reset exp_patron_map;
   Hashtbl.reset lv_map;
   Hashtbl.reset binop_map;
   Hashtbl.reset unop_map;
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   print_relation dirname icfg;
-  print_raw dirname
+  if !Options.patron then print_raw_patron dirname else print_raw dirname

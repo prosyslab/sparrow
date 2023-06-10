@@ -236,7 +236,7 @@ let pp_lv_sems fmt global node lv =
 
 let rec pp_exp_sems fmt global inputmem outputmem ?(outer = None) node e =
   let pid = Node.get_pid node in
-  let e_id = Hashtbl.find RelSyntax.exp_map e in
+  let e_id = Hashtbl.find RelSyntax.exp_patron_map (node, e) in
   let v =
     match outer with
     | Some loc -> TaintDom.Mem.lookup loc outputmem
@@ -930,12 +930,11 @@ let pp_taint_alarm_exp global inputmem src_node node fmt aexp =
         if int_max = 0L then Int64.max_int else BatInt64.(int_max - 1L)
       in
       let e' = RelSyntax.remove_cast e in
-      let e_id = Hashtbl.find RelSyntax.exp_map e' in
+      let e_id = Hashtbl.find RelSyntax.exp_patron_map (node, e') in
       let v_id = Hashtbl.find eval_map (node, e_id) in
-      let e1_id = Hashtbl.find RelSyntax.exp_map e1' in
-      let e2_id = Hashtbl.find RelSyntax.exp_map e2' in
-      let mul_id = Hashtbl.find RelSyntax.binop_map Cil.Mult in
-      let binop = F.sprintf "(BinOp %s %s %s %s)" e_id mul_id e1_id e2_id in
+      let e1_id = Hashtbl.find RelSyntax.exp_patron_map (node, e1') in
+      let e2_id = Hashtbl.find RelSyntax.exp_patron_map (node, e2') in
+      let binop = F.sprintf "(BinOp %s * %s %s)" e_id e1_id e2_id in
       let eval = F.asprintf "(Eval %a %s %s)" Node.pp node e_id v_id in
       let val_rel = F.sprintf "(Val %s x)" v_id in
       let val_cons = F.asprintf "(> x %Ld)" int_max in
@@ -943,11 +942,7 @@ let pp_taint_alarm_exp global inputmem src_node node fmt aexp =
       String.concat " " [ ioerror; binop; eval; val_rel; val_cons ]
       (* BinOp(e * e1 e2) /\ Eval(n e v) /\ Val(v x) /\ (x > INT_MAX) -> IOError(n x) *)
       |> F.fprintf fmt.io_err_cons "%a\t%a\t(%s)\n" Node.pp src_node Node.pp
-           node;
-      let e1_id, e2_id =
-        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
-      in
-      F.fprintf fmt.mul_exp "%s\t%s\t%s\n" id e1_id e2_id
+           node
   | MulExp _ -> Logging.warn "Wrong exp in MulExp\n"
   | DivExp (e1, e2, _) ->
       let e1_id, e2_id =
