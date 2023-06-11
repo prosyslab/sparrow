@@ -312,6 +312,9 @@ let rec pp_exp_sems fmt global inputmem outputmem ?(outer = None) node e =
   (e_id, v_id)
 
 let pp_cmd_sems fmt global inputmem outputmem n =
+  (if InterCfg.is_entry n then
+   let reach_n = app_reach n in
+   add_rule fmt [ reach_n ] (* True -> Reach(n) *));
   match InterCfg.cmdof global.Global.icfg n with
   | Cset (lv, e, _) ->
       let pid = Node.get_pid n in
