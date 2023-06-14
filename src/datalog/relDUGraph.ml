@@ -236,6 +236,8 @@ let pp_lv_sems fmt global node lv =
 
 let rec pp_exp_sems fmt global inputmem outputmem ?(outer = None) node e =
   let pid = Node.get_pid node in
+  Logging.warn "pp_exp_sems: node - %a, e - %s\n" Node.pp node
+    (CilHelper.s_exp e);
   let e_id = Hashtbl.find RelSyntax.exp_patron_map (node, e) in
   let v =
     match outer with
@@ -447,9 +449,9 @@ let pp_cmd_sems fmt global inputmem outputmem n =
           if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
         in
         let e_id =
-          if Hashtbl.mem RelSyntax.call_map (e', el) then
-            Hashtbl.find RelSyntax.call_map (e', el)
-          else Hashtbl.find RelSyntax.libcall_map (e', el)
+          if Hashtbl.mem RelSyntax.call_map (n, e', el) then
+            Hashtbl.find RelSyntax.call_map (n, e', el)
+          else Hashtbl.find RelSyntax.libcall_map (n, e', el)
         in
         Hashtbl.add eval_map (n, e_id) v_id;
         let evallv = app_evallv n lv_id loc_id in

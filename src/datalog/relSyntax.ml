@@ -32,6 +32,7 @@ type formatter = {
   binop_exp : F.formatter;
   unop_exp : F.formatter;
   cast_exp : F.formatter;
+  sizeof_exp : F.formatter;
   other_exp : F.formatter;
   global_var : F.formatter;
   local_var : F.formatter;
@@ -302,6 +303,13 @@ and pp_exp fmt n e =
         let l_id = Hashtbl.find lv_map l in
         F.fprintf fmt.start_of "%s\t%s\n" id l_id;
         if !Options.patron then F.fprintf fmt.lval_exp "%s\t%s\n" id l_id
+    | Cil.SizeOfE e1 ->
+        pp_exp fmt n e1;
+        let e_id =
+          if !Options.patron then Hashtbl.find exp_patron_map (n, e1)
+          else Hashtbl.find exp_map e1
+        in
+        F.fprintf fmt.sizeof_exp "%s\t%s\n" id e_id
     | _ -> F.fprintf fmt.other_exp "%s\n" id
 
 let rec remove_cast = function
@@ -323,14 +331,21 @@ let new_arg_id () =
   incr arg_count;
   id
 
+let arg_pos_count = ref 0
+
+let new_arg_pos_id () =
+  let id = "Pos-" ^ string_of_int !arg_pos_count in
+  incr arg_pos_count;
+  id
+
 let pp_arg fmt n arg =
   let id = new_arg_id () in
   List.iteri
-    (fun i e ->
+    (fun _ e ->
       let e' = if !Options.remove_cast then remove_cast e else e in
       (if !Options.patron then Hashtbl.find exp_patron_map (n, e')
       else Hashtbl.find exp_map e')
-      |> F.fprintf fmt.arg "%s\t%d\t%s\n" id i)
+      |> F.fprintf fmt.arg "%s\t%s\t%s\n" id (new_arg_pos_id ()))
     arg;
   id
 
@@ -403,9 +418,9 @@ let pp_cmd fmt icfg n =
         else Hashtbl.find exp_map e'
       in
       let libcall_id =
-        if Hashtbl.mem libcall_map (e', el) then
-          Hashtbl.find libcall_map (e', el)
-        else new_libcall_id (e', el)
+        if Hashtbl.mem libcall_map (n, e', el) then
+          Hashtbl.find libcall_map (n, e', el)
+        else new_libcall_id (n, e', el)
       in
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id libcall_id;
       F.fprintf fmt.libcall_exp "%s\t%s\t%s\n" libcall_id e_id arg_id;
@@ -425,8 +440,9 @@ let pp_cmd fmt icfg n =
         else Hashtbl.find exp_map e'
       in
       let call_id =
-        if Hashtbl.mem call_map (e', el) then Hashtbl.find call_map (e', el)
-        else new_call_id (e', el)
+        if Hashtbl.mem call_map (n, e', el) then
+          Hashtbl.find call_map (n, e', el)
+        else new_call_id (n, e', el)
       in
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id call_id;
       F.fprintf fmt.call_exp "%s\t%s\t%s\n" call_id e_id arg_id;
@@ -456,6 +472,7 @@ let make_formatters dirname =
   let oc_binop_exp = open_out (dirname ^ "/BinOpExp.facts") in
   let oc_unop_exp = open_out (dirname ^ "/UnOpExp.facts") in
   let oc_cast = open_out (dirname ^ "/CastExp.facts") in
+  let oc_sizeof = open_out (dirname ^ "/SizeOfExp.facts") in
   let oc_exp = open_out (dirname ^ "/OtherExp.facts") in
   let oc_cmd = open_out (dirname ^ "/Cmd.facts") in
   let oc_entry = open_out (dirname ^ "/Entry.facts") in
@@ -536,6 +553,7 @@ let make_formatters dirname =
       binop_exp = F.formatter_of_out_channel oc_binop_exp;
       unop_exp = F.formatter_of_out_channel oc_unop_exp;
       cast_exp = F.formatter_of_out_channel oc_cast;
+      sizeof_exp = F.formatter_of_out_channel oc_sizeof;
       other_exp = F.formatter_of_out_channel oc_exp;
       global_var = F.formatter_of_out_channel oc_global_var;
       local_var = F.formatter_of_out_channel oc_local_var;
@@ -667,6 +685,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.binop_exp ();
   F.pp_print_flush fmt.unop_exp ();
   F.pp_print_flush fmt.cast_exp ();
+  F.pp_print_flush fmt.sizeof_exp ();
   F.pp_print_flush fmt.other_exp ();
   F.pp_print_flush fmt.global_var ();
   F.pp_print_flush fmt.local_var ();
