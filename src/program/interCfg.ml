@@ -205,7 +205,8 @@ let remove_node (pid, intra_node) g =
 
 let print chan g = BatMap.iter (fun _ cfg -> IntraCfg.print_dot chan cfg) g.cfgs
 
-let node_to_lstr icfg node = cmdof icfg node |> IntraCfg.Cmd.location_of |> CilHelper.s_location
+let node_to_lstr icfg node =
+  cmdof icfg node |> IntraCfg.Cmd.location_of |> CilHelper.s_location
 
 let to_json g =
   `Assoc

@@ -552,8 +552,7 @@ and trans_builtin_type ?(compinfo = None) scope t =
   | Invalid -> failwith "type Invalid"
   | Char16 -> failwith "type Char16"
   | Char32 -> failwith "type Char32"
-  | WChar | Int128 | NullPtr | Overload | Dependent | ObjCId ->
-      failwith "9"
+  | WChar | Int128 | NullPtr | Overload | Dependent | ObjCId -> failwith "9"
   | ObjCClass -> failwith "objc class"
   | ObjCSel -> failwith "objc sel"
   | Float128 -> failwith "float 128"
@@ -686,8 +685,8 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
       let sl2, idx = trans_expr scope fundec_opt loc action arr.index in
       let base = Option.get base in
       let idx = Option.get idx in
-      (* base may contain casting such as (char * ) 0. But we have to preserve such important castings. Otherwise, CIL will crash  *)
 
+      (* base may contain casting such as (char * ) 0. But we have to preserve such important castings. Otherwise, CIL will crash  *)
       let distinguish e1 e2 =
         if e1 |> Cil.typeOf |> Cil.isPointerType then (e1, e2)
         else
@@ -721,15 +720,21 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
               Cil.NoOffset )
           in
           (sl1 @ sl2, Some (Cil.Lval new_lval))
-          | _ ->
-            let temp =
-              (Cil.Var (Cil.makeTempVar (Option.get fundec_opt) Cil.intPtrType), Cil.NoOffset)
-            in
-            let new_lval =
-                ( Cil.Mem (Cil.BinOp (Cil.PlusPI, (Cil.AddrOf temp), idx, Cil.typeOf (Cil.AddrOf temp))),
-                  Cil.NoOffset )
-              in
-              (sl1 @ sl2, Some (Cil.Lval new_lval)))
+      | _ ->
+          let temp =
+            ( Cil.Var (Cil.makeTempVar (Option.get fundec_opt) Cil.intPtrType),
+              Cil.NoOffset )
+          in
+          let new_lval =
+            ( Cil.Mem
+                (Cil.BinOp
+                   ( Cil.PlusPI,
+                     Cil.AddrOf temp,
+                     idx,
+                     Cil.typeOf (Cil.AddrOf temp) )),
+              Cil.NoOffset )
+          in
+          (sl1 @ sl2, Some (Cil.Lval new_lval)))
   | C.Ast.ConditionalOperator co ->
       trans_cond_op scope fundec_opt loc co.cond co.then_branch co.else_branch
   | C.Ast.UnaryExpr ue ->
@@ -777,7 +782,7 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
             ([], Some (Cil.Lval temp))
         | None -> ([], Some Cil.zero)
       else ([], Some Cil.zero)
-      (* failwith "unknown trans_expr" *)
+(* failwith "unknown trans_expr" *)
 
 and trans_unary_operator scope fundec_opt loc action kind expr =
   let get_var var_opt =
@@ -849,10 +854,9 @@ and trans_unary_operator scope fundec_opt loc action kind expr =
             let temp =
               (Cil.Var (Cil.makeTempVar fundec Cil.intPtrType), Cil.NoOffset)
             in
-            ([], Some (Cil.AddrOf (temp)))
+            ([], Some (Cil.AddrOf temp))
         | None -> ([], Some Cil.zero)
-      else
-        (sl, Some (Cil.AddrOf (lval_of_expr var)))
+      else (sl, Some (Cil.AddrOf (lval_of_expr var)))
   | C.Deref ->
       let sl, var_opt =
         trans_expr ~default_ptr:true scope fundec_opt loc action expr
@@ -1676,13 +1680,13 @@ and mk_local_struct_init scope cfields fundec action loc lv expr_list =
           else
             let field, i, is_find = grab_matching_field origin_cfields f e in
             match field with
-            | [f] ->
-              let i = if is_find >= 0 then i else idx + 1 in
-              let stmts', expr_remainders, scope =
-                mk_init_stmt scope loc fundec action f lv expr_list
-              in
-              loop scope union_flag fl expr_remainders (f :: fis) (stmts @ stmts')
-                (i :: idx_list) (idx + 1)
+            | [ f ] ->
+                let i = if is_find >= 0 then i else idx + 1 in
+                let stmts', expr_remainders, scope =
+                  mk_init_stmt scope loc fundec action f lv expr_list
+                in
+                loop scope union_flag fl expr_remainders (f :: fis)
+                  (stmts @ stmts') (i :: idx_list) (idx + 1)
             | _ -> loop scope union_flag fl [] fis stmts idx_list idx
         else if is_init_list e then
           let lv = Cil.addOffsetLval (Cil.Field (f, Cil.NoOffset)) lv in
@@ -2497,7 +2501,7 @@ and mk_global_struct_init scope loc typ cfields expr_list =
           else
             let field, find, i = grab_matching_field origin_cfields f e in
             match field with
-            | [f] ->
+            | [ f ] ->
                 let i = if i >= 0 then find else idx + 1 in
                 let expr_list =
                   if i >= 0 then
@@ -2513,9 +2517,8 @@ and mk_global_struct_init scope loc typ cfields expr_list =
                   mk_init scope loc f.Cil.ftype expr_list
                 in
                 loop union_flag fl expr_remainders (f :: fis) (init :: inits)
-                (i :: idx_list) (idx + 1)
-            | _ ->
-                loop union_flag fl [] fis inits idx_list idx
+                  (i :: idx_list) (idx + 1)
+            | _ -> loop union_flag fl [] fis inits idx_list idx
         else if is_init_list e then
           let init = trans_global_init scope loc f.ftype e in
           loop true fl el (f :: fis) (init :: inits) ((idx + 1) :: idx_list)

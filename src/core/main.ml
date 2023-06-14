@@ -23,12 +23,14 @@ let transform_simple file =
 let transform global =
   let loop_transformed = UnsoundLoop.transform global in
   let inlined = Frontend.inline global in
-  let global = 
+  let global =
     if (not !Options.il) && (loop_transformed || inlined) then
       (* NOTE: CFG must be re-computed after transformation *)
       Frontend.makeCFGinfo global.file
-      |> StepManager.stepf true "Translation to graphs (after transform)" Global.init
-      |> StepManager.stepf true "Pre-processing (after transform)" PreProcess.perform
+      |> StepManager.stepf true "Translation to graphs (after transform)"
+           Global.init
+      |> StepManager.stepf true "Pre-processing (after transform)"
+           PreProcess.perform
     else (* nothing changed *)
       global
   in
@@ -66,8 +68,11 @@ let print_pgm_info global =
   global
 
 let print_il file =
-  (if !Options.inline = [] && BatSet.is_empty !Options.unsound_loop && not !Options.cut_cyclic_call then
-   Cil.dumpFile !Cil.printerForMaincil stdout "" (transform_simple file)
+  (if
+   !Options.inline = []
+   && BatSet.is_empty !Options.unsound_loop
+   && not !Options.cut_cyclic_call
+  then Cil.dumpFile !Cil.printerForMaincil stdout "" (transform_simple file)
   else
     let global = init_analysis file in
     Cil.dumpFile !Cil.printerForMaincil stdout "" global.file);

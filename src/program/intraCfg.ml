@@ -104,7 +104,8 @@ module Cmd = struct
     | Cinstr (instrs, _) -> s_instrs instrs
     | Cset (lv, e, _) -> "set(" ^ s_lv lv ^ "," ^ s_exp e ^ ")"
     | Cexternal (lv, _) -> "extern(" ^ s_lv lv ^ ")"
-    | Calloc (lv, Array e, _, _, _) -> "alloc(" ^ s_lv lv ^ ",[" ^ s_exp e ^ "])"
+    | Calloc (lv, Array e, _, _, _) ->
+        "alloc(" ^ s_lv lv ^ ",[" ^ s_exp e ^ "])"
     | Calloc (lv, Struct compinfo, _, _, _) ->
         "alloc(" ^ s_lv lv ^ ",{" ^ compinfo.cname ^ "})"
     | Csalloc (lv, s, _) -> "salloc(" ^ s_lv lv ^ ", \"" ^ s ^ "\")"
@@ -272,9 +273,8 @@ let find_cmd n g =
   with _ ->
     if n = Node.ENTRY || n = Node.EXIT then
       Cmd.Cskip (Cmd.Unknown, Cil.locUnknown)
-    else 
-      Cmd.Cskip (Cmd.Unknown, Cil.locUnknown)
-    (* else raise (Failure ("Can't find cmd of " ^ Node.to_string n)) *)
+    else Cmd.Cskip (Cmd.Unknown, Cil.locUnknown)
+(* else raise (Failure ("Can't find cmd of " ^ Node.to_string n)) *)
 
 let add_cmd n c g = { g with cmd_map = BatMap.add n c g.cmd_map }
 
@@ -322,6 +322,7 @@ let is_callnode n g = match find_cmd n g with Cmd.Ccall _ -> true | _ -> false
 let is_returnnode n g =
   let preds = pred n g in
   List.length preds = 1 && is_callnode (List.hd preds) g
+
 let entryof _ = Node.ENTRY
 
 let exitof _ = Node.EXIT
@@ -556,13 +557,16 @@ and generate_allocs_field fl lv local fd entry g =
           in
           let g = g |> add_cmd cast_node cast_cmd |> add_edge term cast_node in
           let term, g =
-            make_nested_array fd field typ exp local fieldinfo.floc cast_node false g
+            make_nested_array fd field typ exp local fieldinfo.floc cast_node
+              false g
           in
           generate_allocs_field t lv local fd term g
       | TComp (comp, _) ->
           let field = addOffsetLval (Cil.Field (fieldinfo, Cil.NoOffset)) lv in
           let term, g = make_struct field comp local fieldinfo.floc entry g in
-          let term, g = generate_allocs_field comp.cfields field local fd term g in
+          let term, g =
+            generate_allocs_field comp.cfields field local fd term g
+          in
           generate_allocs_field t lv local fd term g
       | _ -> generate_allocs_field t lv local fd entry g)
 
@@ -903,7 +907,9 @@ let process_gvardecl fd lv init_opt loc entry g =
         Cmd.Cset (lv, Cil.CastE (Cil.TPtr (typ, []), Cil.Lval tmp), loc)
       in
       let g = g |> add_cmd cast_node cast_cmd |> add_edge term cast_node in
-      let term, g = make_nested_array fd lv typ exp false loc cast_node true g in
+      let term, g =
+        make_nested_array fd lv typ exp false loc cast_node true g
+      in
       (term, g)
   | TArray (typ, None, _), Some ilist ->
       (* For example, int arr[] = {1,2,3}. CIL generates "int arr[3] = ..." while Clang generates "int arr[] = ..." *)
@@ -915,7 +921,9 @@ let process_gvardecl fd lv init_opt loc entry g =
         Cmd.Cset (lv, Cil.CastE (Cil.TPtr (typ, []), Cil.Lval tmp), loc)
       in
       let g = g |> add_cmd cast_node cast_cmd |> add_edge term cast_node in
-      let term, g = make_nested_array fd lv typ exp false loc cast_node true g in
+      let term, g =
+        make_nested_array fd lv typ exp false loc cast_node true g
+      in
       (term, g)
   | TInt (_, _), _ | TFloat (_, _), _ ->
       let node = Node.make () in

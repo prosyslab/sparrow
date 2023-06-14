@@ -176,8 +176,7 @@ and transfer global dug ctx node uses (slice, visited, works) =
     else if is_ret && InterCfg.is_exit p then
       if BatSet.mem (node_f, p_f) global.cyclic_calls then
         skip_ret global node uses p (slice, visited, works)
-      else
-        transfer_normal global ctx node uses p (slice, visited, works)
+      else transfer_normal global ctx node uses p (slice, visited, works)
     else transfer_normal global ctx node uses p (slice, visited, works)
   in
   list_fold folder preds (slice, visited, works)
@@ -223,26 +222,28 @@ let dump_funcs global =
   let funcs = list_fold folder nodes SS.empty in
   SS.iter (fun s -> output_string oc (s ^ "\n")) funcs
 
-let rec slice_control_deps global workset slice = 
+let rec slice_control_deps global workset slice =
   if NodeSet.is_empty workset then slice
   else
     let node, workset = NodeSet.pop workset in
     let slice = NodeSet.add node slice in
     let pid = Node.get_pid node in
     let node = Node.get_cfgnode node in
-    let post_dom_fronts = InterCfg.cfgof global.icfg pid |> IntraCfg.post_dom_fronts node in
-    let control_dep_nodes = 
-      IntraCfg.NodeSet.fold 
-        (fun n acc -> 
+    let post_dom_fronts =
+      InterCfg.cfgof global.icfg pid |> IntraCfg.post_dom_fronts node
+    in
+    let control_dep_nodes =
+      IntraCfg.NodeSet.fold
+        (fun n acc ->
           let n = Node.make pid n in
-          NodeSet.add n acc) post_dom_fronts NodeSet.empty
-        in
-    let workset = 
-      NodeSet.fold 
-        (fun n acc -> 
-          if NodeSet.mem n slice then acc
-          else NodeSet.add n acc) control_dep_nodes workset
-        in
+          NodeSet.add n acc)
+        post_dom_fronts NodeSet.empty
+    in
+    let workset =
+      NodeSet.fold
+        (fun n acc -> if NodeSet.mem n slice then acc else NodeSet.add n acc)
+        control_dep_nodes workset
+    in
     let slice = NodeSet.union slice control_dep_nodes in
     slice_control_deps global workset slice
 
@@ -263,8 +264,8 @@ let perform_slicing global dug (targ_id, targ_line) =
   let folder n acc = SS.add (node_to_lstr global n) acc in
   let lines = NodeSet.fold folder nodes SS.empty in
   (* let control_dep_nodes = slice_control_deps global slice_nodes NodeSet.empty
-  |> NodeSet.union (NodeSet.of_list entry_nodes) in
-  let control_dep_lines = NodeSet.fold folder control_dep_nodes SS.empty in *)
+     |> NodeSet.union (NodeSet.of_list entry_nodes) in
+     let control_dep_lines = NodeSet.fold folder control_dep_nodes SS.empty in *)
   let folder n acc =
     if is_func_invalid global n then acc else SS.add (node_to_fstr global n) acc
   in
@@ -294,7 +295,7 @@ let perform_slicing global dug (targ_id, targ_line) =
   print_to_file targ_id "slice_line.txt" lines;
   print_to_file targ_id "slice_func.txt" funcs;
   print_to_file targ_id "slice_dfg.txt" dfg_nodes
-  (* print_to_file targ_id "slice_control_dep_line.txt" control_dep_lines *)
+(* print_to_file targ_id "slice_control_dep_line.txt" control_dep_lines *)
 
 let run global =
   let slicing_targets = BatMap.bindings !Options.slice_target_map in

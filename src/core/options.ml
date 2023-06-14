@@ -259,9 +259,9 @@ let opts =
     ("-cfg", Arg.Set cfg, "Print Cfg");
     ("-dug", Arg.Set dug, "Print Def-Use graph");
     ( "-slice",
-       Arg.String (fun s -> add_slice_target s),
-       "Slice w.r.t a given target" );
-     ("-full_slice", Arg.Set full_slice, "Perform full (not thin) slicing");
+      Arg.String (fun s -> add_slice_target s),
+      "Slice w.r.t a given target" );
+    ("-full_slice", Arg.Set full_slice, "Perform full (not thin) slicing");
     ("-skip_main_analysis", Arg.Set skip_main_analysis, "Skip main analysis");
     ("-entry_point", Arg.Set_string entry_point, "Entry point (default: main)");
     ("-noalarm", Arg.Set noalarm, "Do not print alarms");

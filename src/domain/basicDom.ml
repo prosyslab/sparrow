@@ -170,24 +170,26 @@ module Loc = struct
 
   let is_field = function Field _ -> true | _ -> false
 
-let rec is_global = function
-  | GVar _ -> true
-  | LVar _ -> false
-  | Allocsite _ -> false
-  | Field (l, _, _) -> is_global l
-let rec is_heap = function
-  | GVar _ -> false
-  | LVar _ -> false
-  | Allocsite (Local _) -> false
-  | Allocsite _ -> true
-  | Field (l, _, _) -> is_heap l
-let rec is_local_of pid = function
-  | GVar _ -> false
-  | LVar (p, _, _) -> p = pid
-  (* Allocation converted from local variable declarations *)
-  | Allocsite (Local n) -> Node.get_pid n = pid
-  | Allocsite _ -> false
-  | Field (l, _, _) -> is_local_of pid l
+  let rec is_global = function
+    | GVar _ -> true
+    | LVar _ -> false
+    | Allocsite _ -> false
+    | Field (l, _, _) -> is_global l
+
+  let rec is_heap = function
+    | GVar _ -> false
+    | LVar _ -> false
+    | Allocsite (Local _) -> false
+    | Allocsite _ -> true
+    | Field (l, _, _) -> is_heap l
+
+  let rec is_local_of pid = function
+    | GVar _ -> false
+    | LVar (p, _, _) -> p = pid
+    (* Allocation converted from local variable declarations *)
+    | Allocsite (Local n) -> Node.get_pid n = pid
+    | Allocsite _ -> false
+    | Field (l, _, _) -> is_local_of pid l
 
   let get_proc = function LVar (p, _, _) -> p | _ -> raise Not_found
 

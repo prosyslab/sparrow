@@ -231,7 +231,7 @@ let eval_list spec pid exps mem =
 
 let eval_array_alloc ?(spec = Spec.empty) node e is_local is_static mem =
   let pid = Node.get_pid node in
-  let allocsite = 
+  let allocsite =
     if is_local then Allocsite.allocsite_of_local node
     else Allocsite.allocsite_of_node node
   in
