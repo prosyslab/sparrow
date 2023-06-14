@@ -165,15 +165,15 @@ let donotcare_lv =
   (Cil.Var vi, Cil.NoOffset)
 
 let string_of_bop = function
-  | Cil.PlusA -> "+"
+  | Cil.PlusA -> "PlusA"
   | PlusPI -> "PlusPI"
   | IndexPI -> "IndexPI"
-  | MinusA -> "-"
+  | MinusA -> "MinusA"
   | MinusPI -> "MinusPI"
   | MinusPP -> "MinusPP"
-  | Mult -> "*"
-  | Div -> "/"
-  | Mod -> "%"
+  | Mult -> "Mult"
+  | Div -> "Div"
+  | Mod -> "Mod"
   | Shiftlt -> "bvshl"
   | Shiftrt -> "bvshr"
   | Lt -> "Lt"
