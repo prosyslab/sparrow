@@ -170,7 +170,7 @@ let print_datalog_fact _ global inputof outputof dug alarms =
   if not !Options.patron then Provenance.print analysis global.relations;
   RelDUGraph.print analysis global dug alarms;
   RelDUGraph.print_sems analysis global inputof outputof dug alarms;
-  RelDUGraph.print_taint_alarm analysis global inputof alarms
+  RelDUGraph.print_taint_alarm analysis alarms
 
 let ignore_function node =
   BatSet.elements !Options.filter_function

@@ -151,7 +151,8 @@ let cycle_elim dug =
            assert false));
   dug
 
-type formtter_of_patron = {
+type formatter_of_patron = {
+  duedge : F.formatter;
   dupath : F.formatter;
   cfpath : F.formatter;
   evallv : F.formatter;
@@ -172,14 +173,11 @@ let new_loc_id loc =
   Hashtbl.add loc_map loc id;
   id
 
-let val_map = Hashtbl.create 1000
-
 let val_count = ref 0
 
-let new_val_id v =
+let new_val_id () =
   let id = "Val-" ^ string_of_int !val_count in
   incr val_count;
-  Hashtbl.add val_map v id;
   id
 
 let eval_map = Hashtbl.create 1000
@@ -234,19 +232,9 @@ let pp_lv_sems fmt global node lv =
   | _ -> (* TODO: array indexing *) ());
   (lv_id, loc_id)
 
-let rec pp_exp_sems fmt global inputmem outputmem ?(outer = None) node e =
-  let pid = Node.get_pid node in
-  Logging.warn "pp_exp_sems: node - %a, e - %s\n" Node.pp node
-    (CilHelper.s_exp e);
+let rec pp_exp_sems fmt global inputmem outputmem node e =
   let e_id = Hashtbl.find RelSyntax.exp_patron_map (node, e) in
-  let v =
-    match outer with
-    | Some loc -> TaintDom.Mem.lookup loc outputmem
-    | None -> TaintSem.eval pid e global.Global.mem inputmem
-  in
-  let v_id =
-    if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
-  in
+  let v_id = new_val_id () in
   Hashtbl.add eval_map (node, e_id) v_id;
   let eval_e = app_eval node e_id v_id in
   let v_rel = app_val v_id "y" in
@@ -255,23 +243,26 @@ let rec pp_exp_sems fmt global inputmem outputmem ?(outer = None) node e =
       let reach = F.asprintf "(Reach %a)" Node.pp node in
       let i = val_of_const c in
       let val_cons = F.sprintf "(= y %Ld)" i in
-      add_rule fmt [ eval_e; reach; val_cons ];
-      (* Reach(n) /\ (y == c) -> Eval(n e v) *)
+      add_rule fmt [ eval_e; reach ];
+      (* Reach(n) -> Eval(n e v) *)
       add_rule fmt [ v_rel; reach; val_cons ]
       (* Reach(n) /\ (y == c) -> Val(v y) *)
   | Cil.Lval l | Cil.StartOf l ->
       let lv_id, loc_id = pp_lv_sems fmt global node l in
       let evallv = app_evallv node lv_id loc_id in
-      (* let memory = app_memory node loc_id v_id in *)
-      add_rule fmt [ eval_e; evallv ]
-      (* TEMP: EvalLv(n lv loc) -> Eval(n e v) *)
-      (* TODO: EvalLv(n lv loc) /\ Memory(n loc v) -> Eval(n e v) *)
+      let memory = app_memory node loc_id "v" in
+      let val_rel = app_val "v" "x" in
+      let val_cons = F.sprintf "(= y x)" in
+      add_rule fmt [ eval_e; evallv; memory; val_rel ];
+      (* EvalLv(n lv loc) /\ Memory(n loc old_v) /\ Val(old_v x) -> Eval(n e v) *)
+      add_rule fmt [ v_rel; evallv; memory; val_rel; val_cons ]
+      (* EvalLv(n lv loc) /\ Memory(n loc old_v) /\ Val(old_v x) /\ (y == x) -> Val(v y) *)
   | Cil.SizeOf t ->
       let reach = app_reach node in
       let size = CilHelper.byteSizeOf t in
       let val_cons = F.sprintf "(= y %d)" size in
-      add_rule fmt [ eval_e; reach; val_cons ];
-      (* Reach(n) /\ (y == sizeof(t)) -> Eval(n e v) *)
+      add_rule fmt [ eval_e; reach ];
+      (* Reach(n) -> Eval(n e v) *)
       add_rule fmt [ v_rel; reach; val_cons ]
       (* Reach(n) /\ (y == sizeof(t)) -> Val(v y) *)
   | Cil.SizeOfE e1 ->
@@ -279,9 +270,8 @@ let rec pp_exp_sems fmt global inputmem outputmem ?(outer = None) node e =
       let eval_e1 = app_eval node e1_id v1_id in
       let v1_rel = app_arr v1_id "x_size" in
       let val_cons = "(= y x_size)" in
-      (* Head :: Body *)
-      add_rule fmt [ eval_e; eval_e1; v1_rel; val_cons ];
-      (* Eval(n e1 v1) /\ ArrVal(v1 x_size) /\ (y == x_size) -> Eval(n e v) *)
+      add_rule fmt [ eval_e; eval_e1; v1_rel ];
+      (* Eval(n e1 v1) /\ ArrVal(v1 x_size) -> Eval(n e v) *)
       add_rule fmt [ v_rel; eval_e1; v1_rel; val_cons ]
       (* Eval(n e1 v1) /\ ArrVal(v1 x_size) /\ (y == x_size) -> Val(v y) *)
   | Cil.BinOp (op, e1, e2, _) ->
@@ -294,9 +284,8 @@ let rec pp_exp_sems fmt global inputmem outputmem ?(outer = None) node e =
       let val_cons =
         F.asprintf "(= y (%s x1 x2))" (RelSyntax.string_of_bop op)
       in
-      (* Head :: Body *)
-      add_rule fmt [ eval_e; eval_e1; eval_e2; v1_rel; v2_rel; val_cons ];
-      (* Eval(n e1 v1) /\ Eval(n e2 v2) /\ Val(v1 x1) /\ Val(v2 x2) /\ (y == f(x1 x2)) -> Eval(n e v) *)
+      add_rule fmt [ eval_e; eval_e1; eval_e2; v1_rel; v2_rel ];
+      (* Eval(n e1 v1) /\ Eval(n e2 v2) /\ Val(v1 x1) /\ Val(v2 x2) -> Eval(n e v) *)
       add_rule fmt [ v_rel; eval_e1; eval_e2; v1_rel; v2_rel; val_cons ]
       (* Eval(n e1 v1) /\ Eval(n e2 v2) /\ Val(v1 x1) /\ Val(v2 x2) /\ (y == f(x1 x2)) -> Val(v y) *)
   | Cil.UnOp (op, e1, _) ->
@@ -305,8 +294,8 @@ let rec pp_exp_sems fmt global inputmem outputmem ?(outer = None) node e =
       let v1_rel = app_val v1_id "x1" in
       let val_cons = F.asprintf "(= y (%s x1))" (RelSyntax.string_of_uop op) in
       (* Head :: Body *)
-      add_rule fmt [ eval_e; eval_e1; v1_rel; val_cons ];
-      (* Eval(n e1 v1) /\ Val(v1 x1) /\ (y == f(x1)) -> Eval(n e v) *)
+      add_rule fmt [ eval_e; eval_e1; v1_rel ];
+      (* Eval(n e1 v1) /\ Val(v1 x1) -> Eval(n e v) *)
       add_rule fmt [ v_rel; eval_e1; v1_rel; val_cons ]
       (* Eval(n e1 v1) /\ Val(v1 x1) /\ (y == f(x1)) -> Val(v y) *)
   | _ -> (* TODO: Question, AlignOf *) ());
@@ -317,37 +306,32 @@ let pp_cmd_sems fmt global inputmem outputmem n =
   (if InterCfg.is_entry n then
    let reach_n = app_reach n in
    add_rule fmt [ reach_n ] (* True -> Reach(n) *));
+  let memory_n = app_memory n "l" "v" in
   match InterCfg.cmdof global.Global.icfg n with
   | Cset (lv, e, _) ->
-      let pid = Node.get_pid n in
-      let loc = ItvSem.eval_lv pid lv global.Global.mem in
       let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
-      let e_id, v_id =
-        pp_exp_sems fmt global inputmem outputmem ~outer:(Some loc) n e'
-      in
+      let e_id, v_id = pp_exp_sems fmt global inputmem outputmem n e' in
       let lv_id, loc_id = pp_lv_sems fmt global n lv in
       let evallv = app_evallv n lv_id loc_id in
       let eval = app_eval n e_id v_id in
       let succ = InterCfg.succ n global.icfg in
       List.iter
         (fun next ->
-          let memory = app_memory next loc_id v_id in
+          let memory_next = app_memory next loc_id v_id in
           let reach_next = app_reach next in
-          add_rule fmt [ memory; evallv; eval ];
+          add_rule fmt [ memory_next; evallv; eval ];
           (* EvalLv(n lv loc) /\ Eval(n e v) -> Memory(n+1 loc v) *)
-          add_rule fmt [ reach_next; evallv; eval ])
+          add_rule fmt [ reach_next; evallv; eval ];
           (* EvalLv(n lv loc) /\ Eval(n e v) -> Reach(n+1) *)
+          let memory_next_for_all = app_memory next "l" "v" in
+          let not_new_loc = F.sprintf "(!= l %s)" loc_id in
+          add_rule fmt [ memory_next_for_all; memory_n; not_new_loc ]
+          (* forall loc v. Memory(n loc v) /\ (loc != lv's loc) -> Memory(n+1 loc v) *))
         succ;
       F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
       F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id v_id
   | Calloc (lv, (Array size as e), _, _, _) ->
-      let pid = Node.get_pid n in
-      let loc = ItvSem.eval_lv pid lv global.Global.mem in
-      let arr_v = TaintDom.Mem.lookup loc outputmem in
-      let arr_v_id =
-        if Hashtbl.mem val_map arr_v then Hashtbl.find val_map arr_v
-        else new_val_id arr_v
-      in
+      let arr_v_id = new_val_id () in
       let size' =
         if !Options.remove_cast then RelSyntax.remove_cast size else size
       in
@@ -369,28 +353,27 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       let succ = InterCfg.succ n global.icfg in
       List.iter
         (fun next ->
-          let memory = app_memory next loc_id arr_v_id in
+          let memory_next = app_memory next loc_id arr_v_id in
           let reach_next = app_reach next in
-          add_rule fmt [ memory; evallv; eval_arr ];
+          add_rule fmt [ memory_next; evallv; eval_arr ];
           (* EvalLv(n lv loc) /\ Eval(n e v) -> Memory(n+1 loc v) *)
-          add_rule fmt [ reach_next; evallv; eval_arr ])
+          add_rule fmt [ reach_next; evallv; eval_arr ];
           (* EvalLv(n lv loc) /\ Eval(n e v) -> Reach(n+1) *)
+          let memory_next_for_all = app_memory next "l" "v" in
+          let not_new_loc = F.sprintf "(!= l %s)" loc_id in
+          add_rule fmt [ memory_next_for_all; memory_n; not_new_loc ]
+          (* forall loc v. Memory(n loc v) /\ (loc != lv's loc) -> Memory(n+1 loc v) *))
         succ;
       F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id arr_v_id;
       F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
       F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id arr_v_id;
       F.fprintf fmt.arrayval "%s\t%s\n" arr_v_id size_v_id
   | Csalloc (lv, s, _) ->
-      let pid = Node.get_pid n in
-      let loc = ItvSem.eval_lv pid lv global.Global.mem in
       let s_id =
         if Hashtbl.mem str_map s then Hashtbl.find str_map s else new_str_id s
       in
       let lv_id, loc_id = pp_lv_sems fmt global n lv in
-      let v = TaintDom.Mem.lookup loc outputmem in
-      let v_id =
-        if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
-      in
+      let v_id = new_val_id () in
       let e_id = Hashtbl.find RelSyntax.salloc_map s in
       Hashtbl.add eval_map (n, e_id) v_id;
       let reach_n = app_reach n in
@@ -399,18 +382,22 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       let val_cons = F.sprintf "(= y \"%s\")" s in
       let str_val = app_str v_id "y" in
       add_rule fmt [ eval; reach_n ];
-      add_rule fmt [ str_val; reach_n; val_cons ];
       (* Reach(n) -> Eval(n e v) *)
+      add_rule fmt [ str_val; reach_n; val_cons ];
       (* Reach(n) /\ (y == "str") -> StrVal(v y) *)
       let succ = InterCfg.succ n global.icfg in
       List.iter
         (fun next ->
-          let memory = app_memory next loc_id v_id in
+          let memory_next = app_memory next loc_id v_id in
           let reach_next = app_reach next in
-          add_rule fmt [ memory; evallv; eval ];
+          add_rule fmt [ memory_next; evallv; eval ];
           (* EvalLv(n lv loc) /\ Eval(n e v) -> Memory(n+1 loc v) *)
-          add_rule fmt [ reach_next; evallv; eval ]
-          (* EvalLv(n lv loc) /\ Eval(n e v) -> Reach(n+1) *))
+          add_rule fmt [ reach_next; evallv; eval ];
+          (* EvalLv(n lv loc) /\ Eval(n e v) -> Reach(n+1) *)
+          let memory_next_for_all = app_memory next "l" "v" in
+          let not_new_loc = F.sprintf "(!= l %s)" loc_id in
+          add_rule fmt [ memory_next_for_all; memory_n; not_new_loc ]
+          (* forall loc v. Memory(n loc v) /\ (loc != lv's loc) -> Memory(n+1 loc v) *))
         succ;
       F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id v_id;
       F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
@@ -438,16 +425,11 @@ let pp_cmd_sems fmt global inputmem outputmem n =
          /\ Val(arg1_v x1) ... Val(argi_v xi)
          /\ func(x1 ... xi y) -> Val(v y) *)
       let reach_n = app_reach n in
-      let pid = Node.get_pid n in
       let succ = InterCfg.succ n global.icfg in
       if Option.is_some lv_opt then (
         let lv = Option.get lv_opt in
         let lv_id, loc_id = pp_lv_sems fmt global n lv in
-        let loc = ItvSem.eval_lv pid lv global.Global.mem in
-        let v = TaintDom.Mem.lookup loc outputmem in
-        let v_id =
-          if Hashtbl.mem val_map v then Hashtbl.find val_map v else new_val_id v
-        in
+        let v_id = new_val_id () in
         let e_id =
           if Hashtbl.mem RelSyntax.call_map (n, e', el) then
             Hashtbl.find RelSyntax.call_map (n, e', el)
@@ -467,8 +449,12 @@ let pp_cmd_sems fmt global inputmem outputmem n =
             let reach_next = app_reach next in
             add_rule fmt [ memory; evallv; eval ];
             (* EvalLv(n lv loc) /\ Eval(n e v) -> Memory(n+1 loc v) *)
-            add_rule fmt [ reach_next; evallv; eval ])
+            add_rule fmt [ reach_next; evallv; eval ];
             (* EvalLv(n lv loc) /\ Eval(n e v) -> Reach(n+1) *)
+            let memory_next_for_all = app_memory next "l" "v" in
+            let not_new_loc = F.sprintf "(!= l %s)" loc_id in
+            add_rule fmt [ memory_next_for_all; memory_n; not_new_loc ]
+            (* forall loc v. Memory(n loc v) /\ (loc != lv's loc) -> Memory(n+1 loc v) *))
           succ;
         F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id v_id;
         F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
@@ -490,9 +476,12 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       List.iter
         (fun next ->
           let reach_next = app_reach next in
-          add_rule fmt [ reach_next; eval; v_rel; x_isnzero ])
-        (* Eval(n e v) /\ Val(v x) /\ (x <> 0) -> Reach(n_t) *)
-        (* Eval(n e v) /\ Val(v x) /\ (x == 0) -> Reach(n_f) *)
+          add_rule fmt [ reach_next; eval; v_rel; x_isnzero ];
+          (* Eval(n e v) /\ Val(v x) /\ (x <> 0) -> Reach(n_t) *)
+          (* Eval(n e v) /\ Val(v x) /\ (x == 0) -> Reach(n_f) *)
+          let memory_next_for_all = app_memory next "l" "v" in
+          add_rule fmt [ memory_next_for_all; memory_n; reach_next ]
+          (* forall loc v. Memory(n loc v) /\ Reach(n+1) -> Memory(n+1 loc v) *))
         succ
   | Creturn (e_opt, _) ->
       (* TODO: add rule for return *)
@@ -504,30 +493,26 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       List.iter
         (fun next ->
           let reach_next = app_reach next in
-          add_rule fmt [ reach_next; reach_n ]
-          (* Reach(n) -> Reach(n + 1) *))
+          add_rule fmt [ reach_next; reach_n ];
+          (* Reach(n) -> Reach(n + 1) *)
+          let memory_next_for_all = app_memory next "l" "v" in
+          add_rule fmt [ memory_next_for_all; memory_n ]
+          (* forall loc v. Memory(n loc v) -> Memory(n+1 loc v) *))
         succ
   | _ -> ()
 
 let print_maps dirname =
   let oc_loc_text = open_out (dirname ^ "/Loc.map") in
-  let oc_val_text = open_out (dirname ^ "/Val.map") in
   let oc_str_text = open_out (dirname ^ "/Str.map") in
   let loc_fmt = F.formatter_of_out_channel oc_loc_text in
-  let val_fmt = F.formatter_of_out_channel oc_val_text in
   let str_fmt = F.formatter_of_out_channel oc_str_text in
   Hashtbl.iter
     (fun loc id -> F.fprintf loc_fmt "%s\t%a\n" id PowLoc.pp loc)
     loc_map;
-  Hashtbl.iter
-    (fun v id -> F.fprintf val_fmt "%s\t%a\n" id TaintDom.Val.pp v)
-    val_map;
   Hashtbl.iter (fun str id -> F.fprintf str_fmt "%s\t%s\n" id str) str_map;
   F.pp_print_flush loc_fmt ();
-  F.pp_print_flush val_fmt ();
   F.pp_print_flush str_fmt ();
   close_out oc_loc_text;
-  close_out oc_val_text;
   close_out oc_str_text
 
 let print analysis global dug alarms =
@@ -609,6 +594,7 @@ let print_sems analysis global inputof outputof dug alarms =
   in
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   (* fmt for patron *)
+  let oc_duedge = open_out (dirname ^ "/DetailedDUEdge.facts") in
   let oc_dupath = open_out (dirname ^ "/DUPath.facts") in
   let oc_cfpath = open_out (dirname ^ "/CFPath.facts") in
   let oc_evallv = open_out (dirname ^ "/EvalLv.facts") in
@@ -619,6 +605,7 @@ let print_sems analysis global inputof outputof dug alarms =
   let oc_conststr = open_out (dirname ^ "/ConstStr.facts") in
   let fmt =
     {
+      duedge = F.formatter_of_out_channel oc_duedge;
       dupath = F.formatter_of_out_channel oc_dupath;
       cfpath = F.formatter_of_out_channel oc_cfpath;
       evallv = F.formatter_of_out_channel oc_evallv;
@@ -630,7 +617,6 @@ let print_sems analysis global inputof outputof dug alarms =
     }
   in
   Hashtbl.reset loc_map;
-  Hashtbl.reset val_map;
   Hashtbl.reset str_map;
   Hashtbl.reset eval_map;
   let tc = G.transitive_closure dug in
@@ -653,7 +639,14 @@ let print_sems analysis global inputof outputof dug alarms =
           F.fprintf fmt.cfpath "%a\t%a\n" pp src pp dst)
         tc)
     icfg;
+  G.iter_edges_e
+    (fun src dst locset ->
+      if Hashtbl.mem loc_map locset then
+        F.fprintf fmt.duedge "%a\t%a\t%s\n" Node.pp src Node.pp dst
+          (Hashtbl.find loc_map locset))
+    dug;
   print_maps dirname;
+  F.pp_print_flush fmt.duedge ();
   F.pp_print_flush fmt.dupath ();
   F.pp_print_flush fmt.cfpath ();
   F.pp_print_flush fmt.evallv ();
@@ -662,6 +655,7 @@ let print_sems analysis global inputof outputof dug alarms =
   F.pp_print_flush fmt.sem_rule ();
   F.pp_print_flush fmt.arrayval ();
   F.pp_print_flush fmt.conststr ();
+  close_out oc_duedge;
   close_out oc_dupath;
   close_out oc_cfpath;
   close_out oc_evallv;
@@ -901,9 +895,8 @@ let print_alarm analysis alarms =
       oc_taint;
     ]
 
-let pp_taint_alarm_exp global inputmem src_node node fmt aexp =
+let pp_taint_alarm_exp src_node node fmt aexp =
   let id = new_alarm_exp_id aexp in
-  let pid = Node.get_pid node in
   match aexp with
   | AlarmExp.ArrayExp (l, e, _) ->
       let l_id = find_lv RelSyntax.lv_map l in
@@ -997,24 +990,6 @@ let pp_taint_alarm_exp global inputmem src_node node fmt aexp =
       F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e0_id e1_id e2_id;
       F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
   | BufferOverrunLib (("sprintf" as name), el, _) ->
-      let arg0 = List.hd el in
-      let arr_arg0 = TaintSem.eval pid arg0 global.Global.mem inputmem in
-      let arr_val_id =
-        if Hashtbl.mem val_map arr_arg0 then Hashtbl.find val_map arr_arg0
-        else new_val_id arr_arg0
-      in
-      let strlen_exp =
-        List.tl el
-        |> List.map (fun arg ->
-               TaintSem.eval pid arg global.Global.mem inputmem
-               |> (fun v ->
-                    if Hashtbl.mem val_map v then Hashtbl.find val_map v
-                    else new_val_id v)
-               |> F.sprintf "(StrLen %s)")
-        |> String.concat " "
-      in
-      F.fprintf fmt.sprintf_err_cons "%a\t%a\t(< (SizeOf %s) (+ %s))\n" Node.pp
-        src_node Node.pp node arr_val_id strlen_exp;
       let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
       let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
       F.fprintf fmt.sprintf "%s\t%s\t%s\n" id e0_id e1_id;
@@ -1029,7 +1004,7 @@ let pp_taint_alarm_exp global inputmem src_node node fmt aexp =
       F.fprintf fmt.taint "%s\t%s\n" id e1_id
   | BufferOverrunLib (name, _, _) -> failwith name
 
-let print_taint_alarm analysis global inputof alarms =
+let print_taint_alarm analysis alarms =
   let alarms = Report.get alarms Report.UnProven in
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   let oc_start = open_out (dirname ^ "/Start.facts") in
@@ -1087,9 +1062,7 @@ let print_taint_alarm analysis global inputof alarms =
          match alarm.Report.src with
          | Some (src_node, _) when not (AlarmSet.mem (src_node, alarm.node) set)
            ->
-             pp_taint_alarm_exp global
-               (Table.find alarm.node inputof)
-               src_node alarm.node fmt alarm.exp;
+             pp_taint_alarm_exp src_node alarm.node fmt alarm.exp;
              let a_id = Hashtbl.find alarm_exp_map alarm.exp in
              F.fprintf fmt.alarm "%a\t%a\t%s\n" Node.pp src_node Node.pp
                alarm.node a_id;
