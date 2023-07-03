@@ -405,15 +405,17 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       F.fprintf fmt.conststr "%s\t%s\n" v_id s_id
   | Ccall (lv_opt, (Lval (Var _, NoOffset) as e), el, _) ->
       let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
+      let el' =
+        List.map
+          (fun e -> if !Options.remove_cast then RelSyntax.remove_cast e else e)
+          el
+      in
       let arg_e_ids, arg_v_ids =
         List.fold_left
           (fun (aes, avs) e ->
-            let e' =
-              if !Options.remove_cast then RelSyntax.remove_cast e else e
-            in
-            let e_id, v_id = pp_exp_sems fmt global inputmem outputmem n e' in
+            let e_id, v_id = pp_exp_sems fmt global inputmem outputmem n e in
             (e_id :: aes, v_id :: avs))
-          ([], []) el
+          ([], []) el'
       in
       let _ = List.rev arg_e_ids in
       let _ = List.rev arg_v_ids in
@@ -431,9 +433,9 @@ let pp_cmd_sems fmt global inputmem outputmem n =
         let lv_id, loc_id = pp_lv_sems fmt global n lv in
         let v_id = new_val_id () in
         let e_id =
-          if Hashtbl.mem RelSyntax.call_map (n, e', el) then
-            Hashtbl.find RelSyntax.call_map (n, e', el)
-          else Hashtbl.find RelSyntax.libcall_map (n, e', el)
+          if Hashtbl.mem RelSyntax.call_map (n, e', el') then
+            Hashtbl.find RelSyntax.call_map (n, e', el')
+          else Hashtbl.find RelSyntax.libcall_map (n, e', el')
         in
         Hashtbl.add eval_map (n, e_id) v_id;
         let evallv = app_evallv n lv_id loc_id in
