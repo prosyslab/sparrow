@@ -432,17 +432,20 @@ let pp_cmd fmt icfg n =
       pp_lv fmt n lv;
       let e' = if !Options.remove_cast then remove_cast e else e in
       pp_exp fmt n e';
-      List.iter (pp_exp fmt n) el;
-      let arg_id = pp_arg fmt n el in
+      let el' =
+        List.map (fun e -> if !Options.remove_cast then remove_cast e else e) el
+      in
+      List.iter (pp_exp fmt n) el';
+      let arg_id = pp_arg fmt n el' in
       let lv_id = Hashtbl.find lv_map lv in
       let e_id =
         if !Options.patron then Hashtbl.find exp_patron_map (n, e')
         else Hashtbl.find exp_map e'
       in
       let call_id =
-        if Hashtbl.mem call_map (n, e', el) then
-          Hashtbl.find call_map (n, e', el)
-        else new_call_id (n, e', el)
+        if Hashtbl.mem call_map (n, e', el') then
+          Hashtbl.find call_map (n, e', el')
+        else new_call_id (n, e', el')
       in
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id call_id;
       F.fprintf fmt.call_exp "%s\t%s\t%s\n" call_id e_id arg_id;
