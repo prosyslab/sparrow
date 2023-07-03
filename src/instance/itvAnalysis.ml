@@ -441,7 +441,7 @@ let post_process spec (global, dug, inputof, outputof) =
   let fmt = F.formatter_of_out_channel report_file in
   Report.print ~fmt:(Some fmt) global alarms;
   close_out report_file;
-  if !Options.extract_datalog_fact then
+  if (not !Options.patron) && !Options.extract_datalog_fact then
     print_datalog_fact spec global dug alarms;
   (global, dug, inputof, outputof, alarms)
 
