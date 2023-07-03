@@ -7,8 +7,8 @@ Excluded too large functions : []
 #Nodes : 14
 #Nodes in def-use graph : 7
 #Locs on def-use graph : 5
-#Nodes in def-use graph : 5
-#Locs on def-use graph : 5
+#Nodes in def-use graph : 4
+#Locs on def-use graph : 4
 
 = Alarms =
 1. printf.c:4 {main} UnProven
