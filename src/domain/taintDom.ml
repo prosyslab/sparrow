@@ -52,104 +52,46 @@ module UserInput = struct
   let is_taint x = not (is_bot x)
 end
 
-module Symbolic = struct
-  module Symbol = struct
-    type t = Sym of int | Const of int
-
-    let to_string = function
-      | Sym s -> "a-" ^ string_of_int s
-      | Const i -> "Const " ^ string_of_int i
-
-    let compare x y =
-      match (x, y) with
-      | Sym a, Sym b | Const a, Const b -> Int.compare a b
-      | Sym _, Const _ -> 1
-      | Const _, Sym _ -> -1
-
-    let pp fmt x = Format.fprintf fmt "%s" (to_string x)
-
-    let sym_id = ref 0
-
-    let make () =
-      incr sym_id;
-      Sym !sym_id
-  end
-
-  include PowDom.MakeCPO (Symbol)
-
-  let make () = Symbol.make () |> singleton
-
-  let is_bot = is_empty
-end
-
 module Val = struct
-  type t = {
-    int_overflow : IntOverflow.t;
-    user_input : UserInput.t;
-    symbolic : Symbolic.t;
-  }
+  type t = { int_overflow : IntOverflow.t; user_input : UserInput.t }
 
   let int_overflow x = x.int_overflow
 
   let user_input x = x.user_input
-
-  let symbolic x = x.symbolic
 
   let to_string t =
     "{ int_overflow: "
     ^ IntOverflow.to_string t.int_overflow
     ^ ", user_input: "
     ^ UserInput.to_string t.user_input
-    ^ ", symbolic: "
-    ^ Symbolic.to_string t.symbolic
     ^ " }"
 
   let compare = compare
 
-  let bot =
-    {
-      int_overflow = IntOverflow.bot;
-      user_input = UserInput.bot;
-      symbolic = Symbolic.bot;
-    }
+  let bot = { int_overflow = IntOverflow.bot; user_input = UserInput.bot }
 
-  let top =
-    {
-      int_overflow = IntOverflow.top;
-      user_input = UserInput.top;
-      symbolic = Symbolic.make ();
-    }
+  let top = { int_overflow = IntOverflow.top; user_input = UserInput.top }
 
-  let input_value node loc =
-    {
-      top with
-      user_input = UserInput.make node loc;
-      symbolic = Symbolic.make ();
-    }
+  let input_value node loc = { top with user_input = UserInput.make node loc }
 
   let le x y =
     IntOverflow.le x.int_overflow y.int_overflow
     && UserInput.le x.user_input y.user_input
-    && Symbolic.is_bot x.symbolic
-  (* NOTE: slightly different from general ordering for symbolic domain, just check whether the value is bot *)
 
   let eq x y =
     IntOverflow.eq x.int_overflow y.int_overflow
     && UserInput.eq x.user_input y.user_input
-    && Symbolic.eq x.symbolic y.symbolic
 
   let join x y =
     {
       int_overflow = IntOverflow.join x.int_overflow y.int_overflow;
       user_input = UserInput.join x.user_input y.user_input;
-      symbolic = Symbolic.join x.symbolic y.symbolic;
     }
 
   let meet x y =
     {
       int_overflow = IntOverflow.meet x.int_overflow y.int_overflow;
       user_input = UserInput.meet x.user_input y.user_input;
-      symbolic = Symbolic.meet x.symbolic y.symbolic;
     }
 
   let is_bot x = x = bot
@@ -159,9 +101,8 @@ module Val = struct
   let narrow = meet
 
   let pp fmt x =
-    Format.fprintf fmt "{ int_overflow: %a, user_input: %a, symbolic: %a }"
-      IntOverflow.pp x.int_overflow UserInput.pp x.user_input Symbolic.pp
-      x.symbolic
+    Format.fprintf fmt "{ int_overflow: %a, user_input: %a }" IntOverflow.pp
+      x.int_overflow UserInput.pp x.user_input
 end
 
 module Mem = struct

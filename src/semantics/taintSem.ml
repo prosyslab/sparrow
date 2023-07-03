@@ -45,21 +45,17 @@ let eval_bop b v1 v2 itv1 itv2 =
       (* overflow may happen *)
       let user_input = UserInput.join v1.Val.user_input v2.Val.user_input in
       let int_overflow = inspect_overflow v1 v2 itv1 itv2 in
-      let symbolic = Symbolic.make () in
-      { Val.int_overflow; user_input; Val.symbolic }
+      { Val.int_overflow; user_input }
   | Cil.Lt | Cil.Gt | Cil.Le | Cil.Ge | Cil.Eq | Cil.Ne | Cil.LAnd | Cil.LOr ->
-      { Val.bot with symbolic = Symbolic.make () }
+      Val.bot
 
 let rec eval pid e itvmem mem =
   match e with
   | Cil.Const _ | Cil.SizeOf _ | Cil.SizeOfE _ | Cil.SizeOfStr _ | Cil.AlignOf _
   | Cil.AlignOfE _
   | Cil.UnOp (_, _, _)
-  | Cil.AddrOf _ | Cil.AddrOfLabel _ ->
-      { Val.bot with symbolic = Symbolic.make () }
-  | Cil.StartOf l ->
-      let symbolic = lookup (ItvSem.eval_lv pid l itvmem) mem |> Val.symbolic in
-      { Val.bot with symbolic }
+  | Cil.AddrOf _ | Cil.AddrOfLabel _ | Cil.StartOf _ ->
+      Val.bot
   | Cil.Lval l -> lookup (ItvSem.eval_lv pid l itvmem) mem
   | Cil.BinOp (b, e1, e2, _) ->
       let itv1, itv2 =
@@ -172,7 +168,6 @@ let rec collect_size_vals arg_exps arg_typs node itvmem mem =
 
 let process_dst mode node pid src_vals global alloc itvmem mem dst_e =
   let src_v = List.fold_left Val.join Val.bot src_vals in
-  let src_v = { src_v with symbolic = Symbolic.make () } in
   let dst_loc = ItvDom.Val.all_locs (ItvSem.eval pid dst_e itvmem) in
   if alloc then
     let allocsite = Allocsite.allocsite_of_node node in
@@ -246,7 +241,6 @@ let produce_ret mode node ret_typ va_src_flag src_vals dst_vals buf_vals
       (* Top itv & taintness of Src argument returned *)
       let _ = assert (va_src_flag || List.length src_vals > 0) in
       let src_v = List.fold_left Val.join Val.bot src_vals in
-      let src_v = { src_v with symbolic = Symbolic.make () } in
       (mem, src_v)
   | DstArg ->
       (* Dst argument returned *)
@@ -263,7 +257,6 @@ let produce_ret mode node ret_typ va_src_flag src_vals dst_vals buf_vals
       (* New block, filled with Src argument *)
       let _ = assert (va_src_flag || List.length src_vals > 0) in
       let src_v = List.fold_left Val.join Val.bot src_vals in
-      let src_v = { src_v with symbolic = Symbolic.make () } in
       gen_block mode node src_v (mem, global)
   | AllocBuf ->
       (* New block, filled with user input *)
@@ -292,7 +285,6 @@ let handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc =
         produce_ret mode node ret_typ va_src_flag src_vals dst_vals buf_vals
           size_vals loc (mem, global)
       in
-      let ret_v = { ret_v with symbolic = Symbolic.make () } in
       update mode global (ItvSem.eval_lv pid lv itvmem) ret_v mem
   | None -> mem
 
@@ -372,15 +364,12 @@ let run_cmd mode node itvmem (mem, global) =
       let lv = ItvSem.eval_lv pid l itvmem in
       update mode global lv (eval pid e itvmem mem) mem
   | IntraCfg.Cmd.Cexternal (_, _) -> mem
-  | IntraCfg.Cmd.Calloc (l, IntraCfg.Cmd.Array e, _, _, _) ->
-      let lv = ItvSem.eval_lv pid l itvmem in
+  | IntraCfg.Cmd.Calloc (_, IntraCfg.Cmd.Array e, _, _, _) ->
       let _ = eval pid e itvmem mem in
       (* for inspection *)
-      update mode global lv { Val.bot with symbolic = Symbolic.make () } mem
+      mem
   | IntraCfg.Cmd.Calloc (_, IntraCfg.Cmd.Struct _, _, _, _) -> mem
-  | IntraCfg.Cmd.Csalloc (l, _, _) ->
-      let lv = ItvSem.eval_lv pid l itvmem in
-      update mode global lv { Val.bot with symbolic = Symbolic.make () } mem
+  | IntraCfg.Cmd.Csalloc (_, _, _) -> mem
   | IntraCfg.Cmd.Cfalloc (_, _, _) | IntraCfg.Cmd.Cassume (_, _, _) -> mem
   | IntraCfg.Cmd.Ccall (lvo, Cil.Lval (Cil.Var f, Cil.NoOffset), arg_exps, loc)
     when Global.is_undef f.vname global ->
