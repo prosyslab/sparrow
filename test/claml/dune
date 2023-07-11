@@ -1249,6 +1249,56 @@
   (diff init-list1.expected init-list1.output)))
 
 (rule
+ (deps init-list2.c)
+ (targets init-list2.output)
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (ignore-stderr
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
+    (run clang-format)))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff init-list2.expected init-list2.output)))
+
+(rule
+ (deps init-list3.c)
+ (targets init-list3.output)
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (ignore-stderr
+     (run
+      ../../src/main.exe
+      -verbose
+      0
+      -frontend
+      claml
+      -outdir
+      sparrow-out-%{deps}
+      -il
+      %{deps}))
+    (run clang-format)))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff init-list3.expected init-list3.output)))
+
+(rule
  (deps __int128_t0.c)
  (targets __int128_t0.output)
  (action

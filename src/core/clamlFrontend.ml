@@ -2381,9 +2381,8 @@ and trans_stmt_opt scope fundec = function
   | Some s -> trans_stmt scope fundec s
   | None -> (Chunk.empty, scope)
 
-and trans_global_var_decl scope loc storage typ name init =
-  let vi, scope = find_global_variable scope name typ in
-  vi.vstorage <- storage;
+and trans_global_var_decl scope loc storage vi init =
+  vi.Cil.vstorage <- storage;
   match init with
   | Some init ->
       vi.vinit.init <- Some init;
@@ -2438,16 +2437,18 @@ and trans_global_decl ?(new_name = "") ?(compinfos = []) scope (decl : C.Decl.t)
       let e = C.VarDecl.get_init decl |> Option.get in
       let typ = C.VarDecl.get_type decl |> trans_type scope in
       let name = C.VarDecl.get_name decl in
+      let vi, scope = find_global_variable scope name typ in
       let gdecls, init = trans_global_init scope loc typ e in
       let vdecl, scope =
-        trans_global_var_decl scope loc storage typ name (Some init)
+        trans_global_var_decl scope loc storage vi (Some init)
       in
       (gdecls @ [ vdecl ], scope)
   | VarDecl ->
       let typ = C.VarDecl.get_type decl |> trans_type scope in
       let name = C.VarDecl.get_name decl in
-      trans_global_var_decl scope loc storage typ name None
-      |> fun (vdecl, scope) -> ([ vdecl ], scope)
+      let vi, scope = find_global_variable scope name typ in
+      trans_global_var_decl scope loc storage vi None |> fun (vdecl, scope) ->
+      ([ vdecl ], scope)
   | RecordDecl when C.RecordDecl.is_complete_definition decl ->
       let is_struct = C.RecordDecl.is_struct decl in
       let name =
