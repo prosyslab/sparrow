@@ -59,6 +59,9 @@ let alloc_re = Str.regexp ".*alloc.*"
 
 let calloc_re = Str.regexp ".*calloc.*"
 
+let is_unrolled_int typ =
+  match Cil.unrollType typ with TInt _ -> true | _ -> false
+
 (* Heuristically choose the first integer type argument (for malloc/reallc) *)
 let rec extract_alloc_arg is_func name args =
   match args with
@@ -77,6 +80,17 @@ let rec extract_calloc_arg is_func name args =
   | arg1 :: arg2 :: tail_args -> (
       match (Cil.typeOf arg1, Cil.typeOf arg2) with
       | TInt _, TInt _ ->
+          add_unwrapped is_func name;
+          CallocWrapper (arg1, arg2)
+      | TInt _, TNamed _ when is_unrolled_int (Cil.typeOf arg2) ->
+          add_unwrapped is_func name;
+          CallocWrapper (arg1, arg2)
+      | TNamed _, TInt _ when is_unrolled_int (Cil.typeOf arg1) ->
+          add_unwrapped is_func name;
+          CallocWrapper (arg1, arg2)
+      | TNamed _, TNamed _
+        when is_unrolled_int (Cil.typeOf arg1)
+             && is_unrolled_int (Cil.typeOf arg2) ->
           add_unwrapped is_func name;
           CallocWrapper (arg1, arg2)
       | _ -> extract_calloc_arg is_func name (arg2 :: tail_args))
