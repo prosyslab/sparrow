@@ -210,7 +210,7 @@ let check_dz v =
 
 let inspect_aexp_dz node aexp mem queries =
   (match aexp with
-  | DivExp (_, e, loc) ->
+  | DivExp (Cil.BinOp (_, _, e, _), loc) ->
       let v = ItvSem.eval (InterCfg.Node.get_pid node) e mem in
       let lst = check_dz v in
       List.map

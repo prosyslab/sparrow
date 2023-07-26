@@ -685,8 +685,7 @@ type formatter = {
   memchr : F.formatter;
   strncmp : F.formatter;
   sprintf : F.formatter;
-  sprintf_err_cons : F.formatter;
-  io_err_cons : F.formatter;
+  alarm_rule : F.formatter;
   bufferoverrunlib : F.formatter;
   strcat : F.formatter;
   allocsize : F.formatter;
@@ -722,7 +721,7 @@ let pp_alarm_exp fmt aexp =
   | DerefExp (e, _) ->
       let e_id = find_exp RelSyntax.exp_map e in
       F.fprintf fmt.deref_exp "%s\t%s\n" id e_id
-  | DivExp (e1, e2, _) ->
+  | DivExp (Cil.BinOp (_, e1, e2, _), _) ->
       let e1_id, e2_id =
         (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
       in
@@ -800,8 +799,7 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.memchr ();
   F.pp_print_flush fmt.strncmp ();
   F.pp_print_flush fmt.sprintf ();
-  F.pp_print_flush fmt.sprintf_err_cons ();
-  F.pp_print_flush fmt.io_err_cons ();
+  F.pp_print_flush fmt.alarm_rule ();
   F.pp_print_flush fmt.bufferoverrunlib ();
   F.pp_print_flush fmt.allocsize ();
   F.pp_print_flush fmt.printf ();
@@ -824,10 +822,7 @@ let print_alarm analysis alarms =
   let oc_memchr = open_out (dirname ^ "/AlarmMemchr.facts") in
   let oc_strncmp = open_out (dirname ^ "/AlarmStrncmp.facts") in
   let oc_sprintf = open_out (dirname ^ "/AlarmSprintf.facts") in
-  let oc_sprintf_err_cons =
-    open_out (dirname ^ "/SprintfErrorConstraint.facts")
-  in
-  let oc_io_err_cons = open_out (dirname ^ "/IOErrorConstraint.facts") in
+  let oc_alarm_rule = open_out (dirname ^ "/Alarm.rules") in
   let oc_bufferoverrunlib =
     open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
   in
@@ -850,8 +845,7 @@ let print_alarm analysis alarms =
       memchr = F.formatter_of_out_channel oc_memchr;
       strncmp = F.formatter_of_out_channel oc_strncmp;
       sprintf = F.formatter_of_out_channel oc_sprintf;
-      sprintf_err_cons = F.formatter_of_out_channel oc_sprintf_err_cons;
-      io_err_cons = F.formatter_of_out_channel oc_io_err_cons;
+      alarm_rule = F.formatter_of_out_channel oc_alarm_rule;
       bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
       strcat = F.formatter_of_out_channel oc_strcat;
       allocsize = F.formatter_of_out_channel oc_allocsize;
@@ -888,8 +882,7 @@ let print_alarm analysis alarms =
       oc_memchr;
       oc_strncmp;
       oc_sprintf;
-      oc_sprintf_err_cons;
-      oc_io_err_cons;
+      oc_alarm_rule;
       oc_bufferoverrunlib;
       oc_strcat;
       oc_allocsize;
@@ -941,14 +934,25 @@ let pp_taint_alarm_exp src_node node fmt aexp =
       let ioerror = F.asprintf "(IOError %a x)" Node.pp node in
       String.concat " " [ ioerror; binop; eval; val_rel; val_cons ]
       (* BinOp(e * e1 e2) /\ Eval(n e v) /\ Val(v x) /\ (x > INT_MAX) -> IOError(n x) *)
-      |> F.fprintf fmt.io_err_cons "%a\t%a\t(%s)\n" Node.pp src_node Node.pp
-           node
+      |> F.fprintf fmt.alarm_rule "%a\t%a\t(%s)\n" Node.pp src_node Node.pp node
   | MulExp _ -> Logging.warn "Wrong exp in MulExp\n"
-  | DivExp (e1, e2, _) ->
-      let e1_id, e2_id =
-        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
-      in
-      F.fprintf fmt.div_exp "%s\t%s\t%s\n" id e1_id e2_id
+  | DivExp ((Cil.BinOp (_, e1, e2, _) as e), _) ->
+      let e1' = RelSyntax.remove_cast e1 in
+      let e2' = RelSyntax.remove_cast e2 in
+      let e' = RelSyntax.remove_cast e in
+      let e_id = Hashtbl.find RelSyntax.exp_patron_map (node, e') in
+      let v_id = Hashtbl.find eval_map (node, e_id) in
+      let e1_id = Hashtbl.find RelSyntax.exp_patron_map (node, e1') in
+      let e2_id = Hashtbl.find RelSyntax.exp_patron_map (node, e2') in
+      let binop = F.sprintf "(BinOp %s Div %s %s)" e_id e1_id e2_id in
+      let eval = F.asprintf "(Eval %a %s %s)" Node.pp node e2_id v_id in
+      let val_rel = F.sprintf "(Val %s x)" v_id in
+      let val_cons = F.asprintf "(> x 0)" in
+      let dzerror = F.asprintf "(DZError %a x)" Node.pp node in
+      String.concat " " [ dzerror; binop; eval; val_rel; val_cons ]
+      (* BinOp(e / e1 e2) /\ Eval(n e2 v) /\ Val(v x) /\ (x == 0) -> DZError(n x) *)
+      |> F.fprintf fmt.alarm_rule "%a\t%a\t(%s)\n" Node.pp src_node Node.pp node
+  | DivExp _ -> Logging.warn "Wrong exp in DivExp\n"
   | Strcpy (e1, e2, _) ->
       let e1_id, e2_id =
         (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
@@ -1022,10 +1026,7 @@ let print_taint_alarm analysis alarms =
   let oc_memchr = open_out (dirname ^ "/AlarmMemchr.facts") in
   let oc_strncmp = open_out (dirname ^ "/AlarmStrncmp.facts") in
   let oc_sprintf = open_out (dirname ^ "/AlarmSprintf.facts") in
-  let oc_sprintf_err_cons =
-    open_out (dirname ^ "/SprintfErrorConstraint.facts")
-  in
-  let oc_io_err_cons = open_out (dirname ^ "/IOErrorConstraint.rules") in
+  let oc_alarm_rule = open_out (dirname ^ "/Alarm.rules") in
   let oc_bufferoverrunlib =
     open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
   in
@@ -1048,8 +1049,7 @@ let print_taint_alarm analysis alarms =
       memchr = F.formatter_of_out_channel oc_memchr;
       strncmp = F.formatter_of_out_channel oc_strncmp;
       sprintf = F.formatter_of_out_channel oc_sprintf;
-      sprintf_err_cons = F.formatter_of_out_channel oc_sprintf_err_cons;
-      io_err_cons = F.formatter_of_out_channel oc_io_err_cons;
+      alarm_rule = F.formatter_of_out_channel oc_alarm_rule;
       bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
       strcat = F.formatter_of_out_channel oc_strcat;
       allocsize = F.formatter_of_out_channel oc_allocsize;
@@ -1086,8 +1086,7 @@ let print_taint_alarm analysis alarms =
       oc_memchr;
       oc_strncmp;
       oc_sprintf;
-      oc_sprintf_err_cons;
-      oc_io_err_cons;
+      oc_alarm_rule;
       oc_bufferoverrunlib;
       oc_strcat;
       oc_allocsize;

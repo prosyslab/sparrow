@@ -18,7 +18,7 @@ type t =
   | ArrayExp of lval * exp * location
   | DerefExp of exp * location
   | MulExp of exp * location
-  | DivExp of exp * exp * location
+  | DivExp of exp * location
   | Strcpy of exp * exp * location
   | Strcat of exp * exp * location
   | Strncpy of exp * exp * exp * location
@@ -32,8 +32,7 @@ let to_string t =
   match t with
   | ArrayExp (lv, e, _) -> CilHelper.s_lv lv ^ "[" ^ CilHelper.s_exp e ^ "]"
   | DerefExp (e, _) -> "*(" ^ CilHelper.s_exp e ^ ")"
-  | MulExp (e, _) -> CilHelper.s_exp e
-  | DivExp (e1, e2, _) -> CilHelper.s_exp e1 ^ " / " ^ CilHelper.s_exp e2
+  | MulExp (e, _) | DivExp (e, _) -> CilHelper.s_exp e
   | Strcpy (e1, e2, _) ->
       "strcpy (" ^ CilHelper.s_exp e1 ^ ", " ^ CilHelper.s_exp e2 ^ ")"
   | Strncpy (e1, e2, e3, _) ->
@@ -56,7 +55,7 @@ let location_of = function
   | ArrayExp (_, _, l)
   | DerefExp (_, l)
   | MulExp (_, l)
-  | DivExp (_, _, l)
+  | DivExp (_, l)
   | Strcpy (_, _, l)
   | Strncpy (_, _, _, l)
   | Memcpy (_, _, _, l)
@@ -103,7 +102,7 @@ and c_exp e loc =
       match bop with
       | Mult when !Options.mul ->
           (MulExp (e, loc) :: c_exp e1 loc) @ c_exp e2 loc
-      | Div | Mod -> (DivExp (e1, e2, loc) :: c_exp e1 loc) @ c_exp e2 loc
+      | Div | Mod -> (DivExp (e, loc) :: c_exp e1 loc) @ c_exp e2 loc
       | _ -> c_exp e1 loc @ c_exp e2 loc)
   | CastE (_, e) -> c_exp e loc
   | AddrOf lv -> c_lv lv loc
