@@ -280,17 +280,7 @@ let opts =
     ( "-mul",
       Arg.Set mul,
       "Print Integer-overflow alarms from multiply expressions" );
-    ( "-patron",
-      Arg.Unit
-        (fun () ->
-          patron := true;
-          taint := true;
-          extract_datalog_fact := true;
-          extract_datalog_fact_full := true;
-          extract_datalog_fact_full_no_opt := true;
-          mul := true;
-          remove_cast := true),
-      "Anlyze for Patron" );
+    ("-patron", Arg.Set patron, "Anlyze for Patron");
     ("-dz", Arg.Set dz, "Print Divide-by-zero alarms");
     ( "-bugfinder",
       Arg.Set_int bugfinder,
