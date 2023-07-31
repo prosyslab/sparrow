@@ -641,12 +641,6 @@ let print_sems analysis global inputof outputof dug alarms =
           F.fprintf fmt.cfpath "%a\t%a\n" pp src pp dst)
         tc)
     icfg;
-  G.iter_edges_e
-    (fun src dst locset ->
-      if Hashtbl.mem loc_map locset then
-        F.fprintf fmt.duedge "%a\t%a\t%s\n" Node.pp src Node.pp dst
-          (Hashtbl.find loc_map locset))
-    dug;
   print_maps dirname;
   F.pp_print_flush fmt.duedge ();
   F.pp_print_flush fmt.dupath ();

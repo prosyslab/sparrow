@@ -164,30 +164,36 @@ let inspect_aexp_dz node aexp itvmem mem queries =
         taint queries
   | _ -> queries
 
-let inspect_alarm global spec inputof =
+let generate spec (global, mem, target) =
   let nodes = InterCfg.nodesof global.icfg in
   let total = List.length nodes in
   list_fold
     (fun node (qs, k) ->
       prerr_progressbar ~itv:1000 k total;
       let ptrmem = ItvDom.Table.find node spec.Spec.ptrinfo in
-      let mem = Table.find node inputof in
+      let mem = Table.find node mem in
       let cmd = InterCfg.cmdof global.icfg node in
       let aexps = AlarmExp.collect analysis cmd in
       let qs =
         list_fold
-          (fun aexp qs ->
-            (if !Options.bo then inspect_aexp_bo node aexp ptrmem mem qs
-            else [])
-            @ (if !Options.mul then inspect_aexp_mul node aexp ptrmem mem qs
-              else [])
-            @
-            if !Options.dz then inspect_aexp_dz node aexp ptrmem mem qs else [])
+          (fun aexp ->
+            if mem = Mem.bot then id (* dead code *)
+            else
+              match target with
+              | BO -> inspect_aexp_bo node aexp ptrmem mem
+              | IO -> inspect_aexp_mul node aexp ptrmem mem
+              | DZ -> inspect_aexp_dz node aexp ptrmem mem
+              | ND -> Fun.id)
           aexps qs
       in
       (qs, k + 1))
     nodes ([], 0)
   |> fst
+
+let inspect_alarm global spec inputof =
+  (if !Options.bo then generate spec (global, inputof, Report.BO) else [])
+  @ (if !Options.nd then generate spec (global, inputof, Report.ND) else [])
+  @ if !Options.dz then generate spec (global, inputof, Report.DZ) else []
 
 let get_locset mem =
   ItvDom.Mem.foldi

@@ -322,7 +322,8 @@ let generate (global, inputof, target) =
               match target with
               | BO -> inspect_aexp_bo node aexp mem
               | ND -> inspect_aexp_nd node aexp mem
-              | DZ -> inspect_aexp_dz node aexp mem)
+              | DZ -> inspect_aexp_dz node aexp mem
+              | IO -> Fun.id)
           aexps qs
       in
       (qs, k + 1))
@@ -341,7 +342,8 @@ let generate_with_mem (global, mem, target) =
         match target with
         | BO -> list_fold (fun aexp -> inspect_aexp_bo node aexp mem) aexps
         | ND -> list_fold (fun aexp -> inspect_aexp_nd node aexp mem) aexps
-        | DZ -> list_fold (fun aexp -> inspect_aexp_dz node aexp mem) aexps)
+        | DZ -> list_fold (fun aexp -> inspect_aexp_dz node aexp mem) aexps
+        | IO -> list_fold (fun _ -> Fun.id) aexps)
     nodes []
 
 (* ********** *

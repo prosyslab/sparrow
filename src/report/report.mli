@@ -10,7 +10,7 @@
 (***********************************************************************)
 (** Alarm report of interval analysis *)
 
-type target = BO | ND | DZ
+type target = BO | ND | DZ | IO
 
 type status = Proven | UnProven | BotAlarm
 
