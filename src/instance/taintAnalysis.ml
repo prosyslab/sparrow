@@ -28,7 +28,7 @@ let marshal_out (global, dug, input, output) =
   MarshalManager.output (filename ^ ".taint.output") output;
   (global, dug, input, output)
 
-let inspect_aexp node aexp itvmem mem queries =
+let inspect_aexp_bo node aexp itvmem mem queries =
   match aexp with
   | AllocSize (_, e, loc) ->
       let pid = InterCfg.Node.get_pid node in
@@ -83,6 +83,33 @@ let inspect_aexp node aexp itvmem mem queries =
           }
           :: queries)
         taint queries
+  | BufferOverrunLib ("sprintf", [ _; _; e3 ], loc) ->
+      let pid = InterCfg.Node.get_pid node in
+      let taint =
+        ItvSem.eval pid e3 itvmem |> ItvDom.Val.all_locs |> flip Mem.lookup mem
+        |> TaintDom.Val.user_input
+      in
+      TaintDom.UserInput.fold
+        (fun (src_node, src_loc) queries ->
+          let desc =
+            "source = " ^ Node.to_string src_node ^ " @ "
+            ^ CilHelper.s_location src_loc
+          in
+          {
+            node;
+            exp = aexp;
+            loc;
+            allocsite = None;
+            status = UnProven;
+            desc;
+            src = Some (src_node, src_loc);
+          }
+          :: queries)
+        taint queries
+  | _ -> queries
+
+let inspect_aexp_mul node aexp itvmem mem queries =
+  match aexp with
   | MulExp (e, loc) ->
       let pid = InterCfg.Node.get_pid node in
       let tv = TaintSem.eval pid e itvmem mem in
@@ -110,12 +137,14 @@ let inspect_aexp node aexp itvmem mem queries =
           }
           :: queries)
         taint queries
-  | BufferOverrunLib ("sprintf", [ _; _; e3 ], loc) ->
+  | _ -> queries
+
+let inspect_aexp_dz node aexp itvmem mem queries =
+  match aexp with
+  | DivExp (e, loc) ->
       let pid = InterCfg.Node.get_pid node in
-      let taint =
-        ItvSem.eval pid e3 itvmem |> ItvDom.Val.all_locs |> flip Mem.lookup mem
-        |> TaintDom.Val.user_input
-      in
+      let tv = TaintSem.eval pid e itvmem mem in
+      let taint = TaintDom.Val.user_input tv in
       TaintDom.UserInput.fold
         (fun (src_node, src_loc) queries ->
           let desc =
@@ -146,7 +175,15 @@ let inspect_alarm global spec inputof =
       let cmd = InterCfg.cmdof global.icfg node in
       let aexps = AlarmExp.collect analysis cmd in
       let qs =
-        list_fold (fun aexp -> inspect_aexp node aexp ptrmem mem) aexps qs
+        list_fold
+          (fun aexp qs ->
+            (if !Options.bo then inspect_aexp_bo node aexp ptrmem mem qs
+            else [])
+            @ (if !Options.mul then inspect_aexp_mul node aexp ptrmem mem qs
+              else [])
+            @
+            if !Options.dz then inspect_aexp_dz node aexp ptrmem mem qs else [])
+          aexps qs
       in
       (qs, k + 1))
     nodes ([], 0)
