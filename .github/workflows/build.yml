@@ -15,6 +15,20 @@ jobs:
         with:
           ocaml-compiler: 4.13.1
 
+      - name: Use cached dependencies
+        id: cache-opam
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-opam
+        with:
+          path: |
+            ~/.opam
+            ./_opam
+          key: ${{ env.cache-name }}-build-${{ hashFiles('opam', 'build.sh') }}
+          restore-keys: |
+            ${{ env.cache-name }}-build-${{ hashFiles('opam', 'build.sh') }}
+            ${{ env.cache-name }}-build-
+
       - name: Install deps
         run: |
           sudo apt-get update
