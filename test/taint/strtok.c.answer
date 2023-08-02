@@ -11,11 +11,13 @@ Excluded too large functions : []
 #Locs on def-use graph : 4
 
 = Alarms =
-1. strtok.c:6 {main} UnProven
+1. strtok.c:5 {main} UnProven
+  *(argv+0) @main-6:  source = main-4 @ strtok.c:3 UnProven
+2. strtok.c:6 {main} UnProven
   printf(p) @main-7:  source = main-4 @ strtok.c:3 UnProven
 
-#queries                 : 2
+#queries                 : 3
 #queries mod alarm point : 2
-#proven                  : 1
-#unproven                : 1
+#proven                  : 0
+#unproven                : 2
 #bot-involved            : 0

@@ -12,11 +12,12 @@ Excluded too large functions : []
 
 = Alarms =
 1. asprintf.c:4 {main} UnProven
+  *(argv+1) @main-8:  source = main-4 @ asprintf.c:1 UnProven
   *(argv+1) @main-8:  offset: [1, 1], size: [1, +oo] UnProven, allocsite: __extern__argv
 2. asprintf.c:5 {main} UnProven
   sprintf(fmt) @main-9:  source = main-4 @ asprintf.c:1 UnProven
 
-#queries                 : 2
+#queries                 : 3
 #queries mod alarm point : 2
 #proven                  : 0
 #unproven                : 2

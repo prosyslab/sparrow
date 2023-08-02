@@ -177,14 +177,17 @@ let collect_interval = function
   | _ -> []
 
 let collect_taint = function
-  | Cmd.Calloc (_, Array e, _, _, loc) ->
-      AllocSize ("malloc", e, loc) :: c_exp e loc
-  | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) ->
-      c_lib_taint f es loc @ c_exps es loc
-  | Cmd.Ccall (_, _, es, loc) -> c_exps es loc
-  | Cmd.Cset (_, e, loc) -> c_exp e loc
+  | Cmd.Cset (lv, e, loc) -> c_lv lv loc @ c_exp e loc
+  | Cmd.Cexternal (lv, loc) -> c_lv lv loc
+  | Cmd.Calloc (lv, Array e, _, _, loc) ->
+      (AllocSize ("malloc", e, loc) :: c_lv lv loc) @ c_exp e loc
+  | Cmd.Csalloc (lv, _, loc) -> c_lv lv loc
   | Cmd.Cassume (e, _, loc) -> c_exp e loc
   | Cmd.Creturn (Some e, loc) -> c_exp e loc
+  | Cmd.Ccall (_, Lval (Var f, NoOffset), es, loc) ->
+      c_lib_taint f es loc @ c_exps es loc
+  | Cmd.Ccall (None, _, es, loc) -> c_exps es loc
+  | Cmd.Ccall (Some lv, _, es, loc) -> c_lv lv loc @ c_exps es loc
   | _ -> []
 
 let collect analysis cmd =

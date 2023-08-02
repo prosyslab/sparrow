@@ -60,7 +60,7 @@ let inspect_aexp_bo node aexp itvmem mem queries =
           }
           :: queries)
         taint queries
-  | Printf (_, e, loc) ->
+  | Printf (_, e, loc) | ArrayExp (_, e, loc) | DerefExp (e, loc) ->
       let pid = InterCfg.Node.get_pid node in
       let taint =
         ItvSem.eval pid e itvmem |> ItvDom.Val.all_locs |> flip Mem.lookup mem

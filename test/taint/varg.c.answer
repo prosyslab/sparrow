@@ -14,9 +14,10 @@ Excluded too large functions : []
 1. varg.c:6 {myprintf} UnProven
   vsnprintf(format) @myprintf-5:  source = main-8 @ varg.c:9 UnProven
 2. varg.c:11 {main} UnProven
+  *(argv+1) @main-11:  source = main-8 @ varg.c:9 UnProven
   *(argv+1) @main-11:  offset: [1, 1], size: [1, +oo] UnProven, allocsite: __extern__argv
 
-#queries                 : 2
+#queries                 : 3
 #queries mod alarm point : 2
 #proven                  : 0
 #unproven                : 2
