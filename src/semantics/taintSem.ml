@@ -372,7 +372,8 @@ let run_cmd mode node itvmem (mem, global) =
   | IntraCfg.Cmd.Csalloc (_, _, _) -> mem
   | IntraCfg.Cmd.Cfalloc (_, _, _) | IntraCfg.Cmd.Cassume (_, _, _) -> mem
   | IntraCfg.Cmd.Ccall (lvo, Cil.Lval (Cil.Var f, Cil.NoOffset), arg_exps, loc)
-    when Global.is_undef f.vname global ->
+    when Global.is_undef f.vname global
+         || ApiSem.ApiMap.mem f.vname ApiSem.api_map ->
       (* undefined library functions *)
       let _ = eval_list pid arg_exps itvmem mem in
       (* for inspection *)
