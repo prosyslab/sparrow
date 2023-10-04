@@ -35,6 +35,9 @@ val string_of_query : query -> string
 
 val partition : query list -> (part_unit, query list) BatMap.t
 
+val filter_by_target_locs :
+  (string, string) BatMap.t -> query list -> query list
+
 val get : query list -> status -> query list
 
 val print : ?fmt:Format.formatter option -> Global.t -> query list -> unit

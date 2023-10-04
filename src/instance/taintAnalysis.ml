@@ -192,6 +192,7 @@ let generate spec (global, mem, target) =
 
 let inspect_alarm global spec inputof =
   (if !Options.bo then generate spec (global, inputof, Report.BO) else [])
+  @ (if !Options.mul then generate spec (global, inputof, Report.IO) else [])
   @ (if !Options.nd then generate spec (global, inputof, Report.ND) else [])
   @ if !Options.dz then generate spec (global, inputof, Report.DZ) else []
 
@@ -209,10 +210,11 @@ let make_top_mem locset =
   PowLoc.fold (fun l mem -> Mem.add l TaintDom.Val.top mem) locset Mem.bot
 
 let print_datalog_fact _ global inputof outputof dug alarms =
-  RelSyntax.print analysis global.icfg;
+  if !Options.patron then
+    RelDUGraph.print_patron analysis global inputof outputof dug alarms
+  else RelSyntax.print analysis global.icfg;
   if not !Options.patron then Provenance.print analysis global.relations;
-  if not !Options.patron then RelDUGraph.print analysis global dug alarms
-  else RelDUGraph.print_sems analysis global inputof outputof dug alarms;
+  if not !Options.patron then RelDUGraph.print analysis global dug alarms;
   RelDUGraph.print_taint_alarm analysis alarms
 
 let ignore_function node =
@@ -258,6 +260,6 @@ let do_analysis (global, itvdug, itvinputof) =
   let _ = Options.pfs := 100 in
   let dug = Analysis.generate_dug spec global in
   (if !Options.marshal_in then marshal_in global
-  else Analysis.perform spec global dug)
+   else Analysis.perform spec global dug)
   |> opt !Options.marshal_out marshal_out
   |> post_process spec itvdug

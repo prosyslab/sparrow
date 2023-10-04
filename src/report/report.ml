@@ -167,6 +167,21 @@ let filter_allocsite partition =
            ql))
     partition
 
+let filter_by_target_locs target_map =
+  List.filter (fun alarm ->
+      BatMap.exists
+        (fun _ target_loc ->
+          let file, line =
+            match String.split_on_char ':' target_loc with
+            | [ f; l ] -> (f, int_of_string l)
+            | _ ->
+                L.error "Invalid slice option (must be '-slice X=file:line')";
+                exit 1
+          in
+          Filename.basename alarm.loc.file |> String.equal file
+          && alarm.loc.line = line)
+        target_map)
+
 let alarm_filter global part =
   part
   |> opt !Options.filter_extern filter_extern

@@ -233,6 +233,18 @@ let pp_unop fmt uop =
     | LNot -> F.fprintf fmt.lnot "%s\n" id
     | Neg -> F.fprintf fmt.neg "%s\n" id
 
+let rec remove_cast = function
+  | ( Cil.Const _ | Cil.Lval _ | Cil.SizeOf _ | Cil.SizeOfStr _ | Cil.AlignOf _
+    | Cil.AddrOf _ | Cil.AddrOfLabel _ | Cil.StartOf _ ) as e ->
+      e
+  | Cil.SizeOfE e -> Cil.SizeOfE (remove_cast e)
+  | Cil.AlignOfE e -> Cil.AlignOfE (remove_cast e)
+  | Cil.UnOp (o, e, t) -> Cil.UnOp (o, remove_cast e, t)
+  | Cil.BinOp (o, e1, e2, t) -> Cil.BinOp (o, remove_cast e1, remove_cast e2, t)
+  | Cil.Question (e1, e2, e3, t) ->
+      Cil.Question (remove_cast e1, remove_cast e2, remove_cast e3, t)
+  | Cil.CastE (_, e) -> remove_cast e
+
 let rec pp_lv fmt n lv =
   if Hashtbl.mem lv_map lv then ()
   else
@@ -255,10 +267,16 @@ let rec pp_lv fmt n lv =
     | _, _ -> F.fprintf fmt.lval "%s\tOther\n" id
 
 and pp_exp fmt n e =
-  if
+  let is_new_expr =
     if !Options.patron then Hashtbl.mem exp_patron_map (n, e)
     else Hashtbl.mem exp_map e
-  then ()
+  in
+  let is_new =
+    if !Options.patron && is_new_expr then
+      Hashtbl.mem exp_patron_map (n, remove_cast e)
+    else is_new_expr
+  in
+  if is_new then ()
   else
     let id =
       if !Options.patron then new_exp_patron_id (n, e) else new_exp_id e
@@ -312,18 +330,6 @@ and pp_exp fmt n e =
         F.fprintf fmt.sizeof_exp "%s\t%s\n" id e_id
     | _ -> F.fprintf fmt.other_exp "%s\n" id
 
-let rec remove_cast = function
-  | ( Cil.Const _ | Cil.Lval _ | Cil.SizeOf _ | Cil.SizeOfStr _ | Cil.AlignOf _
-    | Cil.AddrOf _ | Cil.AddrOfLabel _ | Cil.StartOf _ ) as e ->
-      e
-  | Cil.SizeOfE e -> Cil.SizeOfE (remove_cast e)
-  | Cil.AlignOfE e -> Cil.AlignOfE (remove_cast e)
-  | Cil.UnOp (o, e, t) -> Cil.UnOp (o, remove_cast e, t)
-  | Cil.BinOp (o, e1, e2, t) -> Cil.BinOp (o, remove_cast e1, remove_cast e2, t)
-  | Cil.Question (e1, e2, e3, t) ->
-      Cil.Question (remove_cast e1, remove_cast e2, remove_cast e3, t)
-  | Cil.CastE (_, e) -> remove_cast e
-
 let arg_count = ref 0
 
 let new_arg_id () =
@@ -344,7 +350,7 @@ let pp_arg fmt n arg =
     (fun _ e ->
       let e' = if !Options.remove_cast then remove_cast e else e in
       (if !Options.patron then Hashtbl.find exp_patron_map (n, e')
-      else Hashtbl.find exp_map e')
+       else Hashtbl.find exp_map e')
       |> F.fprintf fmt.arg "%s\t%s\t%s\n" id (new_arg_pos_id ()))
     arg;
   id

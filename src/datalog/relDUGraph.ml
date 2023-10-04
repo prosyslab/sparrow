@@ -118,7 +118,6 @@ let optimize alarms g =
   let g = reachability2 alarms g in
   L.info "%d nodes and %d edges after reachability2\n" (G.nb_node g)
     (G.nb_edge g);
-  (*   let g = optimize_inter_edge global g in *)
   g
 
 module SCC = Graph.Components.Make (G)
@@ -302,10 +301,10 @@ let rec pp_exp_sems fmt global inputmem outputmem node e =
   F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp node e_id v_id;
   (e_id, v_id)
 
-let pp_cmd_sems fmt global inputmem outputmem n =
+let pp_cmd_sems fmt global inputmem outputmem n dug =
   (if InterCfg.is_entry n then
-   let reach_n = app_reach n in
-   add_rule fmt [ reach_n ] (* True -> Reach(n) *));
+     let reach_n = app_reach n in
+     add_rule fmt [ reach_n ] (* True -> Reach(n) *));
   let memory_n = app_memory n "l" "v" in
   match InterCfg.cmdof global.Global.icfg n with
   | Cset (lv, e, _) ->
@@ -314,7 +313,7 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       let lv_id, loc_id = pp_lv_sems fmt global n lv in
       let evallv = app_evallv n lv_id loc_id in
       let eval = app_eval n e_id v_id in
-      let succ = InterCfg.succ n global.icfg in
+      let succ = G.succ n dug in
       List.iter
         (fun next ->
           let memory_next = app_memory next loc_id v_id in
@@ -350,7 +349,7 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       (* Eval(n size_e size_v) /\ Val(size_v x_size) -> Eval(n e v) *)
       add_rule fmt [ arr_val; eval_size; v_size_rel ];
       (* Eval(n size_e size_v) /\ Val(size_v x_size) -> ArrVal(v x_size) *)
-      let succ = InterCfg.succ n global.icfg in
+      let succ = G.succ n dug in
       List.iter
         (fun next ->
           let memory_next = app_memory next loc_id arr_v_id in
@@ -379,13 +378,13 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       let reach_n = app_reach n in
       let evallv = app_evallv n lv_id loc_id in
       let eval = app_eval n e_id v_id in
-      let val_cons = F.sprintf "(= y \"%s\")" s in
+      let val_cons = F.sprintf "(= y %d)" (String.length s) in
       let str_val = app_str v_id "y" in
       add_rule fmt [ eval; reach_n ];
       (* Reach(n) -> Eval(n e v) *)
       add_rule fmt [ str_val; reach_n; val_cons ];
-      (* Reach(n) /\ (y == "str") -> StrVal(v y) *)
-      let succ = InterCfg.succ n global.icfg in
+      (* Reach(n) /\ (y == strlen) -> StrVal(v y) *)
+      let succ = G.succ n dug in
       List.iter
         (fun next ->
           let memory_next = app_memory next loc_id v_id in
@@ -427,7 +426,7 @@ let pp_cmd_sems fmt global inputmem outputmem n =
          /\ Val(arg1_v x1) ... Val(argi_v xi)
          /\ func(x1 ... xi y) -> Val(v y) *)
       let reach_n = app_reach n in
-      let succ = InterCfg.succ n global.icfg in
+      let succ = G.succ n dug in
       if Option.is_some lv_opt then (
         let lv = Option.get lv_opt in
         let lv_id, loc_id = pp_lv_sems fmt global n lv in
@@ -474,7 +473,7 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       let eval = app_eval n e_id v_id in
       let v_rel = app_val v_id "x" in
       let x_isnzero = F.sprintf "(!= x 0)" in
-      let succ = InterCfg.succ n global.icfg in
+      let succ = G.succ n dug in
       List.iter
         (fun next ->
           let reach_next = app_reach next in
@@ -490,7 +489,7 @@ let pp_cmd_sems fmt global inputmem outputmem n =
       ignore e_opt;
       ()
   | Cskip _ ->
-      let succ = InterCfg.succ n global.icfg in
+      let succ = G.succ n dug in
       let reach_n = app_reach n in
       List.iter
         (fun next ->
@@ -587,13 +586,7 @@ let print analysis global dug alarms =
   close_out oc_fc;
   close_out oc_fb
 
-let print_sems analysis global inputof outputof dug alarms =
-  let dug = G.copy dug in
-  let alarms = Report.get alarms Report.UnProven in
-  let dug =
-    if !Options.extract_datalog_fact_full_no_opt then dug
-    else optimize alarms dug
-  in
+let print_sems analysis global inputof outputof dug =
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   (* fmt for patron *)
   let oc_duedge = open_out (dirname ^ "/DetailedDUEdge.facts") in
@@ -621,26 +614,17 @@ let print_sems analysis global inputof outputof dug alarms =
   Hashtbl.reset loc_map;
   Hashtbl.reset str_map;
   Hashtbl.reset eval_map;
-  let tc = G.transitive_closure dug in
-  G.iter_edges
-    (fun src dst -> F.fprintf fmt.dupath "%a\t%a\n" Node.pp src Node.pp dst)
-    tc;
-  let icfg = global.Global.icfg in
-  InterCfg.iter
-    (fun pid cfg ->
-      IntraCfg.iter_node
-        (fun n ->
-          let node = Node.make pid n in
-          pp_cmd_sems fmt global (Table.find node inputof)
-            (Table.find node outputof) node)
-        cfg;
-      let tc = IntraCfg.transitive_closure cfg in
-      IntraCfg.iter_edges
-        (fun src dst ->
-          let pp = IntraCfg.pp_node_like_interCfg cfg in
-          F.fprintf fmt.cfpath "%a\t%a\n" pp src pp dst)
-        tc)
-    icfg;
+  G.iter_node
+    (fun node ->
+      pp_cmd_sems fmt global (Table.find node inputof)
+        (Table.find node outputof) node dug)
+    dug;
+  G.iter_edges_e
+    (fun src dst locset ->
+      if Hashtbl.mem loc_map locset then
+        F.fprintf fmt.duedge "%a\t%a\t%s\n" Node.pp src Node.pp dst
+          (Hashtbl.find loc_map locset))
+    dug;
   print_maps dirname;
   F.pp_print_flush fmt.duedge ();
   F.pp_print_flush fmt.dupath ();
@@ -660,6 +644,194 @@ let print_sems analysis global inputof outputof dug alarms =
   close_out oc_sem_rule;
   close_out oc_arrayval;
   close_out oc_conststr
+
+let pp_dug_cmd fmt icfg dug n =
+  if G.pred n dug |> List.length = 2 then
+    F.fprintf fmt.RelSyntax.join "%a\n" Node.pp n;
+  F.fprintf fmt.func "%s\t%a\n" (Node.get_pid n) Node.pp n;
+  match InterCfg.cmdof icfg n with
+  | Cskip _ ->
+      if InterCfg.is_entry n then F.fprintf fmt.entry "%a\n" Node.pp n
+      else if InterCfg.is_exit n then F.fprintf fmt.exit "%a\n" Node.pp n
+      else F.fprintf fmt.skip "%a\n" Node.pp n
+  | Cset (lv, e, _) ->
+      RelSyntax.pp_lv fmt n lv;
+      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
+      RelSyntax.pp_exp fmt n e';
+      let lv_id = Hashtbl.find RelSyntax.lv_map lv in
+      let e_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (n, e')
+        else Hashtbl.find RelSyntax.exp_map e'
+      in
+      F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id e_id;
+      F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id
+  | Cexternal (_, _) -> F.fprintf fmt.cmd "external\n"
+  | Calloc (lv, (Array e as alloc), _, _, _) ->
+      RelSyntax.pp_lv fmt n lv;
+      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
+      RelSyntax.pp_exp fmt n e';
+      let lv_id = Hashtbl.find RelSyntax.lv_map lv in
+      let size_e_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (n, e')
+        else Hashtbl.find RelSyntax.exp_map e'
+      in
+      let alloc_id =
+        if Hashtbl.mem RelSyntax.alloc_map alloc then
+          Hashtbl.find RelSyntax.alloc_map alloc
+        else RelSyntax.new_alloc_id alloc
+      in
+      F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id alloc_id;
+      F.fprintf fmt.alloc_exp "%s\t%s\n" alloc_id size_e_id;
+      F.fprintf fmt.alloc "%a\t%s\t%s\n" Node.pp n lv_id size_e_id
+  | Calloc (_, _, _, _, _) -> F.fprintf fmt.cmd "alloc\n"
+  | Csalloc (lv, str, _) ->
+      RelSyntax.pp_lv fmt n lv;
+      let lv_id = Hashtbl.find RelSyntax.lv_map lv in
+      let salloc_id =
+        if Hashtbl.mem RelSyntax.salloc_map str then
+          Hashtbl.find RelSyntax.salloc_map str
+        else RelSyntax.new_salloc_id str
+      in
+      F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id salloc_id;
+      F.fprintf fmt.salloc_exp "%s\t%s\n" salloc_id str;
+      F.fprintf fmt.salloc "%a\t%s\n" Node.pp n lv_id
+  | Cfalloc (_, _, _) -> F.fprintf fmt.cmd "falloc\n"
+  | Ccall (lv_opt, (Lval (Var f, NoOffset) as e), el, _)
+    when f.vstorage = Cil.Extern ->
+      let lv =
+        if Option.is_none lv_opt then RelSyntax.donotcare_lv
+        else Option.get lv_opt
+      in
+      RelSyntax.pp_lv fmt n lv;
+      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
+      RelSyntax.pp_exp fmt n e';
+      let el' =
+        List.map
+          (fun e -> if !Options.remove_cast then RelSyntax.remove_cast e else e)
+          el
+      in
+      List.iter (RelSyntax.pp_exp fmt n) el';
+      let arg_id = RelSyntax.pp_arg fmt n el' in
+      let lv_id = Hashtbl.find RelSyntax.lv_map lv in
+      let e_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (n, e')
+        else Hashtbl.find RelSyntax.exp_map e'
+      in
+      let libcall_id =
+        if Hashtbl.mem RelSyntax.libcall_map (n, e', el') then
+          Hashtbl.find RelSyntax.libcall_map (n, e', el')
+        else RelSyntax.new_libcall_id (n, e', el')
+      in
+      F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id libcall_id;
+      F.fprintf fmt.libcall_exp "%s\t%s\t%s\n" libcall_id e_id arg_id;
+      F.fprintf fmt.libcall "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
+  | Ccall (lv_opt, e, el, _) ->
+      let lv =
+        if Option.is_none lv_opt then RelSyntax.donotcare_lv
+        else Option.get lv_opt
+      in
+      RelSyntax.pp_lv fmt n lv;
+      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
+      RelSyntax.pp_exp fmt n e';
+      let el' =
+        List.map
+          (fun e -> if !Options.remove_cast then RelSyntax.remove_cast e else e)
+          el
+      in
+      List.iter (RelSyntax.pp_exp fmt n) el';
+      let arg_id = RelSyntax.pp_arg fmt n el' in
+      let lv_id = Hashtbl.find RelSyntax.lv_map lv in
+      let e_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (n, e')
+        else Hashtbl.find RelSyntax.exp_map e'
+      in
+      let call_id =
+        if Hashtbl.mem RelSyntax.call_map (n, e', el') then
+          Hashtbl.find RelSyntax.call_map (n, e', el')
+        else RelSyntax.new_call_id (n, e', el')
+      in
+      F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id call_id;
+      F.fprintf fmt.call_exp "%s\t%s\t%s\n" call_id e_id arg_id;
+      F.fprintf fmt.call "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
+  | Creturn (Some e, _) ->
+      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
+      RelSyntax.pp_exp fmt n e';
+      let id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (n, e')
+        else Hashtbl.find RelSyntax.exp_map e'
+      in
+      F.fprintf fmt.return "%a\t%s\n" Node.pp n id
+  | Cassume (e, _, _) ->
+      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
+      RelSyntax.pp_exp fmt n e';
+      let e_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (n, e')
+        else Hashtbl.find RelSyntax.exp_map e'
+      in
+      F.fprintf fmt.assume "%a\t%s\n" Node.pp n e_id
+  | _ -> F.fprintf fmt.cmd "unknown"
+
+let print_patron_relation dirname icfg dug =
+  let fmt, channels = RelSyntax.make_formatters dirname in
+  G.iter_node (fun n -> pp_dug_cmd fmt icfg dug n) dug;
+  RelSyntax.close_formatters fmt channels
+
+let print_syntax_patron analysis icfg dug =
+  Hashtbl.reset RelSyntax.exp_map;
+  Hashtbl.reset RelSyntax.exp_patron_map;
+  Hashtbl.reset RelSyntax.lv_map;
+  Hashtbl.reset RelSyntax.binop_map;
+  Hashtbl.reset RelSyntax.unop_map;
+  let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
+  print_patron_relation dirname icfg dug;
+  RelSyntax.print_raw_patron dirname
+
+let get_target_alram dir alarms =
+  if !Options.target_alarm then (
+    let label_path = dir ^ "/../../../label.json" in
+    let json = Yojson.Basic.from_file label_path in
+    let target_alarm =
+      match json with
+      | `Assoc fields -> List.assoc "alarm" fields |> Yojson.Basic.to_string
+      | _ -> failwith "label.json does not have the alarm specified"
+    in
+    let alarms =
+      List.fold_left
+        (fun acc alarm ->
+          let alarm_loc = CilHelper.s_location alarm.Report.loc in
+          if alarm_loc = Str.(global_replace (regexp "\"") "" target_alarm) then
+            alarm :: acc
+          else acc)
+        [] alarms
+    in
+    if alarms = [] then Logging.error "specified target alarm not found";
+    alarms)
+  else alarms
+
+let print_patron analysis global inputof outputof dug alarms =
+  let dug = G.copy dug in
+  F.printf "alarms before filter: %d\n" (List.length alarms);
+  let alarms =
+    Report.get alarms Report.UnProven
+    |> get_target_alram (FileManager.analysis_dir analysis)
+    |>
+    if BatMap.is_empty !Options.slice_target_map then Fun.id
+    else Report.filter_by_target_locs !Options.slice_target_map
+  in
+  print_endline (string_of_int (List.length alarms) ^ " alarms are selected");
+  F.printf "alarms after filter: %d\n" (List.length alarms);
+  F.printf "dug before optimize: %d nodes, %d edges\n" (G.nb_node dug)
+    (G.nb_edge dug);
+  let dug =
+    if !Options.extract_datalog_fact_full_no_opt then dug
+    else optimize alarms dug
+  in
+  print_endline "slicing dug is done";
+  F.printf "dug after optimize: %d nodes, %d edges\n" (G.nb_node dug)
+    (G.nb_edge dug);
+  if !Options.patron then print_syntax_patron analysis global.Global.icfg dug
+  else RelSyntax.print analysis global.Global.icfg;
+  print_sems analysis global inputof outputof dug
 
 module AlarmSet = Set.Make (struct
   type t = Node.t * Node.t [@@deriving compare]
@@ -941,7 +1113,7 @@ let pp_taint_alarm_exp src_node node fmt aexp =
       let binop = F.sprintf "(BinOp %s Div %s %s)" e_id e1_id e2_id in
       let eval = F.asprintf "(Eval %a %s %s)" Node.pp node e2_id v_id in
       let val_rel = F.sprintf "(Val %s x)" v_id in
-      let val_cons = F.asprintf "(> x 0)" in
+      let val_cons = F.asprintf "(= x 0)" in
       let dzerror = F.asprintf "(DZError %a x)" Node.pp node in
       String.concat " " [ dzerror; binop; eval; val_rel; val_cons ]
       (* BinOp(e / e1 e2) /\ Eval(n e2 v) /\ Val(v x) /\ (x == 0) -> DZError(n x) *)
@@ -1005,7 +1177,15 @@ let pp_taint_alarm_exp src_node node fmt aexp =
   | BufferOverrunLib (name, _, _) -> failwith name
 
 let print_taint_alarm analysis alarms =
-  let alarms = Report.get alarms Report.UnProven in
+  let alarms =
+    Report.get alarms Report.UnProven
+    |> get_target_alram (FileManager.analysis_dir analysis)
+    |>
+    if BatMap.is_empty !Options.slice_target_map then Fun.id
+    else Report.filter_by_target_locs !Options.slice_target_map
+  in
+  L.info "print_taint_alarm - alarms:\n";
+  List.iter (fun alarm -> L.info "%s\n" (Report.string_of_query alarm)) alarms;
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   let oc_start = open_out (dirname ^ "/Start.facts") in
   let oc_alarm = open_out (dirname ^ "/SparrowAlarm.facts") in
