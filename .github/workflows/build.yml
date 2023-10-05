@@ -29,6 +29,13 @@ jobs:
             ${{ env.cache-name }}-build-${{ hashFiles('opam', 'build.sh') }}
             ${{ env.cache-name }}-build-
 
+      - name: Install ocamlformat
+        run: opam install ocamlformat.0.24.1
+
+      - name: Check format
+        run: |
+          eval $(opam env)
+          script/check-format
       - name: Install deps
         run: |
           sudo apt-get update
