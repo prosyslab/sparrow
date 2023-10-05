@@ -123,7 +123,7 @@ let extract_datalog_fact_full_no_opt = ref false
 (* for patron *)
 let patron = ref false
 
-let target_alarm = ref false
+let target_alarm = ref ""
 
 (* remove cast exp for patron *)
 let remove_cast = ref false
@@ -284,7 +284,7 @@ let opts =
       "Print Integer-overflow alarms from multiply expressions" );
     ("-patron", Arg.Set patron, "Anlyze for Patron");
     ( "-target_alarm",
-      Arg.Set target_alarm,
+      Arg.String (fun s -> target_alarm := s),
       "narrow down the optimization results over the taint analysis based on \
        the alarm specified by Patron" );
     ("-dz", Arg.Set dz, "Print Divide-by-zero alarms");

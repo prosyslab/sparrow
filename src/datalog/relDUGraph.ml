@@ -786,21 +786,16 @@ let print_syntax_patron analysis icfg dug =
   print_patron_relation dirname icfg dug;
   RelSyntax.print_raw_patron dirname
 
-let get_target_alram dir alarms =
-  if !Options.target_alarm then (
-    let label_path = dir ^ "/../../../label.json" in
-    let json = Yojson.Basic.from_file label_path in
-    let target_alarm =
-      match json with
-      | `Assoc fields -> List.assoc "alarm" fields |> Yojson.Basic.to_string
-      | _ -> failwith "label.json does not have the alarm specified"
-    in
+let get_target_alram alarms =
+  if !Options.target_alarm != "" then (
     let alarms =
       List.fold_left
         (fun acc alarm ->
           let alarm_loc = CilHelper.s_location alarm.Report.loc in
-          if alarm_loc = Str.(global_replace (regexp "\"") "" target_alarm) then
-            alarm :: acc
+          if
+            alarm_loc
+            = Str.(global_replace (regexp "\"") "" !Options.target_alarm)
+          then alarm :: acc
           else acc)
         [] alarms
     in
@@ -813,12 +808,11 @@ let print_patron analysis global inputof outputof dug alarms =
   F.printf "alarms before filter: %d\n" (List.length alarms);
   let alarms =
     Report.get alarms Report.UnProven
-    |> get_target_alram (FileManager.analysis_dir analysis)
+    |> get_target_alram
     |>
     if BatMap.is_empty !Options.slice_target_map then Fun.id
     else Report.filter_by_target_locs !Options.slice_target_map
   in
-  print_endline (string_of_int (List.length alarms) ^ " alarms are selected");
   F.printf "alarms after filter: %d\n" (List.length alarms);
   F.printf "dug before optimize: %d nodes, %d edges\n" (G.nb_node dug)
     (G.nb_edge dug);
@@ -826,7 +820,6 @@ let print_patron analysis global inputof outputof dug alarms =
     if !Options.extract_datalog_fact_full_no_opt then dug
     else optimize alarms dug
   in
-  print_endline "slicing dug is done";
   F.printf "dug after optimize: %d nodes, %d edges\n" (G.nb_node dug)
     (G.nb_edge dug);
   if !Options.patron then print_syntax_patron analysis global.Global.icfg dug
@@ -1179,7 +1172,7 @@ let pp_taint_alarm_exp src_node node fmt aexp =
 let print_taint_alarm analysis alarms =
   let alarms =
     Report.get alarms Report.UnProven
-    |> get_target_alram (FileManager.analysis_dir analysis)
+    |> get_target_alram
     |>
     if BatMap.is_empty !Options.slice_target_map then Fun.id
     else Report.filter_by_target_locs !Options.slice_target_map

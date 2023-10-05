@@ -148,7 +148,7 @@ val remove_cast : bool ref
 
 val patron : bool ref
 
-val target_alarm : bool ref
+val target_alarm : string ref
 
 (** {2 Pretty Printer & Debugging } *)
 
