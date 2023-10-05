@@ -297,9 +297,110 @@ let perform_slicing global dug (targ_id, targ_line) =
   print_to_file targ_id "slice_dfg.txt" dfg_nodes
 (* print_to_file targ_id "slice_control_dep_line.txt" control_dep_lines *)
 
+let target_file_path targ_id filename =
+  Filename.concat targ_id filename |> Filename.concat !Options.outdir
+
+let target_output_sum filename targets =
+  let read_file filename =
+    let rec read_lines file acc =
+      let line = try Some (input_line file) with End_of_file -> None in
+      match line with
+      | Some line -> read_lines file (SS.add line acc)
+      | None -> acc
+    in
+    let ic = open_in filename in
+    let lines = read_lines ic SS.empty in
+    close_in ic;
+    lines
+  in
+  targets
+  |> List.map (fun targ_id -> read_file (target_file_path targ_id filename))
+  |> List.fold_left SS.union SS.empty
+
+let avg_dfgs mode targets =
+  let process_dfgfile data filename freq =
+    try
+      match Hashtbl.find_opt data filename with
+      | Some value ->
+          let updated_value =
+            match mode with
+            | "max" -> max value freq
+            | "avg" -> value +. freq
+            | _ -> value
+          in
+          Hashtbl.replace data filename updated_value
+      | None -> Hashtbl.add data filename freq
+    with Failure _ -> raise (Failure "Invalid format")
+  in
+  let rec process_dfglines ic data =
+    let line = try Some (input_line ic) with End_of_file -> None in
+    match line with
+    | Some line ->
+        let parts = Str.split (Str.regexp " ") line in
+        (match parts with
+        | [ freq_str; function_name ] ->
+            process_dfgfile data function_name (float_of_string freq_str)
+        | _ -> raise (Failure "Invalid format"));
+        process_dfglines ic data
+    | None -> data
+  in
+  let aggregate_dfgfiles data targ_id =
+    let file_path = target_file_path targ_id "slice_dfg.txt" in
+    let ic = open_in file_path in
+    let data = process_dfglines ic data in
+    close_in ic;
+    data
+  in
+  let dfg_hashtbl = Hashtbl.create 10000 in
+  let file_data = List.fold_left aggregate_dfgfiles dfg_hashtbl targets in
+  let length = float_of_int (List.length targets) in
+  Hashtbl.fold
+    (fun function_name value acc ->
+      if mode = "avg" then
+        Printf.sprintf "%.1f %s" (value /. length) function_name :: acc
+      else Printf.sprintf "%.1f %s" value function_name :: acc)
+    file_data []
+
+let average_slice mode targets =
+  let write_file filename lines =
+    let oc = Filename.concat !Options.outdir filename |> open_out in
+    List.iter (fun line -> output_string oc (line ^ "\n")) lines;
+    close_out oc
+  in
+  let sort_lines lines =
+    let extract_parts line =
+      try
+        let parts = Str.split (Str.regexp ":") line in
+        match parts with
+        | [ filename; line_num ] -> (filename, int_of_string line_num)
+        | _ -> raise (Invalid_argument "Invalid Format")
+      with _ -> raise (Invalid_argument "Parsing Error")
+    in
+    let order line1 line2 =
+      let filename1, line_num1 = extract_parts line1 in
+      let filename2, line_num2 = extract_parts line2 in
+      match String.compare filename1 filename2 with
+      | 0 -> compare line_num1 line_num2
+      | cmp -> cmp
+    in
+    List.sort order lines
+  in
+  let dfg_outputname =
+    if mode = "max" then "slice_dfgs_max.txt"
+    else if mode = "avg" then "slice_dfgs_avg.txt"
+    else raise (Invalid_argument "Undefined other than max or avg")
+  in
+  let all_lines = target_output_sum "slice_line.txt" targets in
+  all_lines |> SS.elements |> sort_lines |> write_file "slice_line.txt";
+  let all_funcs = target_output_sum "slice_func.txt" targets in
+  (* SS.elements automatically sort elements alphabetically *)
+  all_funcs |> SS.elements |> write_file "slice_func.txt";
+  avg_dfgs mode targets |> sort_lines |> write_file dfg_outputname
+
 let run global =
   let slicing_targets = BatMap.bindings !Options.slice_target_map in
   let dug = construct_dug global slicing_targets in
   List.iter (perform_slicing global dug) slicing_targets;
+  List.map fst slicing_targets |> average_slice "avg";
   L.info "Total elapsed time: ";
   print_elapsed_time ~level:0
