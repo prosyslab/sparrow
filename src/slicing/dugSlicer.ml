@@ -385,17 +385,17 @@ let average_slice mode targets =
     in
     List.sort order lines
   in
-  let dfg_outputname =
-    if mode = "max" then "slice_dfgs_max.txt"
-    else if mode = "avg" then "slice_dfgs_avg.txt"
-    else raise (Invalid_argument "Undefined other than max or avg")
-  in
+  let slicing_dir = Filename.concat !Options.outdir "ddafl" in
+  FileManager.mkdir slicing_dir;
+  let filename_line = Filename.concat "ddafl" "slice_line.txt" in 
+  let filename_func = Filename.concat "ddafl" "slice_func.txt" in
+  let filename_dfg = Filename.concat "ddafl" "slice_dfg.txt" in
   let all_lines = target_output_sum "slice_line.txt" targets in
-  all_lines |> SS.elements |> sort_lines |> write_file "slice_line.txt";
+  all_lines |> SS.elements |> sort_lines |> write_file filename_line;
   let all_funcs = target_output_sum "slice_func.txt" targets in
   (* SS.elements automatically sort elements alphabetically *)
-  all_funcs |> SS.elements |> write_file "slice_func.txt";
-  avg_dfgs mode targets |> sort_lines |> write_file dfg_outputname
+  all_funcs |> SS.elements |> write_file filename_func;
+  avg_dfgs mode targets |> sort_lines |> write_file filename_dfg
 
 let run global =
   let slicing_targets = BatMap.bindings !Options.slice_target_map in
