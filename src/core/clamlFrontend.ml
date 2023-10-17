@@ -310,7 +310,7 @@ let trans_int_kind = function
 let trans_float_kind = function
   | C.BuiltinTypeKind.Float -> Cil.FFloat
   | Double -> Cil.FDouble
-  | LongDouble -> Cil.FLongDouble
+  | LongDouble | Float128 -> Cil.FLongDouble
   | _ -> invalid_arg "float kind"
 
 let trans_binop lhs rhs = function
@@ -715,7 +715,7 @@ and trans_builtin_type t =
   | Int | Bool | Char_U | UChar | UShort | UInt | ULong | ULongLong | Char_S
   | SChar | Short | Long | LongLong | Int128 | UInt128 ->
       Cil.TInt (trans_int_kind k, attr)
-  | Float | Double | LongDouble -> Cil.TFloat (trans_float_kind k, attr)
+  | Float | Double | LongDouble | Float128 -> Cil.TFloat (trans_float_kind k, attr)
   | _ ->
       F.fprintf F.err_formatter "%a\n" C.BuiltinType.pp t.ty;
       F.pp_print_flush F.err_formatter ();
