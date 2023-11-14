@@ -703,6 +703,7 @@ let rec trans_type ?(compinfos = []) scope typ =
       C.DecayedType.get_original_type typ.ty |> trans_type ~compinfos scope
   | AdjustedType ->
       C.AdjustedType.get_original_type typ.ty |> trans_type ~compinfos scope
+  | AtomicType -> C.AtomicType.get_value_type typ.ty |> trans_type ~compinfos scope
   | UnaryTransformType -> failwith "qwer"
   | _ -> failwith ("Unknown type " ^ C.Type.get_kind_name typ.ty)
 
