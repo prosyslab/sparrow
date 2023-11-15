@@ -703,7 +703,8 @@ let rec trans_type ?(compinfos = []) scope typ =
       C.DecayedType.get_original_type typ.ty |> trans_type ~compinfos scope
   | AdjustedType ->
       C.AdjustedType.get_original_type typ.ty |> trans_type ~compinfos scope
-  | AtomicType -> C.AtomicType.get_value_type typ.ty |> trans_type ~compinfos scope
+  | AtomicType ->
+      C.AtomicType.get_value_type typ.ty |> trans_type ~compinfos scope
   | UnaryTransformType -> failwith "qwer"
   | _ -> failwith ("Unknown type " ^ C.Type.get_kind_name typ.ty)
 
@@ -716,7 +717,8 @@ and trans_builtin_type t =
   | Int | Bool | Char_U | UChar | UShort | UInt | ULong | ULongLong | Char_S
   | SChar | Short | Long | LongLong | Int128 | UInt128 ->
       Cil.TInt (trans_int_kind k, attr)
-  | Float | Double | LongDouble | Float128 -> Cil.TFloat (trans_float_kind k, attr)
+  | Float | Double | LongDouble | Float128 ->
+      Cil.TFloat (trans_float_kind k, attr)
   | _ ->
       F.fprintf F.err_formatter "%a\n" C.BuiltinType.pp t.ty;
       F.pp_print_flush F.err_formatter ();
@@ -2672,24 +2674,26 @@ and mk_global_struct_init scope loc typ cfields expr_list =
               ((idx + 1) :: idx_list) (idx + 1)
           else
             let field, find, i = grab_matching_field origin_cfields f e in
-            let f = List.hd field in
-            let i = if i >= 0 then find else idx + 1 in
-            let expr_list =
-              if i >= 0 then
-                match expr_list with
-                | e :: el -> (
-                    match C.Stmt.get_kind e with
-                    | C.StmtKind.DesignatedInitExpr ->
-                        C.DesignatedInitExpr.get_init e :: el
-                    | _ -> expr_list)
-                | _ -> expr_list
-              else expr_list
-            in
-            let init, expr_remainders =
-              mk_init scope loc f.Cil.ftype expr_list
-            in
-            loop union_flag fl expr_remainders (f :: fis) (init :: inits)
-              (i :: idx_list) (idx + 1)
+            if field = [] then loop union_flag fl el fis inits idx_list idx
+            else
+              let f = List.hd field in
+              let i = if i >= 0 then find else idx + 1 in
+              let expr_list =
+                if i >= 0 then
+                  match expr_list with
+                  | e :: el -> (
+                      match C.Stmt.get_kind e with
+                      | C.StmtKind.DesignatedInitExpr ->
+                          C.DesignatedInitExpr.get_init e :: el
+                      | _ -> expr_list)
+                  | _ -> expr_list
+                else expr_list
+              in
+              let init, expr_remainders =
+                mk_init scope loc f.Cil.ftype expr_list
+              in
+              loop union_flag fl expr_remainders (f :: fis) (init :: inits)
+                (i :: idx_list) (idx + 1)
         else if is_init_list e then
           let init = trans_global_init scope loc f.ftype e |> snd in
           loop true fl el (f :: fis) (init :: inits) ((idx + 1) :: idx_list)
