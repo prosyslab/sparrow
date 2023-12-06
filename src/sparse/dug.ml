@@ -28,6 +28,8 @@ module type S = sig
 
   val copy : t -> t
 
+  val clear : t -> unit
+
   val nb_node : t -> int
 
   val nb_edge : t -> int
@@ -148,6 +150,10 @@ module Make (Access : Access.S) = struct
       { graph = I.create ~size (); label = Hashtbl.create (2 * size) }
 
     let copy g = { graph = I.copy g.graph; label = Hashtbl.copy g.label }
+
+    let clear g =
+      I.clear g.graph;
+      Hashtbl.clear g.label
 
     let succ g n = I.succ g.graph n
 
@@ -316,6 +322,8 @@ module Make (Access : Access.S) = struct
       loopheads = dug.loopheads;
       backedges = dug.backedges;
     }
+
+  let clear dug = G.clear dug.graph
 
   let nodesof dug = G.fold_vertex BatSet.add dug.graph BatSet.empty
 

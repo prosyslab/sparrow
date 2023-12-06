@@ -387,7 +387,7 @@ let average_slice mode targets =
   in
   let slicing_dir = Filename.concat !Options.outdir "ddafl" in
   FileManager.mkdir slicing_dir;
-  let filename_line = Filename.concat "ddafl" "slice_line.txt" in 
+  let filename_line = Filename.concat "ddafl" "slice_line.txt" in
   let filename_func = Filename.concat "ddafl" "slice_func.txt" in
   let filename_dfg = Filename.concat "ddafl" "slice_dfg.txt" in
   let all_lines = target_output_sum "slice_line.txt" targets in

@@ -109,15 +109,18 @@ let reachability2 alarms g =
       if PowNode.mem n reachable_from_node then g else G.remove_node n g)
     g g
 
-let optimize alarms g =
-  L.info "%d nodes and %d edges before optimization\n" (G.nb_node g)
-    (G.nb_edge g);
+let optimize ?(verbose = true) alarms g =
+  if verbose then
+    L.info "%d nodes and %d edges before optimization\n" (G.nb_node g)
+      (G.nb_edge g);
   let g = optimize_reachability alarms g in
-  L.info "%d nodes and %d edges after reachability\n" (G.nb_node g)
-    (G.nb_edge g);
+  if verbose then
+    L.info "%d nodes and %d edges after reachability\n" (G.nb_node g)
+      (G.nb_edge g);
   let g = reachability2 alarms g in
-  L.info "%d nodes and %d edges after reachability2\n" (G.nb_node g)
-    (G.nb_edge g);
+  if verbose then
+    L.info "%d nodes and %d edges after reachability2\n" (G.nb_node g)
+      (G.nb_edge g);
   g
 
 module SCC = Graph.Components.Make (G)
@@ -151,15 +154,10 @@ let cycle_elim dug =
   dug
 
 type formatter_of_patron = {
+  deduedge : F.formatter;
   duedge : F.formatter;
   dupath : F.formatter;
   cfpath : F.formatter;
-  evallv : F.formatter;
-  eval : F.formatter;
-  memory : F.formatter;
-  sem_rule : F.formatter;
-  arrayval : F.formatter;
-  conststr : F.formatter;
 }
 
 let loc_map = Hashtbl.create 1000
@@ -179,8 +177,6 @@ let new_val_id () =
   incr val_count;
   id
 
-let eval_map = Hashtbl.create 1000
-
 let str_map = Hashtbl.create 1000
 
 let str_count = ref 0
@@ -191,316 +187,10 @@ let new_str_id str =
   Hashtbl.add str_map str id;
   id
 
-let val2x v = "x" ^ (String.split_on_char '-' v |> List.tl |> List.hd)
-
-let app_reach n = F.asprintf "(Reach %a)" Node.pp n
-
-let app_eval n e v = F.asprintf "(Eval %a %s %s)" Node.pp n e v
-
-let app_evallv n lv loc = F.asprintf "(EvalLv %a %s %s)" Node.pp n lv loc
-
-let app_memory n loc v = F.asprintf "(Memory %a %s %s)" Node.pp n loc v
-
-let app_val v x = F.sprintf "(Val %s %s)" v x
-
-let app_arr v x = F.sprintf "(ArrVal %s %s)" v x
-
-let app_str v x = F.sprintf "(StrVal %s %s)" v x
-
-let add_rule fmt r = String.concat " " r |> F.fprintf fmt.sem_rule "(%s)\n"
-
 let val_of_const = function
   | Cil.CInt64 (i, _, _) -> i
   | Cil.CChr c -> Char.code c |> Int64.of_int
   | _ -> 0L (* TODO: add String, Real domain *)
-
-let pp_lv_sems fmt global node lv =
-  let lv_id = Hashtbl.find RelSyntax.lv_map lv in
-  let pid = Node.get_pid node in
-  let loc = ItvSem.eval_lv pid lv global.Global.mem in
-  let loc_id =
-    if Hashtbl.mem loc_map loc then Hashtbl.find loc_map loc else new_loc_id loc
-  in
-  (match lv with
-  | Cil.Var _, Cil.NoOffset ->
-      let evallv = app_evallv node lv_id loc_id in
-      let reach = app_reach node in
-      (* Head :: Body *)
-      add_rule fmt [ evallv; reach ]
-      (* Reach(n) -> EvalLv(n lv loc) *)
-  | _ -> (* TODO: array indexing *) ());
-  (lv_id, loc_id)
-
-let rec pp_exp_sems fmt global inputmem outputmem node e =
-  let e_id = Hashtbl.find RelSyntax.exp_patron_map (node, e) in
-  let v_id = new_val_id () in
-  Hashtbl.add eval_map (node, e_id) v_id;
-  let eval_e = app_eval node e_id v_id in
-  let v_rel = app_val v_id "y" in
-  (match e with
-  | Cil.Const c ->
-      let reach = F.asprintf "(Reach %a)" Node.pp node in
-      let i = val_of_const c in
-      let val_cons = F.sprintf "(= y %Ld)" i in
-      add_rule fmt [ eval_e; reach ];
-      (* Reach(n) -> Eval(n e v) *)
-      add_rule fmt [ v_rel; reach; val_cons ]
-      (* Reach(n) /\ (y == c) -> Val(v y) *)
-  | Cil.Lval l | Cil.StartOf l ->
-      let lv_id, loc_id = pp_lv_sems fmt global node l in
-      let evallv = app_evallv node lv_id loc_id in
-      let memory = app_memory node loc_id "v" in
-      let val_rel = app_val "v" "x" in
-      let val_cons = F.sprintf "(= y x)" in
-      add_rule fmt [ eval_e; evallv; memory; val_rel ];
-      (* EvalLv(n lv loc) /\ Memory(n loc old_v) /\ Val(old_v x) -> Eval(n e v) *)
-      add_rule fmt [ v_rel; evallv; memory; val_rel; val_cons ]
-      (* EvalLv(n lv loc) /\ Memory(n loc old_v) /\ Val(old_v x) /\ (y == x) -> Val(v y) *)
-  | Cil.SizeOf t ->
-      let reach = app_reach node in
-      let size = CilHelper.byteSizeOf t in
-      let val_cons = F.sprintf "(= y %d)" size in
-      add_rule fmt [ eval_e; reach ];
-      (* Reach(n) -> Eval(n e v) *)
-      add_rule fmt [ v_rel; reach; val_cons ]
-      (* Reach(n) /\ (y == sizeof(t)) -> Val(v y) *)
-  | Cil.SizeOfE e1 ->
-      let e1_id, v1_id = pp_exp_sems fmt global inputmem outputmem node e1 in
-      let eval_e1 = app_eval node e1_id v1_id in
-      let v1_rel = app_arr v1_id "x_size" in
-      let val_cons = "(= y x_size)" in
-      add_rule fmt [ eval_e; eval_e1; v1_rel ];
-      (* Eval(n e1 v1) /\ ArrVal(v1 x_size) -> Eval(n e v) *)
-      add_rule fmt [ v_rel; eval_e1; v1_rel; val_cons ]
-      (* Eval(n e1 v1) /\ ArrVal(v1 x_size) /\ (y == x_size) -> Val(v y) *)
-  | Cil.BinOp (op, e1, e2, _) ->
-      let e1_id, v1_id = pp_exp_sems fmt global inputmem outputmem node e1 in
-      let e2_id, v2_id = pp_exp_sems fmt global inputmem outputmem node e2 in
-      let eval_e1 = app_eval node e1_id v1_id in
-      let eval_e2 = app_eval node e2_id v2_id in
-      let v1_rel = app_val v1_id "x1" in
-      let v2_rel = app_val v2_id "x2" in
-      let val_cons =
-        F.asprintf "(= y (%s x1 x2))" (RelSyntax.string_of_bop op)
-      in
-      add_rule fmt [ eval_e; eval_e1; eval_e2; v1_rel; v2_rel ];
-      (* Eval(n e1 v1) /\ Eval(n e2 v2) /\ Val(v1 x1) /\ Val(v2 x2) -> Eval(n e v) *)
-      add_rule fmt [ v_rel; eval_e1; eval_e2; v1_rel; v2_rel; val_cons ]
-      (* Eval(n e1 v1) /\ Eval(n e2 v2) /\ Val(v1 x1) /\ Val(v2 x2) /\ (y == f(x1 x2)) -> Val(v y) *)
-  | Cil.UnOp (op, e1, _) ->
-      let e1_id, v1_id = pp_exp_sems fmt global inputmem outputmem node e1 in
-      let eval_e1 = app_eval node e1_id v1_id in
-      let v1_rel = app_val v1_id "x1" in
-      let val_cons = F.asprintf "(= y (%s x1))" (RelSyntax.string_of_uop op) in
-      (* Head :: Body *)
-      add_rule fmt [ eval_e; eval_e1; v1_rel ];
-      (* Eval(n e1 v1) /\ Val(v1 x1) -> Eval(n e v) *)
-      add_rule fmt [ v_rel; eval_e1; v1_rel; val_cons ]
-      (* Eval(n e1 v1) /\ Val(v1 x1) /\ (y == f(x1)) -> Val(v y) *)
-  | _ -> (* TODO: Question, AlignOf *) ());
-  F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp node e_id v_id;
-  (e_id, v_id)
-
-let pp_cmd_sems fmt global inputmem outputmem n dug =
-  (if InterCfg.is_entry n then
-     let reach_n = app_reach n in
-     add_rule fmt [ reach_n ] (* True -> Reach(n) *));
-  let memory_n = app_memory n "l" "v" in
-  match InterCfg.cmdof global.Global.icfg n with
-  | Cset (lv, e, _) ->
-      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
-      let e_id, v_id = pp_exp_sems fmt global inputmem outputmem n e' in
-      let lv_id, loc_id = pp_lv_sems fmt global n lv in
-      let evallv = app_evallv n lv_id loc_id in
-      let eval = app_eval n e_id v_id in
-      let succ = G.succ n dug in
-      List.iter
-        (fun next ->
-          let memory_next = app_memory next loc_id v_id in
-          let reach_next = app_reach next in
-          add_rule fmt [ memory_next; evallv; eval ];
-          (* EvalLv(n lv loc) /\ Eval(n e v) -> Memory(n+1 loc v) *)
-          add_rule fmt [ reach_next; evallv; eval ];
-          (* EvalLv(n lv loc) /\ Eval(n e v) -> Reach(n+1) *)
-          let memory_next_for_all = app_memory next "l" "v" in
-          let not_new_loc = F.sprintf "(!= l %s)" loc_id in
-          add_rule fmt [ memory_next_for_all; memory_n; not_new_loc ]
-          (* forall loc v. Memory(n loc v) /\ (loc != lv's loc) -> Memory(n+1 loc v) *))
-        succ;
-      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
-      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id v_id
-  | Calloc (lv, (Array size as e), _, _, _) ->
-      let arr_v_id = new_val_id () in
-      let size' =
-        if !Options.remove_cast then RelSyntax.remove_cast size else size
-      in
-      let lv_id, loc_id = pp_lv_sems fmt global n lv in
-      let size_e_id, size_v_id =
-        pp_exp_sems fmt global inputmem outputmem n size'
-      in
-      let e_id = Hashtbl.find RelSyntax.alloc_map e in
-      Hashtbl.add eval_map (n, e_id) arr_v_id;
-      let evallv = app_evallv n lv_id loc_id in
-      let eval_size = app_eval n size_e_id size_v_id in
-      let eval_arr = app_eval n e_id arr_v_id in
-      let v_size_rel = app_val size_v_id "x_size" in
-      let arr_val = app_arr arr_v_id "x_size" in
-      add_rule fmt [ eval_arr; eval_size; v_size_rel ];
-      (* Eval(n size_e size_v) /\ Val(size_v x_size) -> Eval(n e v) *)
-      add_rule fmt [ arr_val; eval_size; v_size_rel ];
-      (* Eval(n size_e size_v) /\ Val(size_v x_size) -> ArrVal(v x_size) *)
-      let succ = G.succ n dug in
-      List.iter
-        (fun next ->
-          let memory_next = app_memory next loc_id arr_v_id in
-          let reach_next = app_reach next in
-          add_rule fmt [ memory_next; evallv; eval_arr ];
-          (* EvalLv(n lv loc) /\ Eval(n e v) -> Memory(n+1 loc v) *)
-          add_rule fmt [ reach_next; evallv; eval_arr ];
-          (* EvalLv(n lv loc) /\ Eval(n e v) -> Reach(n+1) *)
-          let memory_next_for_all = app_memory next "l" "v" in
-          let not_new_loc = F.sprintf "(!= l %s)" loc_id in
-          add_rule fmt [ memory_next_for_all; memory_n; not_new_loc ]
-          (* forall loc v. Memory(n loc v) /\ (loc != lv's loc) -> Memory(n+1 loc v) *))
-        succ;
-      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id arr_v_id;
-      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
-      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id arr_v_id;
-      F.fprintf fmt.arrayval "%s\t%s\n" arr_v_id size_v_id
-  | Csalloc (lv, s, _) ->
-      let s_id =
-        if Hashtbl.mem str_map s then Hashtbl.find str_map s else new_str_id s
-      in
-      let lv_id, loc_id = pp_lv_sems fmt global n lv in
-      let v_id = new_val_id () in
-      let e_id = Hashtbl.find RelSyntax.salloc_map s in
-      Hashtbl.add eval_map (n, e_id) v_id;
-      let reach_n = app_reach n in
-      let evallv = app_evallv n lv_id loc_id in
-      let eval = app_eval n e_id v_id in
-      let val_cons = F.sprintf "(= y %d)" (String.length s) in
-      let str_val = app_str v_id "y" in
-      add_rule fmt [ eval; reach_n ];
-      (* Reach(n) -> Eval(n e v) *)
-      add_rule fmt [ str_val; reach_n; val_cons ];
-      (* Reach(n) /\ (y == strlen) -> StrVal(v y) *)
-      let succ = G.succ n dug in
-      List.iter
-        (fun next ->
-          let memory_next = app_memory next loc_id v_id in
-          let reach_next = app_reach next in
-          add_rule fmt [ memory_next; evallv; eval ];
-          (* EvalLv(n lv loc) /\ Eval(n e v) -> Memory(n+1 loc v) *)
-          add_rule fmt [ reach_next; evallv; eval ];
-          (* EvalLv(n lv loc) /\ Eval(n e v) -> Reach(n+1) *)
-          let memory_next_for_all = app_memory next "l" "v" in
-          let not_new_loc = F.sprintf "(!= l %s)" loc_id in
-          add_rule fmt [ memory_next_for_all; memory_n; not_new_loc ]
-          (* forall loc v. Memory(n loc v) /\ (loc != lv's loc) -> Memory(n+1 loc v) *))
-        succ;
-      F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id v_id;
-      F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
-      F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id v_id;
-      F.fprintf fmt.conststr "%s\t%s\n" v_id s_id
-  | Ccall (lv_opt, (Lval (Var _, NoOffset) as e), el, _) ->
-      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
-      let el' =
-        List.map
-          (fun e -> if !Options.remove_cast then RelSyntax.remove_cast e else e)
-          el
-      in
-      let arg_e_ids, arg_v_ids =
-        List.fold_left
-          (fun (aes, avs) e ->
-            let e_id, v_id = pp_exp_sems fmt global inputmem outputmem n e in
-            (e_id :: aes, v_id :: avs))
-          ([], []) el'
-      in
-      let _ = List.rev arg_e_ids in
-      let _ = List.rev arg_v_ids in
-      (* TODO: add rules below *)
-      (* Eval(n arg1_e arg1_v) ... Eval(n argi_e argi_v)
-         /\ Val(arg1_v x1) ... Val(argi_v xi)
-         /\ func(x1 ... xi y) -> Eval(n e v) *)
-      (* Eval(n arg1_e arg1_v) ... Eval(n argi_e argi_v)
-         /\ Val(arg1_v x1) ... Val(argi_v xi)
-         /\ func(x1 ... xi y) -> Val(v y) *)
-      let reach_n = app_reach n in
-      let succ = G.succ n dug in
-      if Option.is_some lv_opt then (
-        let lv = Option.get lv_opt in
-        let lv_id, loc_id = pp_lv_sems fmt global n lv in
-        let v_id = new_val_id () in
-        let e_id =
-          if Hashtbl.mem RelSyntax.call_map (n, e', el') then
-            Hashtbl.find RelSyntax.call_map (n, e', el')
-          else Hashtbl.find RelSyntax.libcall_map (n, e', el')
-        in
-        Hashtbl.add eval_map (n, e_id) v_id;
-        let evallv = app_evallv n lv_id loc_id in
-        let eval = app_eval n e_id v_id in
-        let val_rel = app_val v_id "y" in
-        add_rule fmt [ eval; reach_n ];
-        add_rule fmt [ val_rel; reach_n ];
-        (* TEMP: Reach(n) -> Eval(n e v) *)
-        (* TEMP: Reach(n) -> Val(v y) *)
-        List.iter
-          (fun next ->
-            let memory = app_memory next loc_id v_id in
-            let reach_next = app_reach next in
-            add_rule fmt [ memory; evallv; eval ];
-            (* EvalLv(n lv loc) /\ Eval(n e v) -> Memory(n+1 loc v) *)
-            add_rule fmt [ reach_next; evallv; eval ];
-            (* EvalLv(n lv loc) /\ Eval(n e v) -> Reach(n+1) *)
-            let memory_next_for_all = app_memory next "l" "v" in
-            let not_new_loc = F.sprintf "(!= l %s)" loc_id in
-            add_rule fmt [ memory_next_for_all; memory_n; not_new_loc ]
-            (* forall loc v. Memory(n loc v) /\ (loc != lv's loc) -> Memory(n+1 loc v) *))
-          succ;
-        F.fprintf fmt.eval "%a\t%s\t%s\n" Node.pp n e_id v_id;
-        F.fprintf fmt.evallv "%a\t%s\t%s\n" Node.pp n lv_id loc_id;
-        F.fprintf fmt.memory "%a\t%s\t%s\n" Node.pp n loc_id v_id)
-      else
-        List.iter
-          (fun next ->
-            let reach_next = app_reach next in
-            add_rule fmt [ reach_next; reach_n ]
-            (* TEMP: Reach(n) -> Reach(n + 1) *))
-          succ
-  | Cassume (e, _, _) ->
-      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
-      let e_id, v_id = pp_exp_sems fmt global inputmem outputmem n e' in
-      let eval = app_eval n e_id v_id in
-      let v_rel = app_val v_id "x" in
-      let x_isnzero = F.sprintf "(!= x 0)" in
-      let succ = G.succ n dug in
-      List.iter
-        (fun next ->
-          let reach_next = app_reach next in
-          add_rule fmt [ reach_next; eval; v_rel; x_isnzero ];
-          (* Eval(n e v) /\ Val(v x) /\ (x <> 0) -> Reach(n_t) *)
-          (* Eval(n e v) /\ Val(v x) /\ (x == 0) -> Reach(n_f) *)
-          let memory_next_for_all = app_memory next "l" "v" in
-          add_rule fmt [ memory_next_for_all; memory_n; reach_next ]
-          (* forall loc v. Memory(n loc v) /\ Reach(n+1) -> Memory(n+1 loc v) *))
-        succ
-  | Creturn (e_opt, _) ->
-      (* TODO: add rule for return *)
-      ignore e_opt;
-      ()
-  | Cskip _ ->
-      let succ = G.succ n dug in
-      let reach_n = app_reach n in
-      List.iter
-        (fun next ->
-          let reach_next = app_reach next in
-          add_rule fmt [ reach_next; reach_n ];
-          (* Reach(n) -> Reach(n + 1) *)
-          let memory_next_for_all = app_memory next "l" "v" in
-          add_rule fmt [ memory_next_for_all; memory_n ]
-          (* forall loc v. Memory(n loc v) -> Memory(n+1 loc v) *))
-        succ
-  | _ -> ()
 
 let print_maps dirname =
   let oc_loc_text = open_out (dirname ^ "/Loc.map") in
@@ -586,64 +276,504 @@ let print analysis global dug alarms =
   close_out oc_fc;
   close_out oc_fb
 
-let print_sems analysis global inputof outputof dug =
-  let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
+let print_sems dirname dug =
   (* fmt for patron *)
-  let oc_duedge = open_out (dirname ^ "/DetailedDUEdge.facts") in
+  let oc_deduedge = open_out (dirname ^ "/DetailedDUEdge.facts") in
+  let oc_duedge = open_out (dirname ^ "/DUEdge.facts") in
   let oc_dupath = open_out (dirname ^ "/DUPath.facts") in
   let oc_cfpath = open_out (dirname ^ "/CFPath.facts") in
-  let oc_evallv = open_out (dirname ^ "/EvalLv.facts") in
-  let oc_eval = open_out (dirname ^ "/Eval.facts") in
-  let oc_memory = open_out (dirname ^ "/Memory.facts") in
-  let oc_sem_rule = open_out (dirname ^ "/Sem.rules") in
-  let oc_arrayval = open_out (dirname ^ "/ArrayVal.facts") in
-  let oc_conststr = open_out (dirname ^ "/ConstStr.facts") in
   let fmt =
     {
+      deduedge = F.formatter_of_out_channel oc_deduedge;
       duedge = F.formatter_of_out_channel oc_duedge;
       dupath = F.formatter_of_out_channel oc_dupath;
       cfpath = F.formatter_of_out_channel oc_cfpath;
-      evallv = F.formatter_of_out_channel oc_evallv;
-      eval = F.formatter_of_out_channel oc_eval;
-      memory = F.formatter_of_out_channel oc_memory;
-      sem_rule = F.formatter_of_out_channel oc_sem_rule;
-      arrayval = F.formatter_of_out_channel oc_arrayval;
-      conststr = F.formatter_of_out_channel oc_conststr;
     }
   in
-  Hashtbl.reset loc_map;
-  Hashtbl.reset str_map;
-  Hashtbl.reset eval_map;
-  G.iter_node
-    (fun node ->
-      pp_cmd_sems fmt global (Table.find node inputof)
-        (Table.find node outputof) node dug)
-    dug;
   G.iter_edges_e
     (fun src dst locset ->
       if Hashtbl.mem loc_map locset then
-        F.fprintf fmt.duedge "%a\t%a\t%s\n" Node.pp src Node.pp dst
-          (Hashtbl.find loc_map locset))
+        F.fprintf fmt.deduedge "%a\t%a\t%s\n" Node.pp src Node.pp dst
+          (Hashtbl.find loc_map locset);
+      F.fprintf fmt.duedge "%a\t%a\n" Node.pp src Node.pp dst)
     dug;
-  print_maps dirname;
+  F.pp_print_flush fmt.deduedge ();
   F.pp_print_flush fmt.duedge ();
   F.pp_print_flush fmt.dupath ();
   F.pp_print_flush fmt.cfpath ();
-  F.pp_print_flush fmt.evallv ();
-  F.pp_print_flush fmt.eval ();
-  F.pp_print_flush fmt.memory ();
-  F.pp_print_flush fmt.sem_rule ();
-  F.pp_print_flush fmt.arrayval ();
-  F.pp_print_flush fmt.conststr ();
   close_out oc_duedge;
   close_out oc_dupath;
-  close_out oc_cfpath;
-  close_out oc_evallv;
-  close_out oc_eval;
-  close_out oc_memory;
-  close_out oc_sem_rule;
-  close_out oc_arrayval;
-  close_out oc_conststr
+  close_out oc_cfpath
+
+module AlarmSet = Set.Make (struct
+  type t = Node.t * Node.t [@@deriving compare]
+end)
+
+type formatter = {
+  start : F.formatter;
+  alarm : F.formatter;
+  array_exp : F.formatter;
+  deref_exp : F.formatter;
+  mul_exp : F.formatter;
+  div_exp : F.formatter;
+  strcpy : F.formatter;
+  strncpy : F.formatter;
+  memcpy : F.formatter;
+  memmove : F.formatter;
+  memchr : F.formatter;
+  strncmp : F.formatter;
+  sprintf : F.formatter;
+  bufferoverrunlib : F.formatter;
+  strcat : F.formatter;
+  allocsize : F.formatter;
+  printf : F.formatter;
+  taint : F.formatter;
+}
+
+let alarm_count = ref 0
+
+let alarm_exp_map = Hashtbl.create 1000
+
+let new_alarm_exp_id aexp =
+  let id = "Alarm-" ^ string_of_int !alarm_count in
+  alarm_count := !alarm_count + 1;
+  Hashtbl.add alarm_exp_map aexp id;
+  id
+
+let find_lv lv_map l =
+  try Hashtbl.find lv_map l with _ -> "UnknownLv-" ^ CilHelper.s_lv l
+
+let find_exp exp_map e =
+  try Hashtbl.find exp_map e with _ -> "UnknownExp-" ^ CilHelper.s_exp e
+
+let ikind_of_typ = function Cil.TInt (ik, _) -> Some ik | _ -> None
+
+let pp_alarm_exp fmt aexp =
+  let id = new_alarm_exp_id aexp in
+  match aexp with
+  | AlarmExp.ArrayExp (l, e, _) ->
+      let l_id = find_lv RelSyntax.lv_map l in
+      let e_id = find_exp RelSyntax.exp_map e in
+      F.fprintf fmt.array_exp "%s\t%s\t%s\n" id l_id e_id
+  | DerefExp (e, _) ->
+      let e_id = find_exp RelSyntax.exp_map e in
+      F.fprintf fmt.deref_exp "%s\t%s\n" id e_id
+  | DivExp (Cil.BinOp (_, e1, e2, _), _) ->
+      let e1_id, e2_id =
+        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
+      in
+      F.fprintf fmt.div_exp "%s\t%s\t%s\n" id e1_id e2_id
+  | Strcpy (e1, e2, _) ->
+      let e1_id, e2_id =
+        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
+      in
+      F.fprintf fmt.strcpy "%s\t%s\t%s\n" id e1_id e2_id
+  | Strcat (e1, e2, _) ->
+      let e1_id, e2_id =
+        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
+      in
+      F.fprintf fmt.strcat "%s\t%s\t%s\n" id e1_id e2_id
+  | Strncpy (e1, e2, e3, _) ->
+      let e1_id, e2_id, e3_id =
+        ( find_exp RelSyntax.exp_map e1,
+          find_exp RelSyntax.exp_map e2,
+          find_exp RelSyntax.exp_map e3 )
+      in
+      F.fprintf fmt.strncpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
+  | Memcpy (e1, e2, e3, _) ->
+      let e1_id, e2_id, e3_id =
+        ( find_exp RelSyntax.exp_map e1,
+          find_exp RelSyntax.exp_map e2,
+          find_exp RelSyntax.exp_map e3 )
+      in
+      F.fprintf fmt.memcpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
+  | Memmove (e1, e2, e3, _) ->
+      let e1_id, e2_id, e3_id =
+        ( find_exp RelSyntax.exp_map e1,
+          find_exp RelSyntax.exp_map e2,
+          find_exp RelSyntax.exp_map e3 )
+      in
+      F.fprintf fmt.memmove "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
+  | BufferOverrunLib (("memchr" as name), el, _) ->
+      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
+      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
+      F.fprintf fmt.memchr "%s\t%s\t%s\n" id e0_id e1_id;
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e1_id
+  | BufferOverrunLib (("strncmp" as name), el, _) ->
+      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
+      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
+      let e2_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
+      F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e0_id e1_id e2_id;
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
+  | BufferOverrunLib (("sprintf" as name), el, _) ->
+      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
+      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
+      F.fprintf fmt.sprintf "%s\t%s\t%s\n" id e0_id e1_id;
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e1_id
+  | AllocSize (_, e1, _) ->
+      let e1_id = find_exp RelSyntax.exp_map e1 in
+      F.fprintf fmt.allocsize "%s\t%s\n" id e1_id;
+      F.fprintf fmt.taint "%s\t%s\n" id e1_id
+  | Printf (_, e1, _) ->
+      let e1_id = find_exp RelSyntax.exp_map e1 in
+      F.fprintf fmt.printf "%s\t%s\n" id e1_id;
+      F.fprintf fmt.taint "%s\t%s\n" id e1_id
+  | BufferOverrunLib (name, _, _) -> failwith name
+  | _ -> ()
+
+let close_formatters fmt channels =
+  F.pp_print_flush fmt.start ();
+  F.pp_print_flush fmt.alarm ();
+  F.pp_print_flush fmt.array_exp ();
+  F.pp_print_flush fmt.deref_exp ();
+  F.pp_print_flush fmt.mul_exp ();
+  F.pp_print_flush fmt.div_exp ();
+  F.pp_print_flush fmt.strcpy ();
+  F.pp_print_flush fmt.strncpy ();
+  F.pp_print_flush fmt.strcat ();
+  F.pp_print_flush fmt.memcpy ();
+  F.pp_print_flush fmt.memmove ();
+  F.pp_print_flush fmt.memchr ();
+  F.pp_print_flush fmt.strncmp ();
+  F.pp_print_flush fmt.sprintf ();
+  F.pp_print_flush fmt.bufferoverrunlib ();
+  F.pp_print_flush fmt.allocsize ();
+  F.pp_print_flush fmt.printf ();
+  F.pp_print_flush fmt.taint ();
+  List.iter close_out channels
+
+let print_alarm analysis alarms =
+  let alarms = Report.get alarms Report.UnProven in
+  let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
+  let oc_start = open_out (dirname ^ "/Start.facts") in
+  let oc_alarm = open_out (dirname ^ "/SparrowAlarm.facts") in
+  let oc_array_exp = open_out (dirname ^ "/AlarmArrayExp.facts") in
+  let oc_deref_exp = open_out (dirname ^ "/AlarmDerefExp.facts") in
+  let oc_mul_exp = open_out (dirname ^ "/AlarmMulExp.facts") in
+  let oc_div_exp = open_out (dirname ^ "/AlarmDivExp.facts") in
+  let oc_strcpy = open_out (dirname ^ "/AlarmStrcpy.facts") in
+  let oc_strncpy = open_out (dirname ^ "/AlarmStrncpy.facts") in
+  let oc_memmove = open_out (dirname ^ "/AlarmMemmove.facts") in
+  let oc_memcpy = open_out (dirname ^ "/AlarmMemcpy.facts") in
+  let oc_memchr = open_out (dirname ^ "/AlarmMemchr.facts") in
+  let oc_strncmp = open_out (dirname ^ "/AlarmStrncmp.facts") in
+  let oc_sprintf = open_out (dirname ^ "/AlarmSprintf.facts") in
+  let oc_bufferoverrunlib =
+    open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
+  in
+  let oc_strcat = open_out (dirname ^ "/AlarmStrcat.facts") in
+  let oc_allocsize = open_out (dirname ^ "/AlarmAllocSize.facts") in
+  let oc_printf = open_out (dirname ^ "/AlarmPrintf.facts") in
+  let oc_taint = open_out (dirname ^ "/AlarmTaint.facts") in
+  let fmt =
+    {
+      start = F.formatter_of_out_channel oc_start;
+      alarm = F.formatter_of_out_channel oc_alarm;
+      array_exp = F.formatter_of_out_channel oc_array_exp;
+      deref_exp = F.formatter_of_out_channel oc_deref_exp;
+      mul_exp = F.formatter_of_out_channel oc_mul_exp;
+      div_exp = F.formatter_of_out_channel oc_div_exp;
+      strcpy = F.formatter_of_out_channel oc_strcpy;
+      strncpy = F.formatter_of_out_channel oc_strncpy;
+      memcpy = F.formatter_of_out_channel oc_memcpy;
+      memmove = F.formatter_of_out_channel oc_memmove;
+      memchr = F.formatter_of_out_channel oc_memchr;
+      strncmp = F.formatter_of_out_channel oc_strncmp;
+      sprintf = F.formatter_of_out_channel oc_sprintf;
+      bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
+      strcat = F.formatter_of_out_channel oc_strcat;
+      allocsize = F.formatter_of_out_channel oc_allocsize;
+      printf = F.formatter_of_out_channel oc_printf;
+      taint = F.formatter_of_out_channel oc_taint;
+    }
+  in
+  F.fprintf fmt.start "%s\n" "_G_-ENTRY";
+  ignore
+    (List.fold_left
+       (fun set alarm ->
+         match alarm.Report.src with
+         | Some (src_node, _) when not (AlarmSet.mem (src_node, alarm.node) set)
+           ->
+             pp_alarm_exp fmt alarm.exp;
+             let a_id = Hashtbl.find alarm_exp_map alarm.exp in
+             F.fprintf fmt.alarm "%a\t%a\t%s\n" Node.pp src_node Node.pp
+               alarm.node a_id;
+             AlarmSet.add (src_node, alarm.node) set
+         | _ -> set)
+       AlarmSet.empty alarms);
+  close_formatters fmt
+    [
+      oc_start;
+      oc_alarm;
+      oc_array_exp;
+      oc_deref_exp;
+      oc_mul_exp;
+      oc_div_exp;
+      oc_strcpy;
+      oc_strncpy;
+      oc_memmove;
+      oc_memcpy;
+      oc_memchr;
+      oc_strncmp;
+      oc_sprintf;
+      oc_bufferoverrunlib;
+      oc_strcat;
+      oc_allocsize;
+      oc_printf;
+      oc_taint;
+    ]
+
+let pp_taint_alarm_exp fmt node aexp =
+  let id = new_alarm_exp_id aexp in
+  match aexp with
+  | AlarmExp.ArrayExp (l, e, _) ->
+      let l_id = find_lv RelSyntax.lv_map l in
+      let e_id = find_exp RelSyntax.exp_map e in
+      F.fprintf fmt.array_exp "%s\t%s\t%s\n" id l_id e_id
+  | DerefExp (e, _) ->
+      let e_id = find_exp RelSyntax.exp_map e in
+      F.fprintf fmt.deref_exp "%s\t%s\n" id e_id
+  | DivExp (Cil.BinOp (_, e1, e2, _), _) ->
+      let e1' = if !Options.remove_cast then RelSyntax.remove_cast e1 else e1 in
+      let e2' = if !Options.remove_cast then RelSyntax.remove_cast e2 else e2 in
+      let e1_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e1')
+        else find_exp RelSyntax.exp_map e1'
+      in
+      let e2_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e2')
+        else find_exp RelSyntax.exp_map e2'
+      in
+      F.fprintf fmt.div_exp "%s\t%s\t%s\n" id e1_id e2_id
+  | Strcpy (e1, e2, _) ->
+      let e1' = if !Options.remove_cast then RelSyntax.remove_cast e1 else e1 in
+      let e2' = if !Options.remove_cast then RelSyntax.remove_cast e2 else e2 in
+      let e1_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e1')
+        else find_exp RelSyntax.exp_map e1'
+      in
+      let e2_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e2')
+        else find_exp RelSyntax.exp_map e2'
+      in
+      F.fprintf fmt.strcpy "%s\t%s\t%s\n" id e1_id e2_id
+  | Strcat (e1, e2, _) ->
+      let e1' = if !Options.remove_cast then RelSyntax.remove_cast e1 else e1 in
+      let e2' = if !Options.remove_cast then RelSyntax.remove_cast e2 else e2 in
+      let e1_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e1')
+        else find_exp RelSyntax.exp_map e1'
+      in
+      let e2_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e2')
+        else find_exp RelSyntax.exp_map e2'
+      in
+      F.fprintf fmt.strcat "%s\t%s\t%s\n" id e1_id e2_id
+  | Strncpy (e1, e2, e3, _) ->
+      let e1' = if !Options.remove_cast then RelSyntax.remove_cast e1 else e1 in
+      let e2' = if !Options.remove_cast then RelSyntax.remove_cast e2 else e2 in
+      let e3' = if !Options.remove_cast then RelSyntax.remove_cast e3 else e3 in
+      let e1_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e1')
+        else find_exp RelSyntax.exp_map e1'
+      in
+      let e2_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e2')
+        else find_exp RelSyntax.exp_map e2'
+      in
+      let e3_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e3')
+        else find_exp RelSyntax.exp_map e3'
+      in
+      F.fprintf fmt.strncpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
+  | Memcpy (e1, e2, e3, _) ->
+      let e1' = if !Options.remove_cast then RelSyntax.remove_cast e1 else e1 in
+      let e2' = if !Options.remove_cast then RelSyntax.remove_cast e2 else e2 in
+      let e3' = if !Options.remove_cast then RelSyntax.remove_cast e3 else e3 in
+      let e1_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e1')
+        else find_exp RelSyntax.exp_map e1'
+      in
+      let e2_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e2')
+        else find_exp RelSyntax.exp_map e2'
+      in
+      let e3_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e3')
+        else find_exp RelSyntax.exp_map e3'
+      in
+      F.fprintf fmt.memcpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
+  | Memmove (e1, e2, e3, _) ->
+      let e1' = if !Options.remove_cast then RelSyntax.remove_cast e1 else e1 in
+      let e2' = if !Options.remove_cast then RelSyntax.remove_cast e2 else e2 in
+      let e3' = if !Options.remove_cast then RelSyntax.remove_cast e3 else e3 in
+      let e1_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e1')
+        else find_exp RelSyntax.exp_map e1'
+      in
+      let e2_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e2')
+        else find_exp RelSyntax.exp_map e2'
+      in
+      let e3_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e3')
+        else find_exp RelSyntax.exp_map e3'
+      in
+      F.fprintf fmt.memmove "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
+  | BufferOverrunLib (("memchr" as name), el, _) ->
+      let e0 = List.nth el 0 in
+      let e1 = List.nth el 1 in
+      let e0' = if !Options.remove_cast then RelSyntax.remove_cast e0 else e0 in
+      let e1' = if !Options.remove_cast then RelSyntax.remove_cast e1 else e1 in
+      let e0_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e0')
+        else find_exp RelSyntax.exp_map e0'
+      in
+      let e1_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e1')
+        else find_exp RelSyntax.exp_map e1'
+      in
+      F.fprintf fmt.memchr "%s\t%s\t%s\n" id e0_id e1_id;
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e1_id
+  | BufferOverrunLib (("strncmp" as name), el, _) ->
+      let e0 = List.nth el 0 in
+      let e1 = List.nth el 1 in
+      let e2 = List.nth el 2 in
+      let e0' = if !Options.remove_cast then RelSyntax.remove_cast e0 else e0 in
+      let e1' = if !Options.remove_cast then RelSyntax.remove_cast e1 else e1 in
+      let e2' = if !Options.remove_cast then RelSyntax.remove_cast e2 else e2 in
+      let e0_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e0')
+        else find_exp RelSyntax.exp_map e0'
+      in
+      let e1_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e1')
+        else find_exp RelSyntax.exp_map e1'
+      in
+      let e2_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e2')
+        else find_exp RelSyntax.exp_map e2'
+      in
+      F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e0_id e1_id e2_id;
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
+  | BufferOverrunLib (("sprintf" as name), el, _) ->
+      let e0 = List.nth el 0 in
+      let e1 = List.nth el 1 in
+      let e0' = if !Options.remove_cast then RelSyntax.remove_cast e0 else e0 in
+      let e1' = if !Options.remove_cast then RelSyntax.remove_cast e1 else e1 in
+      let e0_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e0')
+        else find_exp RelSyntax.exp_map e0'
+      in
+      let e1_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e1')
+        else find_exp RelSyntax.exp_map e1'
+      in
+      F.fprintf fmt.sprintf "%s\t%s\t%s\n" id e0_id e1_id;
+      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e1_id
+  | AllocSize (_, e, _) ->
+      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
+      let e_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e')
+        else find_exp RelSyntax.exp_map e'
+      in
+      F.fprintf fmt.allocsize "%s\t%s\n" id e_id;
+      F.fprintf fmt.taint "%s\t%s\n" id e_id
+  | Printf (_, e, _) ->
+      let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
+      let e_id =
+        if !Options.patron then Hashtbl.find RelSyntax.exp_patron_map (node, e')
+        else find_exp RelSyntax.exp_map e'
+      in
+      F.fprintf fmt.printf "%s\t%s\n" id e_id;
+      F.fprintf fmt.taint "%s\t%s\n" id e_id
+  | BufferOverrunLib (name, _, _) -> failwith name
+  | _ -> ()
+
+let print_taint_alarm_in_dir dirname alarms =
+  let oc_start = open_out (dirname ^ "/Start.facts") in
+  let oc_alarm = open_out (dirname ^ "/SparrowAlarm.facts") in
+  let oc_array_exp = open_out (dirname ^ "/AlarmArrayExp.facts") in
+  let oc_deref_exp = open_out (dirname ^ "/AlarmDerefExp.facts") in
+  let oc_mul_exp = open_out (dirname ^ "/AlarmMulExp.facts") in
+  let oc_div_exp = open_out (dirname ^ "/AlarmDivExp.facts") in
+  let oc_strcpy = open_out (dirname ^ "/AlarmStrcpy.facts") in
+  let oc_strncpy = open_out (dirname ^ "/AlarmStrncpy.facts") in
+  let oc_memmove = open_out (dirname ^ "/AlarmMemmove.facts") in
+  let oc_memcpy = open_out (dirname ^ "/AlarmMemcpy.facts") in
+  let oc_memchr = open_out (dirname ^ "/AlarmMemchr.facts") in
+  let oc_strncmp = open_out (dirname ^ "/AlarmStrncmp.facts") in
+  let oc_sprintf = open_out (dirname ^ "/AlarmSprintf.facts") in
+  let oc_bufferoverrunlib =
+    open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
+  in
+  let oc_strcat = open_out (dirname ^ "/AlarmStrcat.facts") in
+  let oc_allocsize = open_out (dirname ^ "/AlarmAllocSize.facts") in
+  let oc_printf = open_out (dirname ^ "/AlarmPrintf.facts") in
+  let oc_taint = open_out (dirname ^ "/AlarmTaint.facts") in
+  let fmt =
+    {
+      start = F.formatter_of_out_channel oc_start;
+      alarm = F.formatter_of_out_channel oc_alarm;
+      array_exp = F.formatter_of_out_channel oc_array_exp;
+      deref_exp = F.formatter_of_out_channel oc_deref_exp;
+      mul_exp = F.formatter_of_out_channel oc_mul_exp;
+      div_exp = F.formatter_of_out_channel oc_div_exp;
+      strcpy = F.formatter_of_out_channel oc_strcpy;
+      strncpy = F.formatter_of_out_channel oc_strncpy;
+      memcpy = F.formatter_of_out_channel oc_memcpy;
+      memmove = F.formatter_of_out_channel oc_memmove;
+      memchr = F.formatter_of_out_channel oc_memchr;
+      strncmp = F.formatter_of_out_channel oc_strncmp;
+      sprintf = F.formatter_of_out_channel oc_sprintf;
+      bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
+      strcat = F.formatter_of_out_channel oc_strcat;
+      allocsize = F.formatter_of_out_channel oc_allocsize;
+      printf = F.formatter_of_out_channel oc_printf;
+      taint = F.formatter_of_out_channel oc_taint;
+    }
+  in
+  F.fprintf fmt.start "%s\n" "_G_-ENTRY";
+  ignore
+    (List.fold_left
+       (fun set alarm ->
+         match alarm.Report.src with
+         | Some (src_node, _) when not (AlarmSet.mem (src_node, alarm.node) set)
+           ->
+             pp_taint_alarm_exp fmt alarm.node alarm.exp;
+             let a_id = Hashtbl.find alarm_exp_map alarm.exp in
+             F.fprintf fmt.alarm "%a\t%a\t%s\n" Node.pp src_node Node.pp
+               alarm.node a_id;
+             AlarmSet.add (src_node, alarm.node) set
+         | _ -> set)
+       AlarmSet.empty alarms);
+  close_formatters fmt
+    [
+      oc_start;
+      oc_alarm;
+      oc_array_exp;
+      oc_deref_exp;
+      oc_mul_exp;
+      oc_div_exp;
+      oc_strcpy;
+      oc_strncpy;
+      oc_memmove;
+      oc_memcpy;
+      oc_memchr;
+      oc_strncmp;
+      oc_sprintf;
+      oc_bufferoverrunlib;
+      oc_strcat;
+      oc_allocsize;
+      oc_printf;
+      oc_taint;
+    ]
+
+let print_taint_alarm analysis alarms =
+  L.info "print_taint_alarm - alarms:\n";
+  List.iter (fun alarm -> L.info "%s\n" (Report.string_of_query alarm)) alarms;
+  let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
+  print_taint_alarm_in_dir dirname alarms
 
 let pp_dug_cmd fmt icfg dug n =
   if G.pred n dug |> List.length = 2 then
@@ -776,487 +906,49 @@ let print_patron_relation dirname icfg dug =
   G.iter_node (fun n -> pp_dug_cmd fmt icfg dug n) dug;
   RelSyntax.close_formatters fmt channels
 
-let print_syntax_patron analysis icfg dug =
+let print_syntax_patron dirname icfg dug =
   Hashtbl.reset RelSyntax.exp_map;
   Hashtbl.reset RelSyntax.exp_patron_map;
   Hashtbl.reset RelSyntax.lv_map;
   Hashtbl.reset RelSyntax.binop_map;
   Hashtbl.reset RelSyntax.unop_map;
-  let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   print_patron_relation dirname icfg dug;
   RelSyntax.print_raw_patron dirname
 
-let get_target_alram alarms =
-  if !Options.target_alarm != "" then (
-    let alarms =
-      List.fold_left
-        (fun acc alarm ->
-          let alarm_loc = CilHelper.s_location alarm.Report.loc in
-          if
-            alarm_loc
-            = Str.(global_replace (regexp "\"") "" !Options.target_alarm)
-          then alarm :: acc
-          else acc)
-        [] alarms
-    in
-    if alarms = [] then Logging.error "specified target alarm not found";
-    alarms)
-  else alarms
+module AexpSet = BatSet.Make (struct
+  type t = AlarmExp.t
 
-let print_patron analysis global inputof outputof dug alarms =
-  let dug = G.copy dug in
-  F.printf "alarms before filter: %d\n" (List.length alarms);
-  let alarms =
-    Report.get alarms Report.UnProven
-    |> get_target_alram
-    |>
-    if BatMap.is_empty !Options.slice_target_map then Fun.id
-    else Report.filter_by_target_locs !Options.slice_target_map
-  in
-  F.printf "alarms after filter: %d\n" (List.length alarms);
-  F.printf "dug before optimize: %d nodes, %d edges\n" (G.nb_node dug)
-    (G.nb_edge dug);
-  let dug =
-    if !Options.extract_datalog_fact_full_no_opt then dug
-    else optimize alarms dug
-  in
-  F.printf "dug after optimize: %d nodes, %d edges\n" (G.nb_node dug)
-    (G.nb_edge dug);
-  if !Options.patron then print_syntax_patron analysis global.Global.icfg dug
-  else RelSyntax.print analysis global.Global.icfg;
-  print_sems analysis global inputof outputof dug
-
-module AlarmSet = Set.Make (struct
-  type t = Node.t * Node.t [@@deriving compare]
+  let compare = compare
 end)
 
-type formatter = {
-  start : F.formatter;
-  alarm : F.formatter;
-  array_exp : F.formatter;
-  deref_exp : F.formatter;
-  mul_exp : F.formatter;
-  div_exp : F.formatter;
-  strcpy : F.formatter;
-  strncpy : F.formatter;
-  memcpy : F.formatter;
-  memmove : F.formatter;
-  memchr : F.formatter;
-  strncmp : F.formatter;
-  sprintf : F.formatter;
-  alarm_rule : F.formatter;
-  bufferoverrunlib : F.formatter;
-  strcat : F.formatter;
-  allocsize : F.formatter;
-  printf : F.formatter;
-  taint : F.formatter;
-}
+let print_raw_alarm dirname =
+  let oc_alarm = open_out (dirname ^ "/Alarm.map") in
+  let fmt = F.formatter_of_out_channel oc_alarm in
+  Hashtbl.iter
+    (fun aexp id -> F.fprintf fmt "%s\t%s\n" (AlarmExp.to_string aexp) id)
+    alarm_exp_map;
+  F.pp_print_flush fmt ();
+  close_out oc_alarm
 
-let alarm_count = ref 0
-
-let alarm_exp_map = Hashtbl.create 1000
-
-let new_alarm_exp_id aexp =
-  let id = "Alarm-" ^ string_of_int !alarm_count in
-  alarm_count := !alarm_count + 1;
-  Hashtbl.add alarm_exp_map aexp id;
-  id
-
-let find_lv lv_map l =
-  try Hashtbl.find lv_map l with _ -> "UnknownLv-" ^ CilHelper.s_lv l
-
-let find_exp exp_map e =
-  try Hashtbl.find exp_map e with _ -> "UnknownExp-" ^ CilHelper.s_exp e
-
-let ikind_of_typ = function Cil.TInt (ik, _) -> Some ik | _ -> None
-
-let pp_alarm_exp fmt aexp =
-  let id = new_alarm_exp_id aexp in
-  match aexp with
-  | AlarmExp.ArrayExp (l, e, _) ->
-      let l_id = find_lv RelSyntax.lv_map l in
-      let e_id = find_exp RelSyntax.exp_map e in
-      F.fprintf fmt.array_exp "%s\t%s\t%s\n" id l_id e_id
-  | DerefExp (e, _) ->
-      let e_id = find_exp RelSyntax.exp_map e in
-      F.fprintf fmt.deref_exp "%s\t%s\n" id e_id
-  | DivExp (Cil.BinOp (_, e1, e2, _), _) ->
-      let e1_id, e2_id =
-        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
-      in
-      F.fprintf fmt.div_exp "%s\t%s\t%s\n" id e1_id e2_id
-  | Strcpy (e1, e2, _) ->
-      let e1_id, e2_id =
-        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
-      in
-      F.fprintf fmt.strcpy "%s\t%s\t%s\n" id e1_id e2_id
-  | Strcat (e1, e2, _) ->
-      let e1_id, e2_id =
-        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
-      in
-      F.fprintf fmt.strcat "%s\t%s\t%s\n" id e1_id e2_id
-  | Strncpy (e1, e2, e3, _) ->
-      let e1_id, e2_id, e3_id =
-        ( find_exp RelSyntax.exp_map e1,
-          find_exp RelSyntax.exp_map e2,
-          find_exp RelSyntax.exp_map e3 )
-      in
-      F.fprintf fmt.strncpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
-  | Memcpy (e1, e2, e3, _) ->
-      let e1_id, e2_id, e3_id =
-        ( find_exp RelSyntax.exp_map e1,
-          find_exp RelSyntax.exp_map e2,
-          find_exp RelSyntax.exp_map e3 )
-      in
-      F.fprintf fmt.memcpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
-  | Memmove (e1, e2, e3, _) ->
-      let e1_id, e2_id, e3_id =
-        ( find_exp RelSyntax.exp_map e1,
-          find_exp RelSyntax.exp_map e2,
-          find_exp RelSyntax.exp_map e3 )
-      in
-      F.fprintf fmt.memmove "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
-  | BufferOverrunLib (("memchr" as name), el, _) ->
-      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
-      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
-      F.fprintf fmt.memchr "%s\t%s\t%s\n" id e0_id e1_id;
-      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e1_id
-  | BufferOverrunLib (("strncmp" as name), el, _) ->
-      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
-      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
-      let e2_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
-      F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e0_id e1_id e2_id;
-      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
-  | BufferOverrunLib (("sprintf" as name), el, _) ->
-      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
-      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
-      F.fprintf fmt.sprintf "%s\t%s\t%s\n" id e0_id e1_id;
-      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e1_id
-  | AllocSize (_, e1, _) ->
-      let e1_id = find_exp RelSyntax.exp_map e1 in
-      F.fprintf fmt.allocsize "%s\t%s\n" id e1_id;
-      F.fprintf fmt.taint "%s\t%s\n" id e1_id
-  | Printf (_, e1, _) ->
-      let e1_id = find_exp RelSyntax.exp_map e1 in
-      F.fprintf fmt.printf "%s\t%s\n" id e1_id;
-      F.fprintf fmt.taint "%s\t%s\n" id e1_id
-  | BufferOverrunLib (name, _, _) -> failwith name
-  | _ -> ()
-
-let close_formatters fmt channels =
-  F.pp_print_flush fmt.start ();
-  F.pp_print_flush fmt.alarm ();
-  F.pp_print_flush fmt.array_exp ();
-  F.pp_print_flush fmt.deref_exp ();
-  F.pp_print_flush fmt.mul_exp ();
-  F.pp_print_flush fmt.div_exp ();
-  F.pp_print_flush fmt.strcpy ();
-  F.pp_print_flush fmt.strncpy ();
-  F.pp_print_flush fmt.strcat ();
-  F.pp_print_flush fmt.memcpy ();
-  F.pp_print_flush fmt.memmove ();
-  F.pp_print_flush fmt.memchr ();
-  F.pp_print_flush fmt.strncmp ();
-  F.pp_print_flush fmt.sprintf ();
-  F.pp_print_flush fmt.alarm_rule ();
-  F.pp_print_flush fmt.bufferoverrunlib ();
-  F.pp_print_flush fmt.allocsize ();
-  F.pp_print_flush fmt.printf ();
-  F.pp_print_flush fmt.taint ();
-  List.iter close_out channels
-
-let print_alarm analysis alarms =
+let print_patron analysis global dug alarms =
+  let dug = G.copy dug in
   let alarms = Report.get alarms Report.UnProven in
+  let print_for_one_alarm dug (i, visited) alarm =
+    let dug = G.copy dug in
+    let aexp = alarm.Report.exp in
+    if AexpSet.mem aexp visited |> not then (
+      let alarms = [ alarm ] in
+      let dug = optimize ~verbose:false alarms dug in
+      let dirname =
+        F.sprintf "%s/datalog/%d" (FileManager.analysis_dir analysis) i
+      in
+      FileManager.mkdir dirname;
+      print_syntax_patron dirname global.Global.icfg dug;
+      print_taint_alarm_in_dir dirname alarms;
+      print_sems dirname dug);
+    G.clear dug;
+    (i + 1, AexpSet.add aexp visited)
+  in
+  List.fold_left (print_for_one_alarm dug) (0, AexpSet.empty) alarms |> ignore;
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
-  let oc_start = open_out (dirname ^ "/Start.facts") in
-  let oc_alarm = open_out (dirname ^ "/SparrowAlarm.facts") in
-  let oc_array_exp = open_out (dirname ^ "/AlarmArrayExp.facts") in
-  let oc_deref_exp = open_out (dirname ^ "/AlarmDerefExp.facts") in
-  let oc_mul_exp = open_out (dirname ^ "/AlarmMulExp.facts") in
-  let oc_div_exp = open_out (dirname ^ "/AlarmDivExp.facts") in
-  let oc_strcpy = open_out (dirname ^ "/AlarmStrcpy.facts") in
-  let oc_strncpy = open_out (dirname ^ "/AlarmStrncpy.facts") in
-  let oc_memmove = open_out (dirname ^ "/AlarmMemmove.facts") in
-  let oc_memcpy = open_out (dirname ^ "/AlarmMemcpy.facts") in
-  let oc_memchr = open_out (dirname ^ "/AlarmMemchr.facts") in
-  let oc_strncmp = open_out (dirname ^ "/AlarmStrncmp.facts") in
-  let oc_sprintf = open_out (dirname ^ "/AlarmSprintf.facts") in
-  let oc_alarm_rule = open_out (dirname ^ "/Alarm.rules") in
-  let oc_bufferoverrunlib =
-    open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
-  in
-  let oc_strcat = open_out (dirname ^ "/AlarmStrcat.facts") in
-  let oc_allocsize = open_out (dirname ^ "/AlarmAllocSize.facts") in
-  let oc_printf = open_out (dirname ^ "/AlarmPrintf.facts") in
-  let oc_taint = open_out (dirname ^ "/AlarmTaint.facts") in
-  let fmt =
-    {
-      start = F.formatter_of_out_channel oc_start;
-      alarm = F.formatter_of_out_channel oc_alarm;
-      array_exp = F.formatter_of_out_channel oc_array_exp;
-      deref_exp = F.formatter_of_out_channel oc_deref_exp;
-      mul_exp = F.formatter_of_out_channel oc_mul_exp;
-      div_exp = F.formatter_of_out_channel oc_div_exp;
-      strcpy = F.formatter_of_out_channel oc_strcpy;
-      strncpy = F.formatter_of_out_channel oc_strncpy;
-      memcpy = F.formatter_of_out_channel oc_memcpy;
-      memmove = F.formatter_of_out_channel oc_memmove;
-      memchr = F.formatter_of_out_channel oc_memchr;
-      strncmp = F.formatter_of_out_channel oc_strncmp;
-      sprintf = F.formatter_of_out_channel oc_sprintf;
-      alarm_rule = F.formatter_of_out_channel oc_alarm_rule;
-      bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
-      strcat = F.formatter_of_out_channel oc_strcat;
-      allocsize = F.formatter_of_out_channel oc_allocsize;
-      printf = F.formatter_of_out_channel oc_printf;
-      taint = F.formatter_of_out_channel oc_taint;
-    }
-  in
-  F.fprintf fmt.start "%s\n" "_G_-ENTRY";
-  ignore
-    (List.fold_left
-       (fun set alarm ->
-         match alarm.Report.src with
-         | Some (src_node, _) when not (AlarmSet.mem (src_node, alarm.node) set)
-           ->
-             pp_alarm_exp fmt alarm.exp;
-             let a_id = Hashtbl.find alarm_exp_map alarm.exp in
-             F.fprintf fmt.alarm "%a\t%a\t%s\n" Node.pp src_node Node.pp
-               alarm.node a_id;
-             AlarmSet.add (src_node, alarm.node) set
-         | _ -> set)
-       AlarmSet.empty alarms);
-  close_formatters fmt
-    [
-      oc_start;
-      oc_alarm;
-      oc_array_exp;
-      oc_deref_exp;
-      oc_mul_exp;
-      oc_div_exp;
-      oc_strcpy;
-      oc_strncpy;
-      oc_memmove;
-      oc_memcpy;
-      oc_memchr;
-      oc_strncmp;
-      oc_sprintf;
-      oc_alarm_rule;
-      oc_bufferoverrunlib;
-      oc_strcat;
-      oc_allocsize;
-      oc_printf;
-      oc_taint;
-    ]
-
-let pp_taint_alarm_exp src_node node fmt aexp =
-  let id = new_alarm_exp_id aexp in
-  match aexp with
-  | AlarmExp.ArrayExp (l, e, _) ->
-      let l_id = find_lv RelSyntax.lv_map l in
-      let e_id = find_exp RelSyntax.exp_map e in
-      F.fprintf fmt.array_exp "%s\t%s\t%s\n" id l_id e_id
-  | DerefExp (e, _) ->
-      let e_id = find_exp RelSyntax.exp_map e in
-      F.fprintf fmt.deref_exp "%s\t%s\n" id e_id
-  | MulExp ((Cil.BinOp (_, e1, e2, _) as e), _) ->
-      let e1' = RelSyntax.remove_cast e1 in
-      let e2' = RelSyntax.remove_cast e2 in
-      let t1 =
-        Cil.typeOf e1' |> ikind_of_typ
-        |> Option.map (fun ty ->
-               if Cil.isSigned ty then (Cil.bytesSizeOfInt ty * 8) - 1
-               else Cil.bytesSizeOfInt ty * 8)
-        |> Option.value ~default:0
-      in
-      let t2 =
-        Cil.typeOf e2' |> ikind_of_typ
-        |> Option.map (fun ty ->
-               if Cil.isSigned ty then (Cil.bytesSizeOfInt ty * 8) - 1
-               else Cil.bytesSizeOfInt ty * 8)
-        |> Option.value ~default:0
-      in
-      (* TODO: unsigned long long *)
-      let int_max = max t1 t2 |> BatInt64.of_int |> BatInt64.pow 2L in
-      let int_max =
-        if int_max = 0L then Int64.max_int else BatInt64.(int_max - 1L)
-      in
-      let e' = RelSyntax.remove_cast e in
-      let e_id = Hashtbl.find RelSyntax.exp_patron_map (node, e') in
-      let v_id = Hashtbl.find eval_map (node, e_id) in
-      let e1_id = Hashtbl.find RelSyntax.exp_patron_map (node, e1') in
-      let e2_id = Hashtbl.find RelSyntax.exp_patron_map (node, e2') in
-      let binop = F.sprintf "(BinOp %s Mult %s %s)" e_id e1_id e2_id in
-      let eval = F.asprintf "(Eval %a %s %s)" Node.pp node e_id v_id in
-      let val_rel = F.sprintf "(Val %s x)" v_id in
-      let val_cons = F.asprintf "(> x %Ld)" int_max in
-      let ioerror = F.asprintf "(IOError %a x)" Node.pp node in
-      String.concat " " [ ioerror; binop; eval; val_rel; val_cons ]
-      (* BinOp(e * e1 e2) /\ Eval(n e v) /\ Val(v x) /\ (x > INT_MAX) -> IOError(n x) *)
-      |> F.fprintf fmt.alarm_rule "%a\t%a\t(%s)\n" Node.pp src_node Node.pp node
-  | MulExp _ -> Logging.warn "Wrong exp in MulExp\n"
-  | DivExp ((Cil.BinOp (_, e1, e2, _) as e), _) ->
-      let e1' = RelSyntax.remove_cast e1 in
-      let e2' = RelSyntax.remove_cast e2 in
-      let e' = RelSyntax.remove_cast e in
-      let e_id = Hashtbl.find RelSyntax.exp_patron_map (node, e') in
-      let v_id = Hashtbl.find eval_map (node, e_id) in
-      let e1_id = Hashtbl.find RelSyntax.exp_patron_map (node, e1') in
-      let e2_id = Hashtbl.find RelSyntax.exp_patron_map (node, e2') in
-      let binop = F.sprintf "(BinOp %s Div %s %s)" e_id e1_id e2_id in
-      let eval = F.asprintf "(Eval %a %s %s)" Node.pp node e2_id v_id in
-      let val_rel = F.sprintf "(Val %s x)" v_id in
-      let val_cons = F.asprintf "(= x 0)" in
-      let dzerror = F.asprintf "(DZError %a x)" Node.pp node in
-      String.concat " " [ dzerror; binop; eval; val_rel; val_cons ]
-      (* BinOp(e / e1 e2) /\ Eval(n e2 v) /\ Val(v x) /\ (x == 0) -> DZError(n x) *)
-      |> F.fprintf fmt.alarm_rule "%a\t%a\t(%s)\n" Node.pp src_node Node.pp node
-  | DivExp _ -> Logging.warn "Wrong exp in DivExp\n"
-  | Strcpy (e1, e2, _) ->
-      let e1_id, e2_id =
-        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
-      in
-      F.fprintf fmt.strcpy "%s\t%s\t%s\n" id e1_id e2_id
-  | Strcat (e1, e2, _) ->
-      let e1_id, e2_id =
-        (find_exp RelSyntax.exp_map e1, find_exp RelSyntax.exp_map e2)
-      in
-      F.fprintf fmt.strcat "%s\t%s\t%s\n" id e1_id e2_id
-  | Strncpy (e1, e2, e3, _) ->
-      let e1_id, e2_id, e3_id =
-        ( find_exp RelSyntax.exp_map e1,
-          find_exp RelSyntax.exp_map e2,
-          find_exp RelSyntax.exp_map e3 )
-      in
-      F.fprintf fmt.strncpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
-  | Memcpy (e1, e2, e3, _) ->
-      let e1_id, e2_id, e3_id =
-        ( find_exp RelSyntax.exp_map e1,
-          find_exp RelSyntax.exp_map e2,
-          find_exp RelSyntax.exp_map e3 )
-      in
-      F.fprintf fmt.memcpy "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
-  | Memmove (e1, e2, e3, _) ->
-      let e1_id, e2_id, e3_id =
-        ( find_exp RelSyntax.exp_map e1,
-          find_exp RelSyntax.exp_map e2,
-          find_exp RelSyntax.exp_map e3 )
-      in
-      F.fprintf fmt.memmove "%s\t%s\t%s\t%s\n" id e1_id e2_id e3_id
-  | BufferOverrunLib (("memchr" as name), el, _) ->
-      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
-      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
-      F.fprintf fmt.memchr "%s\t%s\t%s\n" id e0_id e1_id;
-      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e1_id
-  | BufferOverrunLib (("strncmp" as name), el, _) ->
-      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
-      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
-      let e2_id = List.nth el 2 |> find_exp RelSyntax.exp_map in
-      F.fprintf fmt.strncmp "%s\t%s\t%s\t%s\n" id e0_id e1_id e2_id;
-      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e2_id
-  | BufferOverrunLib (("sprintf" as name), el, _) ->
-      let e0_id = List.nth el 0 |> find_exp RelSyntax.exp_map in
-      let e1_id = List.nth el 1 |> find_exp RelSyntax.exp_map in
-      F.fprintf fmt.sprintf "%s\t%s\t%s\n" id e0_id e1_id;
-      F.fprintf fmt.bufferoverrunlib "%s\t%s\t%s\n" id name e1_id
-  | AllocSize (_, e1, _) ->
-      let e1_id = find_exp RelSyntax.exp_map e1 in
-      F.fprintf fmt.allocsize "%s\t%s\n" id e1_id;
-      F.fprintf fmt.taint "%s\t%s\n" id e1_id
-  | Printf (_, e1, _) ->
-      let e1_id = find_exp RelSyntax.exp_map e1 in
-      F.fprintf fmt.printf "%s\t%s\n" id e1_id;
-      F.fprintf fmt.taint "%s\t%s\n" id e1_id
-  | BufferOverrunLib (name, _, _) -> failwith name
-
-let print_taint_alarm analysis alarms =
-  let alarms =
-    Report.get alarms Report.UnProven
-    |> get_target_alram
-    |>
-    if BatMap.is_empty !Options.slice_target_map then Fun.id
-    else Report.filter_by_target_locs !Options.slice_target_map
-  in
-  L.info "print_taint_alarm - alarms:\n";
-  List.iter (fun alarm -> L.info "%s\n" (Report.string_of_query alarm)) alarms;
-  let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
-  let oc_start = open_out (dirname ^ "/Start.facts") in
-  let oc_alarm = open_out (dirname ^ "/SparrowAlarm.facts") in
-  let oc_array_exp = open_out (dirname ^ "/AlarmArrayExp.facts") in
-  let oc_deref_exp = open_out (dirname ^ "/AlarmDerefExp.facts") in
-  let oc_mul_exp = open_out (dirname ^ "/AlarmMulExp.facts") in
-  let oc_div_exp = open_out (dirname ^ "/AlarmDivExp.facts") in
-  let oc_strcpy = open_out (dirname ^ "/AlarmStrcpy.facts") in
-  let oc_strncpy = open_out (dirname ^ "/AlarmStrncpy.facts") in
-  let oc_memmove = open_out (dirname ^ "/AlarmMemmove.facts") in
-  let oc_memcpy = open_out (dirname ^ "/AlarmMemcpy.facts") in
-  let oc_memchr = open_out (dirname ^ "/AlarmMemchr.facts") in
-  let oc_strncmp = open_out (dirname ^ "/AlarmStrncmp.facts") in
-  let oc_sprintf = open_out (dirname ^ "/AlarmSprintf.facts") in
-  let oc_alarm_rule = open_out (dirname ^ "/Alarm.rules") in
-  let oc_bufferoverrunlib =
-    open_out (dirname ^ "/AlarmBufferOverrunLib.facts")
-  in
-  let oc_strcat = open_out (dirname ^ "/AlarmStrcat.facts") in
-  let oc_allocsize = open_out (dirname ^ "/AlarmAllocSize.facts") in
-  let oc_printf = open_out (dirname ^ "/AlarmPrintf.facts") in
-  let oc_taint = open_out (dirname ^ "/AlarmTaint.facts") in
-  let fmt =
-    {
-      start = F.formatter_of_out_channel oc_start;
-      alarm = F.formatter_of_out_channel oc_alarm;
-      array_exp = F.formatter_of_out_channel oc_array_exp;
-      deref_exp = F.formatter_of_out_channel oc_deref_exp;
-      mul_exp = F.formatter_of_out_channel oc_mul_exp;
-      div_exp = F.formatter_of_out_channel oc_div_exp;
-      strcpy = F.formatter_of_out_channel oc_strcpy;
-      strncpy = F.formatter_of_out_channel oc_strncpy;
-      memcpy = F.formatter_of_out_channel oc_memcpy;
-      memmove = F.formatter_of_out_channel oc_memmove;
-      memchr = F.formatter_of_out_channel oc_memchr;
-      strncmp = F.formatter_of_out_channel oc_strncmp;
-      sprintf = F.formatter_of_out_channel oc_sprintf;
-      alarm_rule = F.formatter_of_out_channel oc_alarm_rule;
-      bufferoverrunlib = F.formatter_of_out_channel oc_bufferoverrunlib;
-      strcat = F.formatter_of_out_channel oc_strcat;
-      allocsize = F.formatter_of_out_channel oc_allocsize;
-      printf = F.formatter_of_out_channel oc_printf;
-      taint = F.formatter_of_out_channel oc_taint;
-    }
-  in
-  F.fprintf fmt.start "%s\n" "_G_-ENTRY";
-  ignore
-    (List.fold_left
-       (fun set alarm ->
-         match alarm.Report.src with
-         | Some (src_node, _) when not (AlarmSet.mem (src_node, alarm.node) set)
-           ->
-             pp_taint_alarm_exp src_node alarm.node fmt alarm.exp;
-             let a_id = Hashtbl.find alarm_exp_map alarm.exp in
-             F.fprintf fmt.alarm "%a\t%a\t%s\n" Node.pp src_node Node.pp
-               alarm.node a_id;
-             AlarmSet.add (src_node, alarm.node) set
-         | _ -> set)
-       AlarmSet.empty alarms);
-  close_formatters fmt
-    [
-      oc_start;
-      oc_alarm;
-      oc_array_exp;
-      oc_deref_exp;
-      oc_mul_exp;
-      oc_div_exp;
-      oc_strcpy;
-      oc_strncpy;
-      oc_memmove;
-      oc_memcpy;
-      oc_memchr;
-      oc_strncmp;
-      oc_sprintf;
-      oc_alarm_rule;
-      oc_bufferoverrunlib;
-      oc_strcat;
-      oc_allocsize;
-      oc_printf;
-      oc_taint;
-    ]
+  print_raw_alarm dirname

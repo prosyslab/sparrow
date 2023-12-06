@@ -29,6 +29,8 @@ module type S = sig
 
   val copy : t -> t
 
+  val clear : t -> unit
+
   val nb_node : t -> int
 
   val nb_edge : t -> int

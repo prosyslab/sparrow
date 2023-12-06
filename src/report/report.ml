@@ -175,7 +175,8 @@ let filter_by_target_locs target_map =
             match String.split_on_char ':' target_loc with
             | [ f; l ] -> (f, int_of_string l)
             | _ ->
-                L.error "Invalid slice option (must be '-slice X=file:line')";
+                L.error
+                  "Invalid slice option (must be '-target_alarm X=file:line')";
                 exit 1
           in
           Filename.basename alarm.loc.file |> String.equal file

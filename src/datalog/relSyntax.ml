@@ -350,7 +350,7 @@ let pp_arg fmt n arg =
     (fun _ e ->
       let e' = if !Options.remove_cast then remove_cast e else e in
       (if !Options.patron then Hashtbl.find exp_patron_map (n, e')
-       else Hashtbl.find exp_map e')
+      else Hashtbl.find exp_map e')
       |> F.fprintf fmt.arg "%s\t%s\t%s\n" id (new_arg_pos_id ()))
     arg;
   id
@@ -808,4 +808,4 @@ let print analysis icfg =
   Hashtbl.reset unop_map;
   let dirname = FileManager.analysis_dir analysis ^ "/datalog" in
   print_relation dirname icfg;
-  if !Options.patron then print_raw_patron dirname else print_raw dirname
+  print_raw dirname

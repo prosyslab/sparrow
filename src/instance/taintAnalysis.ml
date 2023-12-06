@@ -209,13 +209,13 @@ let get_locset mem =
 let make_top_mem locset =
   PowLoc.fold (fun l mem -> Mem.add l TaintDom.Val.top mem) locset Mem.bot
 
-let print_datalog_fact _ global inputof outputof dug alarms =
-  if !Options.patron then
-    RelDUGraph.print_patron analysis global inputof outputof dug alarms
-  else RelSyntax.print analysis global.icfg;
-  if not !Options.patron then Provenance.print analysis global.relations;
-  if not !Options.patron then RelDUGraph.print analysis global dug alarms;
-  RelDUGraph.print_taint_alarm analysis alarms
+let print_datalog_fact _ global dug alarms =
+  if !Options.patron then RelDUGraph.print_patron analysis global dug alarms
+  else (
+    RelSyntax.print analysis global.icfg;
+    Provenance.print analysis global.relations;
+    RelDUGraph.print analysis global dug alarms;
+    RelDUGraph.print_taint_alarm analysis alarms)
 
 let ignore_function node =
   BatSet.elements !Options.filter_function
@@ -240,7 +240,7 @@ let post_process spec itvdug (global, _, inputof, outputof) =
   Report.print ~fmt:(Some fmt) global alarms;
   close_out report_file;
   if !Options.extract_datalog_fact_full then
-    print_datalog_fact spec global inputof outputof itvdug alarms;
+    print_datalog_fact spec global itvdug alarms;
   (global, inputof, outputof, alarms)
 
 let do_analysis (global, itvdug, itvinputof) =
@@ -260,6 +260,6 @@ let do_analysis (global, itvdug, itvinputof) =
   let _ = Options.pfs := 100 in
   let dug = Analysis.generate_dug spec global in
   (if !Options.marshal_in then marshal_in global
-   else Analysis.perform spec global dug)
+  else Analysis.perform spec global dug)
   |> opt !Options.marshal_out marshal_out
   |> post_process spec itvdug

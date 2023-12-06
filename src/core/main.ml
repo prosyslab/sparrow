@@ -69,13 +69,13 @@ let print_pgm_info global =
 
 let print_il file =
   (if
-     !Options.inline = []
-     && BatSet.is_empty !Options.unsound_loop
-     && not !Options.cut_cyclic_call
-   then Cil.dumpFile !Cil.printerForMaincil stdout "" (transform_simple file)
-   else
-     let global = init_analysis file in
-     Cil.dumpFile !Cil.printerForMaincil stdout "" global.file);
+   !Options.inline = []
+   && BatSet.is_empty !Options.unsound_loop
+   && not !Options.cut_cyclic_call
+  then Cil.dumpFile !Cil.printerForMaincil stdout "" (transform_simple file)
+  else
+    let global = init_analysis file in
+    Cil.dumpFile !Cil.printerForMaincil stdout "" global.file);
   exit 0
 
 let print_cfg global =

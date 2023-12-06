@@ -148,7 +148,7 @@ val remove_cast : bool ref
 
 val patron : bool ref
 
-val target_alarm : string ref
+val target_alarm_map : (string, string) BatMap.t ref
 
 (** {2 Pretty Printer & Debugging } *)
 
