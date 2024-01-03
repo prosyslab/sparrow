@@ -1592,9 +1592,8 @@ and handle_stmt_init scope typ fundec loc action lv e =
   in
   let is_struct_typ typ = not (is_primitive_typ typ) in
   match (C.Expr.get_kind e, Cil.unrollType typ) with
-  | C.StmtKind.InitListExpr, Cil.TArray (_, None, _)
-  | InitListExpr, Cil.TPtr _
-  | InitListExpr, TInt _ ->
+  | C.StmtKind.InitListExpr, Cil.TArray (_, None, _) | InitListExpr, Cil.TPtr _
+    ->
       ([], scope)
   | InitListExpr, Cil.TArray (arr_typ, Some _, _) when is_nested_init_list e ->
       let el =
@@ -1672,15 +1671,14 @@ and handle_stmt_init scope typ fundec loc action lv e =
         match C.InitListExpr.get_syntactic_form e with Some e -> e | None -> e
       in
       let el = C.InitListExpr.get_inits e in
-      let e =
-        if List.length el <> 1 then
-          failwith "primitive literal init list should be only one element"
-        else List.hd el
-      in
-      let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
-      let expr = get_opt "var_decl" expr_opt in
-      let instr = Cil.Set (lv, expr, loc) in
-      (append_instr sl_expr instr, scope)
+      (* Ignore vector InitExpr *)
+      if List.length el <> 1 then ([], scope)
+      else
+        let e = List.hd el in
+        let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
+        let expr = get_opt "var_decl" expr_opt in
+        let instr = Cil.Set (lv, expr, loc) in
+        (append_instr sl_expr instr, scope)
   (* primitive *)
   | _ ->
       let sl_expr, expr_opt = trans_expr scope (Some fundec) loc action e in
