@@ -305,6 +305,7 @@ let trans_int_kind = function
   | Short -> Cil.IShort
   | Long -> Cil.ILong
   | LongLong -> Cil.ILongLong
+  | Dependent -> Cil.IInt
   | _ -> invalid_arg "int kind"
 
 let trans_float_kind = function
@@ -705,6 +706,8 @@ let rec trans_type ?(compinfos = []) scope typ =
       C.AdjustedType.get_original_type typ.ty |> trans_type ~compinfos scope
   | AtomicType ->
       C.AtomicType.get_value_type typ.ty |> trans_type ~compinfos scope
+      (* TODO: deal with the vector type, treating as int type for now *)
+  | VectorType -> Cil.TInt (Cil.IInt, [])
   | UnaryTransformType -> failwith "qwer"
   | _ -> failwith ("Unknown type " ^ C.Type.get_kind_name typ.ty)
 
@@ -715,10 +718,11 @@ and trans_builtin_type t =
   | Void -> Cil.TVoid attr
   (* integer types *)
   | Int | Bool | Char_U | UChar | UShort | UInt | ULong | ULongLong | Char_S
-  | SChar | Short | Long | LongLong | Int128 | UInt128 ->
+  | SChar | Short | Long | LongLong | Int128 | UInt128 | Dependent ->
       Cil.TInt (trans_int_kind k, attr)
   | Float | Double | LongDouble | Float128 ->
       Cil.TFloat (trans_float_kind k, attr)
+  (* | Dependent -> failwith "Dependent" *)
   | _ ->
       F.fprintf F.err_formatter "%a\n" C.BuiltinType.pp t.ty;
       F.pp_print_flush F.err_formatter ();
@@ -945,6 +949,13 @@ and trans_expr ?(allow_undef = false) ?(skip_lhs = false) ?(default_ptr = false)
               Cil.NoOffset )
           in
           (sl1 @ sl2, Some (Cil.Lval new_lval))
+      (* translated vector type. should be ignored and not affect the analysis *)
+      | Cil.Const (CInt64 _) ->
+          let new_lval =
+            ( Cil.Var (Cil.makeTempVar (Option.get fundec_opt) Cil.intType),
+              Cil.NoOffset )
+          in
+          ([], Some (Cil.Lval new_lval))
       | _ -> failwith "ArraySubscript")
   | BinaryConditionalOperator -> trans_binary_cond_op scope fundec_opt loc expr
   | ConditionalOperator -> trans_cond_op scope fundec_opt loc expr
@@ -1171,8 +1182,7 @@ and trans_binary_operator scope fundec_opt loc kind lhs rhs =
       match (rhs_expr, rhs_sl) with
       | ( Cil.Lval _,
           [
-            ({ Cil.skind = Cil.Instr [ Cil.Call (Some _, f, el, loc) ]; _ } as
-            s);
+            ({ Cil.skind = Cil.Instr [ Cil.Call (Some _, f, el, loc) ]; _ } as s);
           ] ) ->
           let stmt =
             { s with skind = Cil.Instr [ Cil.Call (Some lval, f, el, loc) ] }
@@ -1582,8 +1592,9 @@ and handle_stmt_init scope typ fundec loc action lv e =
   in
   let is_struct_typ typ = not (is_primitive_typ typ) in
   match (C.Expr.get_kind e, Cil.unrollType typ) with
-  | C.StmtKind.InitListExpr, Cil.TArray (_, None, _) | InitListExpr, Cil.TPtr _
-    ->
+  | C.StmtKind.InitListExpr, Cil.TArray (_, None, _)
+  | InitListExpr, Cil.TPtr _
+  | InitListExpr, TInt _ ->
       ([], scope)
   | InitListExpr, Cil.TArray (arr_typ, Some _, _) when is_nested_init_list e ->
       let el =
@@ -2852,6 +2863,7 @@ let split_decl tu =
   |> fun (ts, vs) -> (List.rev ts, List.rev vs)
 
 let parse fname =
+  (* TODO: add -fno-vectorize option at the TranslationUnit *)
   C.initialize ~debug:false ();
   let tu = C.TranslationUnit.parse_file [| fname |] in
   let scope = initialize_builtins (Scope.create ()) in
