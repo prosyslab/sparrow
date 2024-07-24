@@ -454,7 +454,7 @@ let stat locset =
         if Loc.is_gvar loc then (gvar + 1, lvar, allocsite, field)
         else if Loc.is_lvar loc then (gvar, lvar + 1, allocsite, field)
         else if Loc.is_allocsite loc then (gvar, lvar, allocsite + 1, field)
-        else (gvar, lvar, allocsite + 1, field + 1))
+        else (gvar, lvar, allocsite, field + 1))
       locset (0, 0, 0, 0)
   in
   let cardinal = PowLoc.cardinal locset |> float_of_int in
