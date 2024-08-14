@@ -45,6 +45,10 @@ let marshal_out file global =
   MarshalManager.output (filename ^ ".global") global;
   global
 
+let print_pre_mem g =
+  L.info "\nPre-memory:\n";
+  L.info "%a\n" ItvDom.Mem.pp g.mem
+
 let init_analysis file =
   if !Options.marshal_in then marshal_in file
   else
@@ -54,6 +58,7 @@ let init_analysis file =
     |> StepManager.stepf true "Pre-processing" PreProcess.perform
     |> transform
     |> StepManager.stepf true "Pre-analysis" PreAnalysis.perform
+    |> opt !Options.print_pre_mem (fun g -> print_pre_mem g; g)
     |> opt !Options.marshal_out (marshal_out file)
 
 let print_pgm_info global =

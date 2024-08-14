@@ -195,7 +195,7 @@ let oct_debug = ref false
 let taint_debug = ref false
 
 (* ETC *)
-let print_premem = ref false
+let print_pre_mem = ref false
 
 let verbose = ref 1
 
@@ -276,6 +276,7 @@ let opts =
     ("-entry_point", Arg.Set_string entry_point, "Entry point (default: main)");
     ("-noalarm", Arg.Set noalarm, "Do not print alarms");
     ("-verbose", Arg.Set_int verbose, "Verbose level (default: 1)");
+    ("-print_pre_mem", Arg.Set print_pre_mem, "Print pre-analysis memory");
     ("-debug", Arg.Set debug, "Print debug information");
     ( "-oct_debug",
       Arg.Set oct_debug,
