@@ -38,11 +38,11 @@ val global_proc : Proc.t
 val start_node : node
 (** Starting point of program *)
 
-val init : Cil.file -> t
+val init : ProsysCil.Cil.file -> t
 
 val cfgof : t -> pid -> IntraCfg.t
 
-val argsof : t -> pid -> Cil.varinfo list
+val argsof : t -> pid -> ProsysCil.Cil.varinfo list
 
 val cmdof : t -> Node.t -> IntraCfg.cmd
 

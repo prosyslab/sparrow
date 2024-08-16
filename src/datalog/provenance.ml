@@ -1,5 +1,6 @@
 open BasicDom
 open Vocab
+module Cil = ProsysCil.Cil
 module F = Format
 module G = Graph.Persistent.Digraph.ConcreteBidirectional (Loc)
 module Rel = RelSemantics

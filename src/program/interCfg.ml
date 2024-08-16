@@ -11,8 +11,9 @@
 (** Inter-procedural CFG *)
 
 open Vocab
-open Cil
+open ProsysCil.Cil
 open IntraCfg.Cmd
+module Cil = ProsysCil.Cil
 
 module Proc = struct
   include String

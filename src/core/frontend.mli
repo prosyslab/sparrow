@@ -10,6 +10,8 @@
 
 (** Frontend *)
 
+open ProsysCil
+
 val files : string list ref
 
 val marshal_file : string ref

@@ -9,7 +9,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Cil
+open ProsysCil.Cil
 open IntraCfg
 open Cmd
 module F = Format
@@ -154,11 +154,11 @@ let c_lib_taint f es loc =
       Printf (f.vname, List.nth es 1, loc)
       ::
       (if !Options.patron && List.length es > 2 then
-       [
-         BufferOverrunLib
-           (f.vname, [ List.nth es 0; List.nth es 1; List.nth es 2 ], loc);
-       ]
-      else [])
+         [
+           BufferOverrunLib
+             (f.vname, [ List.nth es 0; List.nth es 1; List.nth es 2 ], loc);
+         ]
+       else [])
   | "snprintf" | "vsnprintf" -> [ Printf (f.vname, List.nth es 2, loc) ]
   | _ -> []
 

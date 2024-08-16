@@ -8,6 +8,7 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
+open ProsysCil
 open Cil
 open Vocab
 open Global
@@ -214,7 +215,7 @@ let incptr_itself_by_one (lv, e) =
   match (lv, e) with
   | ( (Var x, NoOffset),
       BinOp (PlusPI, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
-    when x.vname = y.vname && Cil.i64_to_int i = 1 ->
+    when x.vname = y.vname && Z.to_int i = 1 ->
       true
   | _ -> false
 
@@ -607,7 +608,7 @@ let inc_itself_by_one (lv, e) =
   match (lv, e) with
   | ( (Var x, NoOffset),
       BinOp (PlusA, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
-    when x.vname = y.vname && Cil.i64_to_int i = 1 ->
+    when x.vname = y.vname && Z.to_int i = 1 ->
       true
   | _ -> false
 
@@ -776,7 +777,7 @@ let normalize trset =
         points_to = feat.points_to /. max_points_to;
         diff_array_access =
           (if feat.diff_array_access = 0.0 then 0.0
-          else feat.diff_array_access /. max_diff_array_access);
+           else feat.diff_array_access /. max_diff_array_access);
         idx_pp = (if feat.idx_pp = 0.0 then 0.0 else feat.idx_pp /. max_idx_pp);
       })
     trset

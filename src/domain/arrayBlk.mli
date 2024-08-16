@@ -48,10 +48,10 @@ val set_null_pos : t -> Itv.t -> t
 
 val plus_null_pos : t -> Itv.t -> t
 
-val cast_array : Cil.typ -> t -> t
+val cast_array : ProsysCil.Cil.typ -> t -> t
 
 val allocsites_of_array : t -> BasicDom.Allocsite.t BatSet.t
 
 val pow_loc_of_array : t -> BasicDom.PowLoc.t
 
-val append_field : t -> Cil.fieldinfo -> BasicDom.PowLoc.t
+val append_field : t -> ProsysCil.Cil.fieldinfo -> BasicDom.PowLoc.t

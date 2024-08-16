@@ -8,6 +8,7 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
+open ProsysCil
 
 val s_exps : Cil.exp list -> string
 

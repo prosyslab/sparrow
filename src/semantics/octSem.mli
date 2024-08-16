@@ -21,7 +21,7 @@ val check_bo :
   OctDom.PackConf.t ->
   BasicDom.Allocsite.t ->
   Itv.t ->
-  Cil.exp ->
+  ProsysCil.Cil.exp ->
   ItvDom.Mem.t ->
   Dom.t ->
   Itv.t

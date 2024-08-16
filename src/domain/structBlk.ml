@@ -11,6 +11,7 @@
 
 open BasicDom
 open Vocab
+module Cil = ProsysCil.Cil
 
 module Struct = struct
   include String

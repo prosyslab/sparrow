@@ -8,6 +8,7 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
+open ProsysCil
 open Cil
 open Global
 open BasicDom
@@ -265,7 +266,7 @@ let inc_itself_by_one (lv, e) =
   match (lv, e) with
   | ( (Var x, NoOffset),
       BinOp (PlusA, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
-    when x.vname = y.vname && Cil.i64_to_int i = 1 ->
+    when x.vname = y.vname && Z.to_int i = 1 ->
       true
   | _ -> false
 
@@ -273,7 +274,7 @@ let incptr_itself_by_one (lv, e) =
   match (lv, e) with
   | ( (Var x, NoOffset),
       BinOp (PlusPI, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
-    when x.vname = y.vname && Cil.i64_to_int i = 1 ->
+    when x.vname = y.vname && Z.to_int i = 1 ->
       true
   | _ -> false
 
@@ -281,7 +282,7 @@ let inc_itself_by_const (lv, e) =
   match (lv, e) with
   | ( (Var x, NoOffset),
       BinOp (PlusA, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
-    when x.vname = y.vname && Cil.i64_to_int i > 1 ->
+    when x.vname = y.vname && Z.to_int i > 1 ->
       true
   | _ -> false
 
@@ -297,7 +298,7 @@ let incptr_itself_by_const (lv, e) =
   match (lv, e) with
   | ( (Var x, NoOffset),
       BinOp (PlusPI, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
-    when x.vname = y.vname && Cil.i64_to_int i > 1 ->
+    when x.vname = y.vname && Z.to_int i > 1 ->
       true
   | _ -> false
 
@@ -305,7 +306,7 @@ let mul_itself_by_const (lv, e) =
   match (lv, e) with
   | ( (Var x, NoOffset),
       BinOp (Mult, Lval (Var y, NoOffset), Const (CInt64 (i, _, _)), _) )
-    when x.vname = y.vname && Cil.i64_to_int i > 1 ->
+    when x.vname = y.vname && Z.to_int i > 1 ->
       true
   | _ -> false
 
@@ -442,23 +443,23 @@ let extract_set pid (lv, e) mem global feature =
     |> (if is_const e then PowLoc.fold add_assign_const locs else id)
     |> (if is_sizeof e then PowLoc.fold add_assign_sizeof locs else id)
     |> (if inc_itself_by_one (lv, e) then PowLoc.fold add_inc_itself_by_one locs
-       else id)
+        else id)
     |> (if incptr_itself_by_one (lv, e) then
-        PowLoc.fold add_incptr_itself_by_one locs
-       else id)
+          PowLoc.fold add_incptr_itself_by_one locs
+        else id)
     |> (if incptr_itself_by_const (lv, e) then
-        PowLoc.fold add_incptr_itself_by_const locs
-       else id)
+          PowLoc.fold add_incptr_itself_by_const locs
+        else id)
     |> (if inc_itself_by_const (lv, e) then
-        PowLoc.fold add_inc_itself_by_const locs
-       else id)
+          PowLoc.fold add_inc_itself_by_const locs
+        else id)
     |> (if inc_itself_by_var (lv, e) then PowLoc.fold add_inc_itself_by_var locs
-       else id)
+        else id)
     |> (if mul_itself_by_const (lv, e) then
-        PowLoc.fold add_mul_itself_by_const locs
-       else id)
+          PowLoc.fold add_mul_itself_by_const locs
+        else id)
     |> (if mul_itself_by_var (lv, e) then PowLoc.fold add_mul_itself_by_var locs
-       else id)
+        else id)
     |> (if dec_itself (lv, e) then PowLoc.fold add_dec_itself locs else id)
     |> (if is_inc (lv, e) then PowLoc.fold add_inc locs else id)
     |> (if is_dec (lv, e) then PowLoc.fold add_dec locs else id)
@@ -613,14 +614,14 @@ let extract2 icfg mem node feature =
           let l_y = PowLoc.choose locs_e in
           feature
           |> (if PowLoc.mem l_x feature.pass_to_alloc then
-              add_pass_to_alloc2 l_y
-             else id)
+                add_pass_to_alloc2 l_y
+              else id)
           |> (if PowLoc.mem l_y feature.return_from_alloc then
-              add_return_from_alloc2 l_x
-             else id)
+                add_return_from_alloc2 l_x
+              else id)
           |> (if PowLoc.mem l_x feature.pass_to_realloc then
-              add_pass_to_realloc2 l_y
-             else id)
+                add_pass_to_realloc2 l_y
+              else id)
           |>
           if PowLoc.mem l_y feature.return_from_realloc then
             add_return_from_realloc2 l_x
@@ -763,67 +764,67 @@ let weight_of l f weights =
   |> (if mem l f.used_inside_loops then ( +. ) (getw 33) else id)
   (* combination rules *)
   |> (if
-      mem l f.lvars && mem l f.prune_by_const
-      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-     then ( +. ) (getw 34)
-     else id)
+        mem l f.lvars && mem l f.prune_by_const
+        && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+      then ( +. ) (getw 34)
+      else id)
   |> (if
-      mem l f.gvars && mem l f.prune_by_const
-      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-     then ( +. ) (getw 35)
-     else id)
+        mem l f.gvars && mem l f.prune_by_const
+        && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+      then ( +. ) (getw 35)
+      else id)
   |> (if
-      mem l f.lvars
-      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-      && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
-     then ( +. ) (getw 36)
-     else id)
+        mem l f.lvars
+        && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+        && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
+      then ( +. ) (getw 36)
+      else id)
   |> (if
-      mem l f.gvars
-      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-      && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
-     then ( +. ) (getw 37)
-     else id)
+        mem l f.gvars
+        && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+        && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
+      then ( +. ) (getw 37)
+      else id)
   |> (if
-      mem l f.lvars
-      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-      && (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
-     then ( +. ) (getw 38)
-     else id)
+        mem l f.lvars
+        && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+        && (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
+      then ( +. ) (getw 38)
+      else id)
   |> (if
-      mem l f.gvars
-      && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-      && (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
-     then ( +. ) (getw 39)
-     else id)
+        mem l f.gvars
+        && (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+        && (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
+      then ( +. ) (getw 39)
+      else id)
   |> (if
-      (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
-      && mem l f.used_as_array_buf
-     then ( +. ) (getw 40)
-     else id)
+        (mem l f.pass_to_alloc || mem l f.pass_to_alloc_clos)
+        && mem l f.used_as_array_buf
+      then ( +. ) (getw 40)
+      else id)
   |> (if
-      (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
-      && mem l f.used_as_array_buf
-     then ( +. ) (getw 41)
-     else id)
+        (mem l f.return_from_alloc || mem l f.return_from_alloc_clos)
+        && mem l f.used_as_array_buf
+      then ( +. ) (getw 41)
+      else id)
   |> (if
-      mem l f.lvars
-      && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
-      && mem l f.mod_inside_loops
-     then ( +. ) (getw 42)
-     else id)
+        mem l f.lvars
+        && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
+        && mem l f.mod_inside_loops
+      then ( +. ) (getw 42)
+      else id)
   |> (if
-      mem l f.gvars
-      && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
-      && mem l f.mod_inside_loops
-     then ( +. ) (getw 43)
-     else id)
+        mem l f.gvars
+        && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
+        && mem l f.mod_inside_loops
+      then ( +. ) (getw 43)
+      else id)
   |> (if
-      mem l f.lvars
-      && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
-      && not (mem l f.mod_inside_loops)
-     then ( +. ) (getw 44)
-     else id)
+        mem l f.lvars
+        && (mem l f.inc_itself_by_one || mem l f.inc_itself_by_const)
+        && not (mem l f.mod_inside_loops)
+      then ( +. ) (getw 44)
+      else id)
   |>
   if
     mem l f.gvars

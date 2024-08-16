@@ -11,6 +11,7 @@
 
 open Vocab
 open BasicDom
+open ProsysCil
 open Cil
 module F = Format
 module L = Logging

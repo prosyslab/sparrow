@@ -9,7 +9,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Cil
+open ProsysCil
 open Global
 open BasicDom
 open Vocab

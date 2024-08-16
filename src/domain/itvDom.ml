@@ -10,6 +10,7 @@
 (***********************************************************************)
 open BasicDom
 open Vocab
+module Cil = ProsysCil.Cil
 
 module Val = struct
   include ProdDom.Make5 (Itv) (PowLoc) (ArrayBlk) (StructBlk) (PowProc)

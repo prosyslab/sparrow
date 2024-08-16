@@ -9,6 +9,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
+open ProsysCil
 open Cil
 open Vocab
 module F = Format
@@ -17,7 +18,8 @@ module F = Format
  * to_string functions *
  * ******************* *)
 
-let tostring s = Escape.escape_string (Pretty.sprint ~width:0 s)
+let tostring s =
+  ProsysCil.Escape.escape_string (ProsysCil.Pretty.sprint ~width:0 s)
 
 let rec s_exps es = string_of_list ~first:"(" ~last:")" ~sep:", " s_exp es
 
@@ -170,7 +172,7 @@ let is_unsigned = function
   | _ -> false
 
 let is_constant_n n e =
-  match Cil.isInteger e with Some i -> Int64.to_int i = n | None -> false
+  match Cil.isInteger e with Some i -> Z.to_int i = n | None -> false
 
 (* NOTE : Cil.bitsSizeOf often fails: just return top for the moment
  * Adhoc solution: To avoid this failure, translate original C sources

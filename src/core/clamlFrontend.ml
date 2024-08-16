@@ -1,4 +1,5 @@
 open Vocab
+module Cil = ProsysCil.Cil
 module H = Hashtbl
 module C = Claml.Clang
 module F = Format
@@ -1738,7 +1739,7 @@ and mk_arr_stmt scope fundec loc action lv len_exp el =
   let scope = scope |> Scope.enter_block in
   let arr_len =
     match len_exp with
-    | Cil.Const (CInt64 (v, _, _)) -> Int64.to_int v
+    | Cil.Const (CInt64 (v, _, _)) -> Z.to_int v
     | _ -> failwith "not expected"
   in
   let arr_init idx_list =
@@ -2065,7 +2066,7 @@ and mk_array_stmt expr_list fi loc fundec action lv scope arr_type arr_exp
   let len_exp = Option.get arr_exp in
   let arr_len =
     match len_exp with
-    | Cil.Const (Cil.CInt64 (v, _, _)) -> Int64.to_int v
+    | Cil.Const (Cil.CInt64 (v, _, _)) -> Z.to_int v
     | _ -> failwith "not expected"
   in
   let flags =
@@ -2180,7 +2181,7 @@ and trans_while scope fundec loc stmt =
   let body_stmt = trans_block scope fundec body in
   let bstmts =
     match Cil.constFold false cond_expr |> Cil.isInteger with
-    | Some i64 when Cil.i64_to_int i64 = 1 -> body_stmt.Chunk.stmts
+    | Some i64 when Z.to_int i64 = 1 -> body_stmt.Chunk.stmts
     | _ ->
         cond_stmt
         @ Cil.mkStmt (Cil.If (cond_expr, empty_block, break_stmt, loc))
@@ -2207,9 +2208,8 @@ and trans_do scope fundec loc stmt =
   let body_stmt = trans_block scope fundec body in
   let bstmts =
     match Cil.constFold false cond_expr |> Cil.isInteger with
-    | Some i64 when Cil.i64_to_int i64 = 1 -> body_stmt.Chunk.stmts
-    | Some i64 when Cil.i64_to_int i64 = 0 ->
-        body_stmt.Chunk.stmts @ [ break_stmt ]
+    | Some i64 when Z.to_int i64 = 1 -> body_stmt.Chunk.stmts
+    | Some i64 when Z.to_int i64 = 0 -> body_stmt.Chunk.stmts @ [ break_stmt ]
     | _ ->
         let break_stmt = Cil.mkBlock [ break_stmt ] in
         body_stmt.Chunk.stmts
@@ -2620,7 +2620,7 @@ and mk_init scope loc fitype expr_list =
         match len_exp with
         | Const c -> (
             match c with
-            | CInt64 (v, _, _) -> Int64.to_int v
+            | CInt64 (v, _, _) -> Z.to_int v
             | _ -> failwith "not expected")
         | _ -> failwith "not expected"
       in
@@ -2767,7 +2767,7 @@ and trans_global_init scope loc typ e =
         match len_exp with
         | Const c -> (
             match c with
-            | CInt64 (v, _, _) -> Int64.to_int v
+            | CInt64 (v, _, _) -> Z.to_int v
             | _ -> failwith "not expected")
         | _ -> failwith "not expected"
       in

@@ -30,10 +30,10 @@ end
 
 module Allocsite : sig
   type t =
-  | Local of Node.t
-  | Internal of IntAllocsite.t
-  | External of ExtAllocsite.t
-  | Super of string
+    | Local of Node.t
+    | Internal of IntAllocsite.t
+    | External of ExtAllocsite.t
+    | Super of string
 
   include AbsDom.SET with type t := t
 
@@ -58,10 +58,10 @@ end
 
 module Loc : sig
   type t =
-    | GVar of string * Cil.typ
-    | LVar of Proc.t * string * Cil.typ
+    | GVar of string * ProsysCil.Cil.typ
+    | LVar of Proc.t * string * ProsysCil.Cil.typ
     | Allocsite of Allocsite.t
-    | Field of t * field * Cil.typ
+    | Field of t * field * ProsysCil.Cil.typ
 
   and field = string
 
@@ -91,15 +91,15 @@ module Loc : sig
 
   val is_heap : t -> bool
 
-  val of_gvar : string -> Cil.typ -> t
+  val of_gvar : string -> ProsysCil.Cil.typ -> t
 
-  val of_lvar : Proc.t -> string -> Cil.typ -> t
+  val of_lvar : Proc.t -> string -> ProsysCil.Cil.typ -> t
 
-  val append_field : t -> field -> Cil.typ -> t
+  val append_field : t -> field -> ProsysCil.Cil.typ -> t
 
   val of_allocsite : Allocsite.t -> t
 
-  val return_var : Proc.t -> Cil.typ -> t
+  val return_var : Proc.t -> ProsysCil.Cil.typ -> t
 
   val is_global : t -> bool
 
@@ -107,7 +107,7 @@ module Loc : sig
 
   val get_proc : t -> Proc.t
 
-  val typ : t -> Cil.typ option
+  val typ : t -> ProsysCil.Cil.typ option
 end
 
 module PowLoc : sig
@@ -115,9 +115,9 @@ module PowLoc : sig
 
   val null : t
 
-  val prune : Cil.binop -> t -> Cil.exp -> t
+  val prune : ProsysCil.Cil.binop -> t -> ProsysCil.Cil.exp -> t
 
-  val append_field : t -> Cil.fieldinfo -> t
+  val append_field : t -> ProsysCil.Cil.fieldinfo -> t
 end
 with type t = PowDom.MakeCPO(Loc).t
  and type elt = Loc.t

@@ -10,6 +10,8 @@
 (***********************************************************************)
 (** Abstract semantics of taint analysis *)
 
+open ProsysCil
+
 include
   AbsSem.S
     with type Dom.t = TaintDom.Mem.t

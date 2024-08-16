@@ -1,5 +1,6 @@
 open IntraCfg
 open Cmd
+module Cil = ProsysCil.Cil
 module F = Format
 module Node = InterCfg.Node
 
@@ -350,7 +351,7 @@ let pp_arg fmt n arg =
     (fun _ e ->
       let e' = if !Options.remove_cast then remove_cast e else e in
       (if !Options.patron then Hashtbl.find exp_patron_map (n, e')
-      else Hashtbl.find exp_map e')
+       else Hashtbl.find exp_map e')
       |> F.fprintf fmt.arg "%s\t%s\t%s\n" id (new_arg_pos_id ()))
     arg;
   id

@@ -1,3 +1,5 @@
+module Cil = ProsysCil.Cil
+
 type t = Yojson.Safe.t
 
 let rec of_lhost = function

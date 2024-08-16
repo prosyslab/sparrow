@@ -10,6 +10,8 @@
 (***********************************************************************)
 (** Alarm report of interval analysis *)
 
+open ProsysCil
+
 type target = BO | ND | DZ | IO
 
 type status = Proven | UnProven | BotAlarm

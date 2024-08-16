@@ -8,6 +8,7 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
+open ProsysCil
 open Cil
 open Global
 open BasicDom

@@ -13,6 +13,7 @@
 open BasicDom
 open Vocab
 open StructBlk
+module Cil = ProsysCil.Cil
 
 module ArrInfo = struct
   type t = {

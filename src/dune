@@ -9,8 +9,8 @@
   apron
   apron.octMPQ
   batteries
-  cil
-  cil.all-features
+  prosys-cil
+  prosys-cil.all-features
   clangml
   clangml.printer
   claml
@@ -28,8 +28,8 @@
   apron
   apron.octMPQ
   batteries
-  cil
-  cil.all-features
+  prosys-cil
+  prosys-cil.all-features
   clangml
   clangml.printer
   claml

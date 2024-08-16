@@ -1,4 +1,5 @@
 open BasicDom
+open ProsysCil
 module F = Format
 module L = Logging
 module Analysis = SparseAnalysis.Make (ItvSem)
@@ -189,8 +190,8 @@ let new_str_id str =
 
 let val_of_const = function
   | Cil.CInt64 (i, _, _) -> i
-  | Cil.CChr c -> Char.code c |> Int64.of_int
-  | _ -> 0L (* TODO: add String, Real domain *)
+  | Cil.CChr c -> Char.code c |> Z.of_int
+  | _ -> Z.zero (* TODO: add String, Real domain *)
 
 let print_maps dirname =
   let oc_loc_text = open_out (dirname ^ "/Loc.map") in

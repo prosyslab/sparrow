@@ -9,7 +9,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Cil
+open ProsysCil
 open Global
 open BasicDom
 open Vocab
@@ -291,7 +291,7 @@ let do_analysis (global, itvinputof) =
   in
   let dug = Analysis.generate_dug spec global in
   (if !Options.marshal_in then marshal_in global
-  else Analysis.perform spec global dug)
+   else Analysis.perform spec global dug)
   |> opt !Options.marshal_out marshal_out
   |> StepManager.stepf true "Generate Alarm Report"
        (fun (global, _, inputof, outputof) ->

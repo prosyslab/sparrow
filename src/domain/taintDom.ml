@@ -1,5 +1,6 @@
 open BasicDom
 open InterCfg
+module Cil = ProsysCil.Cil
 
 module IntOverflow = struct
   type t = Bot | Top

@@ -10,6 +10,8 @@
 (***********************************************************************)
 (** Alarm Cil.expression *)
 
+open ProsysCil
+
 type t =
   | ArrayExp of Cil.lval * Cil.exp * Cil.location
   | DerefExp of Cil.exp * Cil.location

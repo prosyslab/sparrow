@@ -112,8 +112,8 @@ val l_shift : t -> t -> t
 
 (** {2 Casting } *)
 
-val cast : Cil.typ -> Cil.typ -> t -> t
+val cast : ProsysCil.Cil.typ -> ProsysCil.Cil.typ -> t -> t
 
 (** {2 Pruning } *)
 
-val prune : Cil.binop -> t -> t -> t
+val prune : ProsysCil.Cil.binop -> t -> t -> t

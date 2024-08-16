@@ -51,7 +51,7 @@ module Val : sig
 
   val itv_top : t
 
-  val cast : Cil.typ -> Cil.typ -> t -> t
+  val cast : ProsysCil.Cil.typ -> ProsysCil.Cil.typ -> t -> t
 end
 
 module Mem : sig

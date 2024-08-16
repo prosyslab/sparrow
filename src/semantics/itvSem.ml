@@ -11,6 +11,7 @@
 (** Semantics of interval analysis *)
 
 open Vocab
+open ProsysCil
 open Cil
 open AbsSem
 open BasicDom
@@ -83,7 +84,7 @@ let update mode spec global locs v mem =
 
 let eval_const = function
   | Cil.CInt64 (i64, _, _) ->
-      let itv = try Itv.of_int (Cil.i64_to_int i64) with _ -> Itv.top in
+      let itv = try Itv.of_int (Z.to_int i64) with _ -> Itv.top in
       Val.of_itv itv
   | Cil.CStr _ -> Val.of_itv Itv.top
   | Cil.CWStr _ -> Val.of_itv Itv.top

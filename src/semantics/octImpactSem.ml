@@ -9,7 +9,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Cil
+open ProsysCil
 open Vocab
 open Global
 open AbsSem
@@ -66,8 +66,8 @@ let rec set mode global ptrmem pid lv_set e mem =
     | BinOp (bop, Lval lval, Const (CInt64 (i, _, _)), _)
     | BinOp (bop, Const (CInt64 (i, _, _)), Lval lval, _)
     (* heuristic: forget the relationship only if x = x + 1 *)
-      when (bop = PlusA && Cil.i64_to_int i = 1)
-           || (bop = MinusA && Cil.i64_to_int i = -1) ->
+      when (bop = PlusA && Z.to_int i = 1) || (bop = MinusA && Z.to_int i = -1)
+      ->
         ItvSem.eval_lv pid lval ptrmem |> PowOctLoc.of_locs |> fun rv_set ->
         if PowOctLoc.meet lv_set rv_set |> PowOctLoc.is_empty then
           set mode global ptrmem pid lv_set (Lval lval) mem
@@ -222,7 +222,7 @@ let model_strlen mode pid lvo exps ptrmem (mem, global) =
 
 let handle_undefined_functions mode node pid (lvo, f, exps) ptrmem (mem, global)
     loc =
-  match f.vname with
+  match f.Cil.vname with
   | "sparrow_print" ->
       sparrow_print pid exps mem loc;
       mem

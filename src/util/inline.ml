@@ -1,9 +1,9 @@
 (*
  *
- * Copyright (c) 2007, 
+ * Copyright (c) 2007,
  *  George C. Necula    <necula@cs.berkeley.edu>
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
@@ -33,19 +33,20 @@
  *
  *)
 
-(** This module provides inlining functions. You can run it from the cilly 
+(** This module provides inlining functions. You can run it from the cilly
  * command line by passing the names of the functions to inline:
- * 
- *    cilly --save-temps --inline=toinline module.c
- * 
- * This module has not been tested extensively, so you should run it with 
- * the --check argument to ensure that it does not break any CIL invariants 
  *
- * 
+ *    cilly --save-temps --inline=toinline module.c
+ *
+ * This module has not been tested extensively, so you should run it with
+ * the --check argument to ensure that it does not break any CIL invariants
+ *
+ *
  * You can also call directly the [doFile] and [doFunction] functions.
- 
+
  *)
 
+open ProsysCil
 open Cil
 open Feature
 module E = Errormsg
@@ -57,28 +58,28 @@ let debug = false
 
 exception Recursion (* Used to signal recursion *)
 
-(* A visitor that makes a deep copy of a function body for use inside a host 
+(* A visitor that makes a deep copy of a function body for use inside a host
  * function, replacing duplicate labels, returns, etc. *)
 class copyBodyVisitor (host : fundec)
-  (* The host of the 
+  (* The host of the
    * inlining *) (inlining : varinfo)
-  (* Function being 
+  (* Function being
    * inlined *) (replVar : varinfo -> varinfo)
-  (* Maps locals of the 
-   * inlined function 
-   * to locals of the 
+  (* Maps locals of the
+   * inlined function
+   * to locals of the
    * host *)
-    (retlval : varinfo option) (* The destination 
+    (retlval : varinfo option) (* The destination
                                 * for the "return" *)
   (replLabel : string -> string)
-  (* A renamer for 
+  (* A renamer for
    * labels *)
-    (retlab : stmt) (* The label for the 
+    (retlab : stmt) (* The label for the
                      * return *) =
   object
     inherit nopCilVisitor
 
-    (* Keep here a maping from statements to their copies, indexed by their 
+    (* Keep here a maping from statements to their copies, indexed by their
      * original ID *)
     val stmtmap : stmt IH.t = IH.create 113
 
@@ -130,8 +131,8 @@ class copyBodyVisitor (host : fundec)
 
     (* Replace statements. *)
     method! vstmt (s : stmt) : stmt visitAction =
-      (* There is a possibility that we did not have the statements IDed 
-       * propertly. So, we change the ID even on the replaced copy so that we 
+      (* There is a possibility that we did not have the statements IDed
+       * propertly. So, we change the ID even on the replaced copy so that we
        * can index on them ! *)
       (match host.smaxstmtid with
       | Some id -> s.sid <- 1 + id
@@ -196,20 +197,20 @@ class copyBodyVisitor (host : fundec)
 let replaceStatement (host : fundec) (* The host *)
     (inlineWhat : varinfo -> fundec option) (* What to inline *)
     (replLabel : string -> string)
-    (* label 
+    (* label
      * replacement *) (anyInlining : bool ref)
-    (* will set this 
-     * to true if we 
-     * did any 
+    (* will set this
+     * to true if we
+     * did any
      * inlining *) (s : stmt) : stmt =
   match s.skind with
   | Instr il when il <> [] ->
       let prevrstmts : stmt list ref = ref [] in
-      (* Reversed list of previous 
+      (* Reversed list of previous
        * statements *)
       let prevrinstr : instr list ref = ref [] in
-      (* Reverse list of previous 
-       * instructions, in this 
+      (* Reverse list of previous
+       * instructions, in this
        * statement *)
       let emptyPrevrinstr () =
         if !prevrinstr <> [] then (
@@ -261,7 +262,7 @@ let replaceStatement (host : fundec) (* The host *)
                   match (args, formals) with
                   | [], [] -> ()
                   | a :: args', f :: formals' ->
-                      (* We must copy the argument even if it is already a 
+                      (* We must copy the argument even if it is already a
                        * variable, to obey call by value *)
                       (* Make a local and a copy *)
                       let f' = makeTempVar host ~name:f.vname f.vtype in
@@ -336,14 +337,14 @@ let replaceStatement (host : fundec) (* The host *)
 (** Apply inlining to a function, modify in place *)
 let doFunction (host : fundec) (* The function into which to inline *)
     (inlineWhat : varinfo -> fundec option)
-    (* The functions to 
-     * inline, as a 
-     * partial map 
-     * from varinfo to 
+    (* The functions to
+     * inline, as a
+     * partial map
+     * from varinfo to
      * body *)
       (anyInlining : bool ref) : unit =
-  (* Will be set to true 
-   * if any inlining 
+  (* Will be set to true
+   * if any inlining
    * took place *)
   (* Scan the host function and build the alpha-conversion table for labels *)
   let labTable : (string, unit A.alphaTableData ref) H.t = H.create 5 in
@@ -389,12 +390,12 @@ let doFunction (host : fundec) (* The function into which to inline *)
 
 (** Apply inlining to a whole file *)
 let doFile (inlineWhat : varinfo -> fundec option)
-    (* What to inline. See 
+    (* What to inline. See
      * comments for [doFunction] *) (fl : file) =
   iterGlobals fl (fun g ->
       match g with
       | GFun (fd, _) ->
-          (* Keep doing inlining until there is no more. We will catch 
+          (* Keep doing inlining until there is no more. We will catch
            * recursion eventually when we want to inline a function into itself*)
           let anyInlining = ref true in
           while !anyInlining do

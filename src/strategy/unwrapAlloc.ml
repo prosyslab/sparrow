@@ -1,3 +1,4 @@
+module Cil = ProsysCil.Cil
 open Cil
 module SS = Set.Make (String)
 

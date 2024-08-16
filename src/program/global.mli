@@ -10,6 +10,8 @@
 (***********************************************************************)
 (** Global information *)
 
+open ProsysCil
+
 type t = {
   file : Cil.file;
   icfg : InterCfg.t;

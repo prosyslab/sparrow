@@ -9,7 +9,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open Cil
+open ProsysCil
 open Vocab
 open AbsSem
 open Global
@@ -62,7 +62,7 @@ let itv_to_interval i =
 let octloc_to_texpr l = Texpr1.Var (Apron.Var.of_string (OctLoc.to_string l))
 
 let const_to_texpr = function
-  | Cil.CInt64 (i, _, _) -> Texpr1.Cst (Coeff.s_of_int (Int64.to_int i))
+  | Cil.CInt64 (i, _, _) -> Texpr1.Cst (Coeff.s_of_int (Z.to_int i))
   | Cil.CStr s -> invalid_arg ("octSem.ml: const_to_texpr string " ^ s)
   | Cil.CWStr _ -> invalid_arg "octSem.ml: const_to_texpr wide string"
   | Cil.CChr c -> Texpr1.Cst (Coeff.s_of_int (int_of_char c))
@@ -282,7 +282,7 @@ let rec prune mode global ptrmem packconf pid exp mem =
 
 let sparrow_print ptrmem packconf pid exps mem loc =
   match exps with
-  | Lval lv :: _ ->
+  | Cil.Lval lv :: _ ->
       ItvSem.eval_lv pid lv ptrmem
       |> PowOctLoc.of_locs
       |> PowOctLoc.iter (fun lv ->
@@ -418,7 +418,7 @@ let model_unknown mode packconf _ pid lvo f _ ptrmem (mem, global) =
       forget mode global packconf pid oct_lv mem
   | Some _ ->
       let size =
-        Allocsite.allocsite_of_ext (Some f.vname)
+        Allocsite.allocsite_of_ext (Some f.Cil.vname)
         |> OctLoc.of_size |> PowOctLoc.singleton
       in
       let loc =
@@ -431,7 +431,7 @@ let model_unknown mode packconf _ pid lvo f _ ptrmem (mem, global) =
 
 let handle_undefined_functions mode packconf node pid (lvo, f, exps) ptrmem
     (mem, global) loc =
-  match f.vname with
+  match f.Cil.vname with
   | "sparrow_print" ->
       sparrow_print ptrmem packconf pid exps mem loc;
       mem

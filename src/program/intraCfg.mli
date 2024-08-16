@@ -24,28 +24,38 @@ module NodeSet : BatSet.S with type elt = Node.t
 
 module Cmd : sig
   type t =
-    | Cinstr of Cil.instr list * Cil.location
-    | Cif of Cil.exp * Cil.block * Cil.block * Cil.location
-    | CLoop of Cil.location
+    | Cinstr of ProsysCil.Cil.instr list * ProsysCil.Cil.location
+    | Cif of
+        ProsysCil.Cil.exp
+        * ProsysCil.Cil.block
+        * ProsysCil.Cil.block
+        * ProsysCil.Cil.location
+    | CLoop of ProsysCil.Cil.location
     (* final graph has the following cmds only *)
-    | Cset of Cil.lval * Cil.exp * Cil.location
-    | Cexternal of Cil.lval * Cil.location
-    | Calloc of Cil.lval * alloc * local * static * Cil.location
-    | Csalloc of Cil.lval * string * Cil.location
-    | Cfalloc of Cil.lval * Cil.fundec * Cil.location
-    | Cassume of Cil.exp * branch * Cil.location
-    | Ccall of Cil.lval option * Cil.exp * Cil.exp list * Cil.location
-    | Creturn of Cil.exp option * Cil.location
+    | Cset of ProsysCil.Cil.lval * ProsysCil.Cil.exp * ProsysCil.Cil.location
+    | Cexternal of ProsysCil.Cil.lval * ProsysCil.Cil.location
+    | Calloc of
+        ProsysCil.Cil.lval * alloc * local * static * ProsysCil.Cil.location
+    | Csalloc of ProsysCil.Cil.lval * string * ProsysCil.Cil.location
+    | Cfalloc of
+        ProsysCil.Cil.lval * ProsysCil.Cil.fundec * ProsysCil.Cil.location
+    | Cassume of ProsysCil.Cil.exp * branch * ProsysCil.Cil.location
+    | Ccall of
+        ProsysCil.Cil.lval option
+        * ProsysCil.Cil.exp
+        * ProsysCil.Cil.exp list
+        * ProsysCil.Cil.location
+    | Creturn of ProsysCil.Cil.exp option * ProsysCil.Cil.location
     | Casm of
-        Cil.attributes
+        ProsysCil.Cil.attributes
         * string list
-        * (string option * string * Cil.lval) list
-        * (string option * string * Cil.exp) list
+        * (string option * string * ProsysCil.Cil.lval) list
+        * (string option * string * ProsysCil.Cil.exp) list
         * string list
-        * Cil.location
-    | Cskip of tag * Cil.location
+        * ProsysCil.Cil.location
+    | Cskip of tag * ProsysCil.Cil.location
 
-  and alloc = Array of Cil.exp | Struct of Cil.compinfo
+  and alloc = Array of ProsysCil.Cil.exp | Struct of ProsysCil.Cil.compinfo
 
   and local = bool
 
@@ -55,9 +65,9 @@ module Cmd : sig
 
   and tag = Unknown | ReturnNode | Branch | LoopHead
 
-  val fromCilStmt : Cil.stmtkind -> t
+  val fromCilStmt : ProsysCil.Cil.stmtkind -> t
 
-  val location_of : t -> Cil.location
+  val location_of : t -> ProsysCil.Cil.location
 
   val to_string : t -> string
 end
@@ -69,13 +79,14 @@ and node = Node.t
 
 and cmd = Cmd.t
 
-val init : Cil.fundec -> Cil.location -> t
+val init : ProsysCil.Cil.fundec -> ProsysCil.Cil.location -> t
 
-val generate_global_proc : Cil.global list -> Cil.fundec -> t
+val generate_global_proc :
+  ProsysCil.Cil.global list -> ProsysCil.Cil.fundec -> t
 
 val get_pid : t -> string
 
-val get_formals : t -> Cil.varinfo list
+val get_formals : t -> ProsysCil.Cil.varinfo list
 
 val get_scc_list : t -> node list list
 

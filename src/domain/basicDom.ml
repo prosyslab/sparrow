@@ -11,6 +11,7 @@
 (** Abstract Domain *)
 
 open Vocab
+module Cil = ProsysCil.Cil
 module Node = InterCfg.Node
 module PowNode = PowDom.MakeCPO (Node)
 module Proc = InterCfg.Proc

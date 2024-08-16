@@ -11,9 +11,10 @@
 (** CFG for a Function. *)
 
 open Vocab
-open Cil
+open ProsysCil.Cil
 open CilHelper
 open Printf
+module Cil = ProsysCil.Cil
 module F = Format
 
 module Node = struct
@@ -459,7 +460,7 @@ let make_init_loop fd lv exp loc entry f g =
   let init_node = Node.make () in
   let idxinfo = Cil.makeTempVar fd (Cil.TInt (IInt, [])) in
   let idx = (Cil.Var idxinfo, Cil.NoOffset) in
-  let init_value = Cil.Const (Cil.CInt64 (Int64.zero, IInt, None)) in
+  let init_value = Cil.Const (Cil.CInt64 (Z.zero, IInt, None)) in
   let init_cmd = Cmd.Cset (idx, init_value, loc) in
   let g = add_cmd init_node init_cmd g in
   (* while (i < exp) *)
@@ -491,7 +492,7 @@ let make_init_loop fd lv exp loc entry f g =
         Cil.BinOp
           ( Cil.PlusA,
             Cil.Lval idx,
-            Cil.Const (Cil.CInt64 (Int64.one, IInt, None)),
+            Cil.Const (Cil.CInt64 (Z.one, IInt, None)),
             Cil.intType ),
         loc )
   in

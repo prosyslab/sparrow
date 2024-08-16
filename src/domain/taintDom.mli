@@ -20,7 +20,7 @@ end
 
 module UserInput : sig
   module Source : sig
-    type t = BasicDom.Node.t * Cil.location
+    type t = BasicDom.Node.t * ProsysCil.Cil.location
   end
 
   include PowDom.LAT with type elt = Source.t
@@ -37,7 +37,7 @@ module Val : sig
 
   val user_input : t -> UserInput.t
 
-  val input_value : BasicDom.Node.t -> Cil.location -> t
+  val input_value : BasicDom.Node.t -> ProsysCil.Cil.location -> t
 end
 
 module Mem : sig

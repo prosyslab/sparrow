@@ -11,6 +11,7 @@
 open Vocab
 open Global
 open BasicDom
+open ProsysCil
 module L = Logging
 
 (* ************************************************************************* *

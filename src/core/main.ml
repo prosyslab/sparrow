@@ -9,6 +9,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
+open ProsysCil
 open Global
 open Vocab
 module L = Logging
@@ -58,7 +59,9 @@ let init_analysis file =
     |> StepManager.stepf true "Pre-processing" PreProcess.perform
     |> transform
     |> StepManager.stepf true "Pre-analysis" PreAnalysis.perform
-    |> opt !Options.print_pre_mem (fun g -> print_pre_mem g; g)
+    |> opt !Options.print_pre_mem (fun g ->
+           print_pre_mem g;
+           g)
     |> opt !Options.marshal_out (marshal_out file)
 
 let print_pgm_info global =
@@ -74,13 +77,13 @@ let print_pgm_info global =
 
 let print_il file =
   (if
-   !Options.inline = []
-   && BatSet.is_empty !Options.unsound_loop
-   && not !Options.cut_cyclic_call
-  then Cil.dumpFile !Cil.printerForMaincil stdout "" (transform_simple file)
-  else
-    let global = init_analysis file in
-    Cil.dumpFile !Cil.printerForMaincil stdout "" global.file);
+     !Options.inline = []
+     && BatSet.is_empty !Options.unsound_loop
+     && not !Options.cut_cyclic_call
+   then Cil.dumpFile !Cil.printerForMaincil stdout "" (transform_simple file)
+   else
+     let global = init_analysis file in
+     Cil.dumpFile !Cil.printerForMaincil stdout "" global.file);
   exit 0
 
 let print_cfg global =

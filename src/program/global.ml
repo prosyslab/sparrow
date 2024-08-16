@@ -12,6 +12,7 @@
 open Vocab
 open BasicDom
 open InterCfg
+open ProsysCil
 module L = Logging
 
 type t = {
