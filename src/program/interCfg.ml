@@ -144,6 +144,12 @@ let iter f g = BatMap.iter f g.cfgs
 
 let map_cfgs f g = { g with cfgs = BatMap.map f g.cfgs }
 
+let fold_node f icfg acc =
+  fold_cfgs
+    (fun pid cfg acc ->
+      IntraCfg.fold_node (fun node acc -> f (Node.make pid node) acc) cfg acc)
+    icfg acc
+
 let nodesof g =
   BatMap.foldi
     (fun pid cfg ->
@@ -206,8 +212,43 @@ let remove_node (pid, intra_node) g =
 
 let print chan g = BatMap.iter (fun _ cfg -> IntraCfg.print_dot chan cfg) g.cfgs
 
-let node_to_lstr icfg node =
-  cmdof icfg node |> IntraCfg.Cmd.location_of |> CilHelper.s_location
+let get_node_loc g node = cmdof g node |> IntraCfg.Cmd.location_of
+
+let node_to_cmd g node = cmdof g node |> IntraCfg.Cmd.to_string
+
+let node_to_filename g node = get_node_loc g node |> CilHelper.get_loc_filename
+
+let node_to_lstr_abs g node = get_node_loc g node |> CilHelper.s_location_abs
+
+let node_to_lstr g node = get_node_loc g node |> CilHelper.s_location
+
+let node_to_filtered_pid g line_to_func node =
+  BatMap.find (node_to_lstr g node) line_to_func
+  |> Str.split (Str.regexp "___[0-9]+")
+  |> List.hd
+
+let node_to_fstr g line_to_func node =
+  node_to_filename g node ^ ":" ^ node_to_filtered_pid g line_to_func node
+
+let find_target_func g line_to_func targ_nodes =
+  node_to_filtered_pid g line_to_func (NodeSet.min_elt targ_nodes)
+
+let nodes_of_line g line =
+  fold_node
+    (fun node acc ->
+      let loc =
+        if String.contains line '/' then node_to_lstr_abs g node
+        else node_to_lstr g node
+      in
+      if loc = line then NodeSet.add node acc else acc)
+    g NodeSet.empty
+
+let is_func_name_invalid g line_to_func node =
+  (* XXX. Strangely, some line string is not recorded in global.line_to_func *)
+  node_to_filename g node = ""
+  || (not (BatMap.mem (node_to_lstr g node) line_to_func))
+  || node_to_filtered_pid g line_to_func node = global_proc
+  || node_to_filtered_pid g line_to_func node = "_G_"
 
 let to_json g =
   `Assoc

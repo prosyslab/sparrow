@@ -96,7 +96,25 @@ val iter : (Proc.t -> IntraCfg.t -> unit) -> t -> unit
 
 val nodes_of_pid : t -> pid -> Node.t list
 
-val node_to_lstr : t -> Node.t -> pid
+val get_node_loc : t -> pid * IntraCfg.NodeSet.elt -> ProsysCil.Cil.location
+
+val node_to_cmd : t -> Node.t -> string
+
+val node_to_filename : t -> Node.t -> string
+
+val node_to_lstr_abs : t -> Node.t -> string
+
+val node_to_lstr : t -> Node.t -> string
+
+val node_to_filtered_pid : t -> (string, string) BatMap.t -> Node.t -> string
+
+val node_to_fstr : t -> (string, string) BatMap.t -> Node.t -> string
+
+val find_target_func : t -> (string, string) BatMap.t -> NodeSet.t -> string
+
+val is_func_name_invalid : t -> (string, string) BatMap.t -> Node.t -> bool
+
+val nodes_of_line : t -> string -> NodeSet.t
 
 (** {2 Print } *)
 

@@ -1,12 +1,22 @@
 open ProsysCil
 open Cil
 open Vocab
-open BasicDom
-open ItvDom
 open ApiSem
-open ItvSem
-open Global
+module Node = InterCfg.Node
+module Proc = InterCfg.Proc
+module PowLoc = BasicDom.PowLoc
+module PowProc = BasicDom.PowProc
+module Loc = BasicDom.Loc
+module Val = ItvDom.Val
 module DefUseMap = BatMap.Make (Loc)
+
+let target_nodes = ref InterCfg.NodeSet.empty
+
+let register_target global targ_str =
+  let targ_node_set = InterCfg.nodes_of_line global.Global.icfg targ_str in
+  target_nodes := InterCfg.NodeSet.union targ_node_set !target_nodes
+
+let get_target_nodes () = !target_nodes
 
 module DefUseInfo = struct
   type t = { du_map : PowLoc.t DefUseMap.t; defs : PowLoc.t; uses : PowLoc.t }
@@ -71,7 +81,7 @@ let rec use_of_exp pid e mem is_full =
        * locs that are actually referred to by 'lv'. Recall that the semantics
        * of this expression is "lookup (eval_lv pid lv mem) mem". Also, note
        * that (1) is decide differently depending on thin/full mode. *)
-      PowLoc.union (use_of_lv pid lv mem is_full) (eval_lv pid lv mem)
+      PowLoc.union (use_of_lv pid lv mem is_full) (ItvSem.eval_lv pid lv mem)
   | Cil.SizeOf _ | Cil.SizeOfE _ | Cil.SizeOfStr _ -> PowLoc.empty
   | Cil.AlignOf _ | Cil.AlignOfE _ -> PowLoc.empty
   | Cil.UnOp (_, e', _) -> use_of_exp pid e' mem is_full
@@ -101,8 +111,9 @@ and use_of_lv pid lv mem is_full =
     in
     let base_v =
       match fst lv with
-      | Cil.Var x -> var_of_varinfo x pid |> PowLoc.singleton |> Val.of_pow_loc
-      | Cil.Mem e -> eval pid e mem
+      | Cil.Var x ->
+          ItvSem.var_of_varinfo x pid |> PowLoc.singleton |> Val.of_pow_loc
+      | Cil.Mem e -> ItvSem.eval pid e mem
     in
     let offset_uses = full_use_of_offset pid base_v (snd lv) mem in
     PowLoc.union base_uses offset_uses
@@ -128,7 +139,7 @@ and full_use_of_offset pid base_v os mem =
       (* Note that we do not consider 'ploc' here as used, because struct
        * allocations are syntactic features introduced by CIL. *)
       let base_v =
-        Mem.lookup ploc mem |> Val.struct_of_val
+        ItvDom.Mem.lookup ploc mem |> Val.struct_of_val
         |> flip StructBlk.append_field f
         (* S s; p = &s; p->f *)
         |> PowLoc.join (ArrayBlk.append_field arr f)
@@ -142,7 +153,7 @@ and full_use_of_offset pid base_v os mem =
   | Cil.Index (e, os') ->
       let base_loc = Val.pow_loc_of_val base_v in
       let idx_loc = use_of_exp pid e mem true in
-      let arr = Mem.lookup base_loc mem |> Val.array_of_val in
+      let arr = ItvDom.Mem.lookup base_loc mem |> Val.array_of_val in
       let base_v = ArrayBlk.pow_loc_of_array arr |> Val.of_pow_loc in
       PowLoc.union base_loc idx_loc
       |> PowLoc.union (full_use_of_offset pid base_v os' mem)
@@ -193,7 +204,9 @@ let process_ret_def lv_locs lv_uses ret_typ api_uses du_map =
 (* Update def-use map to reflect the definition on 'AllocDst' return value. *)
 let process_alloc_ret node ret_typ api_uses du_map =
   if ret_typ = AllocDst then
-    let new_loc = Allocsite.allocsite_of_node node |> Loc.of_allocsite in
+    let new_loc =
+      BasicDom.Allocsite.allocsite_of_node node |> Loc.of_allocsite
+    in
     add_assign (PowLoc.singleton new_loc) api_uses.src du_map
   else du_map
 
@@ -202,25 +215,29 @@ let rec process_arg_def node pid mem is_full arg_typs arg_exps api_uses du_map =
   match (arg_typs, arg_exps) with
   | [], _ | _, [] -> du_map (* There can be variable arguments *)
   | Dst (_, is_alloc) :: tail_typs, exp :: tail_exps ->
-      let dst_defs = eval_lv pid (Cil.Mem exp, Cil.NoOffset) mem in
+      let dst_defs = ItvSem.eval_lv pid (Cil.Mem exp, Cil.NoOffset) mem in
       let dst_uses = use_of_lv pid (Cil.Mem exp, Cil.NoOffset) mem is_full in
       let du_map =
         if is_alloc then
-          let new_loc = Allocsite.allocsite_of_node node |> Loc.of_allocsite in
+          let new_loc =
+            BasicDom.Allocsite.allocsite_of_node node |> Loc.of_allocsite
+          in
           add_assign (PowLoc.singleton new_loc) api_uses.src du_map
           |> add_assign dst_defs dst_uses
         else add_assign dst_defs (PowLoc.union dst_uses api_uses.src) du_map
       in
       process_arg_def node pid mem is_full tail_typs tail_exps api_uses du_map
   | Buf _ :: tail_typs, exp :: tail_exps ->
-      let buf_defs = eval_lv pid (Cil.Mem exp, Cil.NoOffset) mem in
+      let buf_defs = ItvSem.eval_lv pid (Cil.Mem exp, Cil.NoOffset) mem in
       let buf_uses = use_of_lv pid (Cil.Mem exp, Cil.NoOffset) mem is_full in
       add_assign buf_defs buf_uses du_map
       |> process_arg_def node pid mem is_full tail_typs tail_exps api_uses
   | StructPtr :: tail_typs, exp :: tail_exps ->
-      let str_defs = eval_lv pid (Cil.Mem exp, Cil.NoOffset) mem in
+      let str_defs = ItvSem.eval_lv pid (Cil.Mem exp, Cil.NoOffset) mem in
       let str_uses = use_of_lv pid (Cil.Mem exp, Cil.NoOffset) mem is_full in
-      let new_loc = Allocsite.allocsite_of_node node |> Loc.of_allocsite in
+      let new_loc =
+        BasicDom.Allocsite.allocsite_of_node node |> Loc.of_allocsite
+      in
       add_assign str_defs str_uses du_map
       |> add_assign (PowLoc.singleton new_loc) PowLoc.empty
       |> process_arg_def node pid mem is_full tail_typs tail_exps api_uses
@@ -251,31 +268,31 @@ let eval_def_use_internal global mem node =
   let is_full = !Options.full_slice in
   let pid = Node.get_pid node in
   let du_map = DefUseMap.empty in
-  match InterCfg.cmdof global.icfg node with
+  match InterCfg.cmdof global.Global.icfg node with
   | IntraCfg.Cmd.Cset (lv, e, _) ->
-      let lv_locs = eval_lv pid lv mem in
+      let lv_locs = ItvSem.eval_lv pid lv mem in
       let lv_uses = use_of_lv pid lv mem is_full in
       let exp_uses = use_of_exp pid e mem is_full in
       add_assign lv_locs (PowLoc.union lv_uses exp_uses) du_map
   | IntraCfg.Cmd.Cexternal (lv, _) -> (
       match Cil.typeOfLval lv with
       | Cil.TInt (_, _) | Cil.TFloat (_, _) ->
-          let lv_locs = eval_lv pid lv mem in
+          let lv_locs = ItvSem.eval_lv pid lv mem in
           let lv_uses = use_of_lv pid lv mem is_full in
           add_assign lv_locs lv_uses du_map
       | _ ->
-          let lv_locs = eval_lv pid lv mem in
+          let lv_locs = ItvSem.eval_lv pid lv mem in
           let lv_uses = use_of_lv pid lv mem is_full in
-          let allocsite = Allocsite.allocsite_of_ext None in
+          let allocsite = BasicDom.Allocsite.allocsite_of_ext None in
           let ext_locs = PowLoc.singleton (Loc.of_allocsite allocsite) in
           add_assign lv_locs lv_uses du_map |> add_assign ext_locs PowLoc.empty)
   | IntraCfg.Cmd.Calloc (lv, IntraCfg.Cmd.Array size_exp, _, _, _) ->
-      let lv_locs = eval_lv pid lv mem in
+      let lv_locs = ItvSem.eval_lv pid lv mem in
       let lv_uses = use_of_lv pid lv mem is_full in
       let size_uses = use_of_exp pid size_exp mem is_full in
       add_assign lv_locs (PowLoc.union lv_uses size_uses) du_map
   | IntraCfg.Cmd.Calloc (lv, IntraCfg.Cmd.Struct _, _, _, _) ->
-      let lv_locs = eval_lv pid lv mem in
+      let lv_locs = ItvSem.eval_lv pid lv mem in
       let lv_uses = use_of_lv pid lv mem is_full in
       add_assign lv_locs lv_uses du_map
   (* String and function declarations are not our interest *)
@@ -288,7 +305,7 @@ let eval_def_use_internal global mem node =
       let lv_locs, lv_uses =
         match lvo with
         | None -> (PowLoc.empty, PowLoc.empty)
-        | Some lv -> (eval_lv pid lv mem, use_of_lv pid lv mem is_full)
+        | Some lv -> (ItvSem.eval_lv pid lv mem, use_of_lv pid lv mem is_full)
       in
       let fn = f.vname in
       if ApiMap.mem fn api_map then
@@ -318,7 +335,7 @@ let eval_def_use_internal global mem node =
       let callnode = InterCfg.callof node global.icfg in
       match InterCfg.cmdof global.icfg callnode with
       | IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
-          let lv_locs = eval_lv pid lv mem in
+          let lv_locs = ItvSem.eval_lv pid lv mem in
           let lv_uses = use_of_lv pid lv mem is_full in
           let callees = ItvSem.eval_callees pid f global mem in
           let ret_vars =
@@ -348,7 +365,7 @@ let eval_def_use global mem node =
 (* Evaluate abslocs used in target node. *)
 let eval_use_of_targ global mem node =
   let pid = Node.get_pid node in
-  match InterCfg.cmdof global.icfg node with
+  match InterCfg.cmdof global.Global.icfg node with
   | IntraCfg.Cmd.Cset (lv, e, _) ->
       (* In the target node, we will consider abslocs used to evaluate 'lv'. For
        * example, if we have "*p = 0", we will trace data-flows on 'p'. *)
@@ -391,3 +408,18 @@ let eval_use_of_targ global mem node =
   | IntraCfg.Cmd.Cskip _ -> PowLoc.empty
   | IntraCfg.Cmd.Casm _ -> PowLoc.empty
   | _ -> invalid_arg "defUse.ml: eval_use_of_targ"
+
+module S = struct
+  include ItvSem
+  module Access = ItvSem.Dom.Access
+
+  let accessof ?locset:(_ = ItvSem.Dom.PowA.empty) global node _ mem =
+    let du_info = eval_def_use global mem node in
+    let targets = get_target_nodes () in
+    let uses =
+      if InterCfg.NodeSet.mem node targets then eval_use_of_targ global mem node
+      else du_info.uses
+    in
+    Access.Info.add_set Access.Info.def du_info.defs Access.Info.empty
+    |> Access.Info.add_set Access.Info.use uses
+end
