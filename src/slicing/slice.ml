@@ -233,15 +233,15 @@ let print global targ_id dfg =
   (* We will always include the entry function (i.e. 'main') nodes. *)
   let entry_nodes = InterCfg.nodes_of_pid icfg !Options.entry_point in
   let nodes = NodeSet.union dfg.sliced_nodes (NodeSet.of_list entry_nodes) in
-  let folder n acc =
-    if InterCfg.is_func_name_invalid icfg line_to_func n then acc
-    else SS.add (InterCfg.node_to_lstr icfg n) acc
-  in
+  let folder n acc = SS.add (InterCfg.node_to_lstr icfg n) acc in
   let lines =
     NodeSet.fold folder nodes SS.empty
     |> SS.remove "unknown" |> filter_slice_lines
   in
-  let folder n acc = SS.add (InterCfg.node_to_fstr icfg line_to_func n) acc in
+  let folder n acc =
+    if InterCfg.is_func_name_invalid icfg line_to_func n then acc
+    else SS.add (InterCfg.node_to_fstr icfg line_to_func n) acc
+  in
   let funcs = NodeSet.fold folder nodes SS.empty |> SS.remove "unknown" in
   let relevance_score = compute_relevance_score global dfg in
   print_stat dfg.sliced_nodes relevance_score funcs;

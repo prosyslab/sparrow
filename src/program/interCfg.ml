@@ -248,7 +248,6 @@ let is_func_name_invalid g line_to_func node =
   node_to_filename g node = ""
   || (not (BatMap.mem (node_to_lstr g node) line_to_func))
   || node_to_filtered_pid g line_to_func node = global_proc
-  || node_to_filtered_pid g line_to_func node = "_G_"
 
 let to_json g =
   `Assoc
