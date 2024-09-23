@@ -413,10 +413,12 @@ module Make (DUGraph : Dug.S) = struct
 
   let make (global, access, locset) =
     let nodes = InterCfg.nodesof global.icfg in
-    let access = Access.restrict_access access locset in
+    (* Restricted access is used for partially flow sensitive analysis.
+     * DUGraph contains the original access for later use. *)
+    let r_access = Access.restrict_access access locset in
     DUGraph.create ~size:(List.length nodes) ~access ()
-    |> draw_intraedges (global, access, locset)
-    |> draw_interedges (global, access, locset)
+    |> draw_intraedges (global, r_access, locset)
+    |> draw_interedges (global, r_access, locset)
 
   let to_json_intra g access =
     let nodes =
