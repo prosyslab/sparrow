@@ -210,115 +210,6 @@ let print_dug global dug =
   to_json (global, dug) |> Yojson.Safe.pretty_to_channel oc;
   close_out oc
 
-let target_file_path targ_id filename =
-  Filename.concat targ_id filename
-  |> Filename.concat "slice"
-  |> Filename.concat !Options.outdir
-
-let target_output_sum filename targets =
-  let read_file filename =
-    let rec read_lines file acc =
-      let line = try Some (input_line file) with End_of_file -> None in
-      match line with
-      | Some line -> read_lines file (SS.add line acc)
-      | None -> acc
-    in
-    let ic = open_in filename in
-    let lines = read_lines ic SS.empty in
-    close_in ic;
-    lines
-  in
-  targets
-  |> List.map (fun targ_id -> read_file (target_file_path targ_id filename))
-  |> List.fold_left SS.union SS.empty
-
-let avg_dfgs mode targets =
-  let process_dfgfile data filename freq =
-    try
-      match Hashtbl.find_opt data filename with
-      | Some value ->
-          let updated_value =
-            match mode with
-            | "max" -> max value freq
-            | "avg" -> value +. freq
-            | _ -> value
-          in
-          Hashtbl.replace data filename updated_value
-      | None -> Hashtbl.add data filename freq
-    with Failure _ -> raise (Failure "Invalid format")
-  in
-  let rec process_dfglines ic data =
-    let line = try Some (input_line ic) with End_of_file -> None in
-    match line with
-    | Some line ->
-        let parts = Str.split (Str.regexp " ") line in
-        (match parts with
-        | [ freq_str; function_name ] ->
-            process_dfgfile data function_name (float_of_string freq_str)
-        | _ -> raise (Failure "Invalid format"));
-        process_dfglines ic data
-    | None -> data
-  in
-  let aggregate_dfgfiles data targ_id =
-    let file_path = target_file_path targ_id "slice_dfg.txt" in
-    let ic = open_in file_path in
-    let data = process_dfglines ic data in
-    close_in ic;
-    data
-  in
-  let dfg_hashtbl = Hashtbl.create 10000 in
-  let file_data = List.fold_left aggregate_dfgfiles dfg_hashtbl targets in
-  let length = float_of_int (List.length targets) in
-  Hashtbl.fold
-    (fun function_name value acc ->
-      if mode = "avg" then
-        Printf.sprintf "%.1f %s" (value /. length) function_name :: acc
-      else Printf.sprintf "%.1f %s" value function_name :: acc)
-    file_data []
-
-(* TODO : Refactor this function *)
-let average_slice mode targets =
-  let write_file filename lines =
-    let oc =
-      Filename.concat "slice" filename
-      |> Filename.concat !Options.outdir
-      |> open_out
-    in
-    List.iter (fun line -> output_string oc (line ^ "\n")) lines;
-    close_out oc
-  in
-  let sort_lines lines =
-    let extract_parts line =
-      try
-        let parts = Str.split (Str.regexp ":") line in
-        match parts with
-        | [ filename; line_num ] -> (filename, int_of_string line_num)
-        | _ -> raise (Invalid_argument "Invalid Format")
-      with _ -> raise (Invalid_argument "Parsing Error")
-    in
-    let order line1 line2 =
-      let filename1, line_num1 = extract_parts line1 in
-      let filename2, line_num2 = extract_parts line2 in
-      match String.compare filename1 filename2 with
-      | 0 -> compare line_num1 line_num2
-      | cmp -> cmp
-    in
-    List.sort order lines
-  in
-  let slicing_dir =
-    Filename.concat "slice" "ddafl" |> Filename.concat !Options.outdir
-  in
-  FileManager.mkdir slicing_dir;
-  let filename_line = Filename.concat "ddafl" "slice_line.txt" in
-  let filename_func = Filename.concat "ddafl" "slice_func.txt" in
-  let filename_dfg = Filename.concat "ddafl" "slice_dfg.txt" in
-  let all_lines = target_output_sum "slice_line.txt" targets in
-  all_lines |> SS.elements |> sort_lines |> write_file filename_line;
-  let all_funcs = target_output_sum "slice_func.txt" targets in
-  (* SS.elements automatically sort elements alphabetically *)
-  all_funcs |> SS.elements |> write_file filename_func;
-  avg_dfgs mode targets |> sort_lines |> write_file filename_dfg
-
 let run global =
   let slicing_targets = BatMap.bindings !Options.slice_target_map in
   let dug = construct_dug global slicing_targets in
@@ -329,6 +220,5 @@ let run global =
       StepManager.stepf true ("Slicing for " ^ targ_id) perform_slicing
         (targ_id, targ_line))
     slicing_targets;
-  List.map fst slicing_targets |> average_slice "avg";
   L.info "Total elapsed time: ";
   print_elapsed_time ~level:0
