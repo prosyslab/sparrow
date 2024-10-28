@@ -62,6 +62,8 @@ val pred : node -> t -> node list
 
 val succ : node -> t -> node list
 
+val get_post_dom_fronts : node -> t -> NodeSet.t
+
 val is_entry : node -> bool
 
 val is_exit : node -> bool
@@ -79,6 +81,8 @@ val add_call_edge : Node.t -> Proc.t -> t -> t
 val remove_call_edge : Node.t -> Proc.t -> t -> t
 
 val get_callees : Node.t -> t -> ProcSet.t
+
+val get_callers : t -> pid -> NodeSet.t
 
 val is_def : pid -> t -> bool
 

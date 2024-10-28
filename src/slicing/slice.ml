@@ -50,6 +50,7 @@ module EdgeSet = BatSet.Make (Edge)
 
 type t = {
   sliced_nodes : NodeSet.t;
+  sliced_control_nodes : NodeSet.t;
   sliced_edges : EdgeSet.t;
   du_map : du_map;
   graph : LineLevelG.t;
@@ -83,6 +84,7 @@ let rec list_max = function
 
 let init targ_nodes targ_line =
   let sliced_nodes = targ_nodes in
+  let sliced_control_nodes = NodeSet.empty in
   let sliced_edges = EdgeSet.empty in
   let succs = Hashtbl.create 10000 in
   let preds = Hashtbl.create 10000 in
@@ -94,7 +96,15 @@ let init targ_nodes targ_line =
   let graph = LineLevelG.create () in
   let target = targ_line in
   let output_nodes = SS.empty in
-  { sliced_nodes; sliced_edges; du_map; graph; target; output_nodes }
+  {
+    sliced_nodes;
+    sliced_control_nodes;
+    sliced_edges;
+    du_map;
+    graph;
+    target;
+    output_nodes;
+  }
 
 let get_preds node dfg =
   if Hashtbl.mem dfg.du_map.preds node then Hashtbl.find dfg.du_map.preds node
@@ -185,10 +195,14 @@ let draw_edge_fwd src dst locs dfg =
     update_fwd_map src locs dfg;
     dfg)
 
-let print_stat nodes lines funcs =
+let print_stat nodes lines control_nodes control_lines funcs =
   L.info ~to_consol:true "== Slicing report ==\n";
   L.info ~to_consol:true "%-16s: %d\n" "# Sliced nodes" (NodeSet.cardinal nodes);
   L.info ~to_consol:true "%-16s: %d\n" "# Sliced lines" (SS.cardinal lines);
+  L.info ~to_consol:true "%-16s: %d\n" "# Sliced control nodes"
+    (NodeSet.cardinal control_nodes);
+  L.info ~to_consol:true "%-16s: %d\n" "# Sliced control lines"
+    (SS.cardinal control_lines);
   L.info ~to_consol:true "%-16s: %d\n" "# Sliced functions" (SS.cardinal funcs)
 
 let print_one_file targ_id file_name str_set =
@@ -200,8 +214,9 @@ let print_one_file targ_id file_name str_set =
   SS.iter (fun str -> output_string oc (str ^ "\n")) str_set;
   close_out oc
 
-let print_to_files targ_id lines funcs relevance_score =
+let print_to_files targ_id lines control_lines funcs relevance_score =
   print_one_file targ_id "slice_line.txt" lines;
+  print_one_file targ_id "slice_control_line.txt" control_lines;
   print_one_file targ_id "slice_func.txt" funcs;
   print_one_file targ_id "slice_dfg.txt" relevance_score
 
@@ -238,11 +253,16 @@ let print global targ_id dfg =
     NodeSet.fold folder nodes SS.empty
     |> SS.remove "unknown" |> filter_slice_lines
   in
+  let control_lines =
+    NodeSet.fold folder dfg.sliced_control_nodes SS.empty
+    |> SS.remove "unknown" |> filter_slice_lines
+  in
   let folder n acc =
     if InterCfg.is_func_name_invalid icfg line_to_func n then acc
     else SS.add (InterCfg.node_to_fstr icfg line_to_func n) acc
   in
   let funcs = NodeSet.fold folder nodes SS.empty |> SS.remove "unknown" in
   let relevance_score = compute_relevance_score global dfg in
-  print_stat dfg.sliced_nodes relevance_score funcs;
-  print_to_files targ_id lines funcs relevance_score
+  print_stat dfg.sliced_nodes relevance_score dfg.sliced_control_nodes
+    control_lines funcs;
+  print_to_files targ_id lines control_lines funcs relevance_score

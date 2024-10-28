@@ -174,11 +174,13 @@ val marshal_in : bool ref
 
 val marshal_out : bool ref
 
-(* {2 DUG slice } *)
+(** {3 DUG slice } *)
 
 val slice_target_map : (string, string) BatMap.t ref
 
 val full_slice : bool ref
+
+val max_control_deps : int ref
 
 (** {2 Options lists } *)
 

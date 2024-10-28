@@ -183,6 +183,47 @@ let slice_edge dfg =
   let sliced_edges = NodeSet.fold folder dfg.sliced_nodes EdgeSet.empty in
   { dfg with sliced_edges }
 
+let rec slice_control_nodes_internal global works sliced_control_nodes =
+  if BatSet.is_empty works then sliced_control_nodes
+  else
+    let icfg = global.Global.icfg in
+    let (k, node), works = BatSet.pop works in
+    let post_dom_fronts = InterCfg.get_post_dom_fronts node icfg in
+    let control_nodes = NodeSet.diff post_dom_fronts sliced_control_nodes in
+    (* Add call nodes to the worklist when we reach the end of intra-procedural control dependency *)
+    let call_nodes =
+      if NodeSet.is_empty control_nodes then
+        let callers = Node.get_pid node |> InterCfg.get_callers icfg in
+        NodeSet.diff callers sliced_control_nodes
+      else NodeSet.empty
+    in
+    let works =
+      if !Options.max_control_deps == 0 || k < !Options.max_control_deps then
+        works
+        |> NodeSet.fold (fun n acc -> BatSet.add (k + 1, n) acc) control_nodes
+        (* k is same here because call nodes are skipped and do not increase the k *)
+        |> NodeSet.fold (fun n acc -> BatSet.add (k, n) acc) call_nodes
+      else works
+    in
+    slice_control_nodes_internal global works
+      (NodeSet.add node sliced_control_nodes)
+
+let slice_control_nodes global slice =
+  let _, targ_line = slice.Slice.target in
+  let targ_nodes = InterCfg.nodes_of_line global.Global.icfg targ_line in
+  let works =
+    NodeSet.fold (fun n acc -> BatSet.add (0, n) acc) targ_nodes BatSet.empty
+  in
+  let sliced_nodes = slice_control_nodes_internal global works NodeSet.empty in
+  (* sliced_call_nodes are targets of semantic coverage
+     sliced_control_nodes are targets of taint analysis *)
+  let _, sliced_control_nodes =
+    NodeSet.partition
+      (fun n -> InterCfg.is_callnode n global.Global.icfg)
+      sliced_nodes
+  in
+  { slice with sliced_control_nodes }
+
 let perform_slicing global dug (targ_id, targ_line) =
   let targ_nodes = InterCfg.nodes_of_line global.Global.icfg targ_line in
   let targ_func =
@@ -193,6 +234,8 @@ let perform_slicing global dug (targ_id, targ_line) =
   |> StepManager.stepf false "Initialize" (initialize global targ_nodes)
   |> StepManager.stepf false "Node slicing" (slice_node global dug)
   |> StepManager.stepf false "Edge slicing" slice_edge
+  |> StepManager.stepf false "Control nodes slicing"
+       (slice_control_nodes global)
   |> StepManager.stepf false "Constructing sliced graph" (Slice.generate global)
   |> StepManager.stepf false "Print" (Slice.print global targ_id)
 

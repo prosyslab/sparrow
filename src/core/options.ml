@@ -187,6 +187,8 @@ let add_slice_target s =
 
 let full_slice = ref false
 
+let max_control_deps = ref 0
+
 (* Debug *)
 let debug = ref false
 
@@ -272,6 +274,10 @@ let opts =
       Arg.String (fun s -> add_slice_target s),
       "Slice w.r.t a given target" );
     ("-full_slice", Arg.Set full_slice, "Perform full (not thin) slicing");
+    ( "-max_control_deps",
+      Arg.Set_int max_control_deps,
+      "Maximum length of control dependencies to slice" );
+    ("-skip_build", Arg.Set skip_build, "Skip build");
     ("-skip_main_analysis", Arg.Set skip_main_analysis, "Skip main analysis");
     ("-entry_point", Arg.Set_string entry_point, "Entry point (default: main)");
     ("-noalarm", Arg.Set noalarm, "Do not print alarms");

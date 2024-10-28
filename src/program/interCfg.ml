@@ -80,6 +80,12 @@ let remove_call_edge call_node pid g =
 let get_callees call_node g =
   try BatMap.find call_node g.call_edges with _ -> ProcSet.empty
 
+let get_callers g pid =
+  BatMap.foldi
+    (fun call_node callees acc ->
+      if ProcSet.mem pid callees then NodeSet.add call_node acc else acc)
+    g.call_edges NodeSet.empty
+
 let global_proc = "_G_"
 
 let start_node = Node.make global_proc IntraCfg.Node.entry
@@ -192,6 +198,14 @@ let pred (pid, node) g =
 let succ (pid, node) g =
   let intra_cfg = cfgof g pid in
   IntraCfg.succ node intra_cfg |> List.map (Node.make pid)
+
+let get_post_dom_fronts node g =
+  let pid, node = node in
+  let cfg = cfgof g pid in
+  IntraCfg.NodeSet.fold
+    (fun n acc -> NodeSet.add (Node.make pid n) acc)
+    (IntraCfg.post_dom_fronts node cfg)
+    NodeSet.empty
 
 let unreachable_node_pid pid icfg =
   IntraNodeSet.fold
