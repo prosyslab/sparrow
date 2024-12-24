@@ -114,7 +114,17 @@ val bo : bool ref
 
 val nd : bool ref
 
-val mul : bool ref
+val detailed_io : bool ref
+
+val plus_io : bool ref
+
+val minus_io : bool ref
+
+val mult_io : bool ref
+
+val shift_io : bool ref
+
+val cast_io : bool ref
 
 val dz : bool ref
 
@@ -147,6 +157,8 @@ val extract_datalog_fact_full_no_opt : bool ref
 val remove_cast : bool ref
 
 val patron : bool ref
+
+val target_loc : string list ref
 
 val target_alarm_map : (string, string) BatMap.t ref
 

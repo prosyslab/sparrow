@@ -123,6 +123,8 @@ let extract_datalog_fact_full_no_opt = ref false
 (* for patron *)
 let patron = ref false
 
+let target_loc = ref []
+
 let target_alarm_map = ref BatMap.empty
 
 let add_target_alarm s =
@@ -143,7 +145,17 @@ let bo = ref true
 
 let nd = ref false
 
-let mul = ref false
+let detailed_io = ref false
+
+let plus_io = ref false
+
+let minus_io = ref false
+
+let mult_io = ref false
+
+let shift_io = ref false
+
+let cast_io = ref false
 
 let dz = ref false
 
@@ -294,10 +306,25 @@ let opts =
     ("-pack_manual", Arg.Set pack_manual, "Pacing by manual annotation");
     ("-nd", Arg.Set nd, "Print Null-dereference alarms");
     ("-bo", Arg.Set bo, "Print Buffer-overrun alarms");
-    ( "-mul",
-      Arg.Set mul,
-      "Print Integer-overflow alarms from multiply expressions" );
+    ("-no_bo", Arg.Clear bo, "Do Not Print Buffer-overrun alarms");
+    ( "-io",
+      Arg.Unit
+        (fun () ->
+          plus_io := true;
+          minus_io := true;
+          mult_io := true;
+          shift_io := true;
+          cast_io := true),
+      "Print all Integer-overflow alarms from binop expressions" );
+    ("-pio", Arg.Set plus_io, "Print plus Integer-overflow alarms");
+    ("-mio", Arg.Set minus_io, "Print minus Integer-overflow alarms");
+    ("-tio", Arg.Set mult_io, "Print multiplication Integer-overflow alarms");
+    ("-sio", Arg.Set shift_io, "Print shift Integer-overflow alarms");
+    ("-cio", Arg.Set cast_io, "Print cast Integer-overflow alarms");
     ("-patron", Arg.Set patron, "Anlyze for Patron");
+    ( "-target_loc",
+      Arg.String (fun s -> target_loc := s :: !target_loc),
+      "Target location for Patron" );
     ( "-target_alarm",
       Arg.String (fun s -> add_target_alarm s),
       "narrow down the optimization results over the taint analysis based on \
