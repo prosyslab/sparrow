@@ -90,6 +90,7 @@ let api_map =
   |> ApiMap.add "memmove"
        { arg_typs = [ dst; arr_src; Size ]; ret_typ = DstArg }
   |> ApiMap.add "strcpy" { arg_typs = [ dst; arr_src ]; ret_typ = DstArg }
+  |> ApiMap.add "g_strdup" { arg_typs = [ arr_src ]; ret_typ = AllocDst }
   |> ApiMap.add "strncpy"
        { arg_typs = [ dst; arr_src; Size ]; ret_typ = DstArg }
   |> ApiMap.add "strxfrm"
@@ -239,6 +240,7 @@ let api_map =
   |> ApiMap.add "pclose" { arg_typs = [ Skip ]; ret_typ = int_v }
   |> ApiMap.add "_IO_getc" { arg_typs = [ Skip ]; ret_typ = tainted_v }
   |> ApiMap.add "getchar" { arg_typs = []; ret_typ = tainted_v }
+  |> ApiMap.add "getc" { arg_typs = [ Skip ]; ret_typ = tainted_v }
   |> ApiMap.add "read" { arg_typs = [ Skip; buf; Size ]; ret_typ = SizeArg }
   |> ApiMap.add "fread"
        { arg_typs = [ buf; Skip; Size; Skip ]; ret_typ = SizeArg }
@@ -261,6 +263,7 @@ let api_map =
   |> ApiMap.add "getenv" { arg_typs = [ Skip ]; ret_typ = tainted_arr }
   (* etc *)
   |> ApiMap.add "scanf" { arg_typs = [ Skip; buf_va ]; ret_typ = int_v }
+  |> ApiMap.add "fscanf" { arg_typs = [ Skip; Skip; buf_va ]; ret_typ = int_v }
   |> ApiMap.add "sscanf"
        { arg_typs = [ arr_src; Skip; dst_va ]; ret_typ = int_v }
   |> ApiMap.add "fgets" { arg_typs = [ buf; Size; Skip ]; ret_typ = BufArg }
@@ -303,3 +306,7 @@ let api_map =
   (* libssh *)
   |> ApiMap.add "_ssh_buffer_unpack"
        { arg_typs = [ arr_src; Skip; Skip; dst_va ]; ret_typ = int_v }
+  |> ApiMap.add "g_get_num_processors" { arg_typs = []; ret_typ = int_v }
+  (* patron experiment *)
+  |> ApiMap.add "TIFFGetField"
+       { arg_typs = [ Skip; Skip; buf_va ]; ret_typ = int_v }

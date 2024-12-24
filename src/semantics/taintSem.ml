@@ -50,14 +50,33 @@ let eval_bop b v1 v2 itv1 itv2 =
   | Cil.Lt | Cil.Gt | Cil.Le | Cil.Ge | Cil.Eq | Cil.Ne | Cil.LAnd | Cil.LOr ->
       Val.bot
 
-let rec eval pid e itvmem mem =
+let rec resolve_offset pid offset itvmem mem =
+  match offset with
+  | Cil.NoOffset -> ()
+  | Cil.Field (_, o) -> resolve_offset pid o itvmem mem
+  | Cil.Index (e, o) ->
+      let _ = eval pid e itvmem mem in
+      resolve_offset pid o itvmem mem
+
+and eval_lv pid lv itvmem mem =
+  (match fst lv with
+  | Cil.Mem e ->
+      let _ = eval pid e itvmem mem in
+      ()
+  | _ -> ());
+  resolve_offset pid (snd lv) itvmem mem
+
+and eval pid e itvmem mem =
   match e with
   | Cil.Const _ | Cil.SizeOf _ | Cil.SizeOfE _ | Cil.SizeOfStr _ | Cil.AlignOf _
   | Cil.AlignOfE _
   | Cil.UnOp (_, _, _)
   | Cil.AddrOf _ | Cil.AddrOfLabel _ | Cil.StartOf _ ->
       Val.bot
-  | Cil.Lval l -> lookup (ItvSem.eval_lv pid l itvmem) mem
+  | Cil.Lval l ->
+      (* for access analysis *)
+      eval_lv pid l itvmem mem;
+      lookup (ItvSem.eval_lv pid l itvmem) mem
   | Cil.BinOp (b, e1, e2, _) ->
       let itv1, itv2 =
         ( ItvSem.eval pid e1 itvmem |> ItvDom.Val.itv_of_val,
