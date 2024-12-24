@@ -646,6 +646,22 @@ let rec model_strchr mode spec node pid (lvo, exps) (mem, global) =
       (mem, global)
   | _, _ -> (mem, global)
 
+let model_fread mode spec pid (lvo, exps) (mem, global) =
+  match exps with
+  | buf :: _ :: cnt :: _ -> (
+      let size_itv = eval ~spec pid cnt mem in
+      let arr = eval ~spec pid buf mem in
+      let locs = Val.all_locs arr in
+      let mem = update Weak spec global locs size_itv mem in
+      match lvo with
+      | Some lv ->
+          let mem =
+            update mode spec global (eval_lv ~spec pid lv mem) arr mem
+          in
+          (mem, global)
+      | _ -> (mem, global))
+  | _ -> (mem, global)
+
 let model_memset mode spec pid (lvo, exps) (mem, global) =
   match exps with
   | buf :: v :: _ -> (
@@ -926,6 +942,7 @@ let scaffolded_functions mode spec node pid (lvo, f, exps) (mem, global) =
     | "strchr" | "strrchr" ->
         model_strchr mode spec node pid (lvo, exps) (mem, global)
     | "memset" -> model_memset mode spec pid (lvo, exps) (mem, global)
+    | "fread" -> model_fread mode spec pid (lvo, exps) (mem, global)
     | s when List.mem s mem_alloc_libs ->
         model_alloc_one mode spec pid lvo f (mem, global)
     | _ when ApiSem.ApiMap.mem f.vname ApiSem.api_map ->
