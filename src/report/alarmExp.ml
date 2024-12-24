@@ -17,7 +17,11 @@ module F = Format
 type t =
   | ArrayExp of lval * exp * location
   | DerefExp of exp * location
-  | MulExp of exp * location
+  | PlusIOExp of exp * location
+  | MinusIOExp of exp * location
+  | MultIOExp of exp * location
+  | ShiftIOExp of exp * location
+  | CastIOExp of exp * location
   | DivExp of exp * location
   | Strcpy of exp * exp * location
   | Strcat of exp * exp * location
@@ -32,7 +36,13 @@ let to_string t =
   match t with
   | ArrayExp (lv, e, _) -> CilHelper.s_lv lv ^ "[" ^ CilHelper.s_exp e ^ "]"
   | DerefExp (e, _) -> "*(" ^ CilHelper.s_exp e ^ ")"
-  | MulExp (e, _) | DivExp (e, _) -> CilHelper.s_exp e
+  | DivExp (e, _)
+  | PlusIOExp (e, _)
+  | MinusIOExp (e, _)
+  | MultIOExp (e, _)
+  | ShiftIOExp (e, _)
+  | CastIOExp (e, _) ->
+      CilHelper.s_exp e
   | Strcpy (e1, e2, _) ->
       "strcpy (" ^ CilHelper.s_exp e1 ^ ", " ^ CilHelper.s_exp e2 ^ ")"
   | Strncpy (e1, e2, e3, _) ->
@@ -54,7 +64,11 @@ let to_string t =
 let location_of = function
   | ArrayExp (_, _, l)
   | DerefExp (_, l)
-  | MulExp (_, l)
+  | PlusIOExp (_, l)
+  | MinusIOExp (_, l)
+  | MultIOExp (_, l)
+  | ShiftIOExp (_, l)
+  | CastIOExp (_, l)
   | DivExp (_, l)
   | Strcpy (_, _, l)
   | Strncpy (_, _, _, l)
@@ -100,11 +114,18 @@ and c_exp e loc =
   | UnOp (_, e, _) -> c_exp e loc
   | BinOp (bop, e1, e2, _) -> (
       match bop with
-      | Mult when !Options.mul ->
-          (MulExp (e, loc) :: c_exp e1 loc) @ c_exp e2 loc
+      | PlusA when !Options.plus_io ->
+          (PlusIOExp (e, loc) :: c_exp e1 loc) @ c_exp e2 loc
+      | MinusA when !Options.minus_io ->
+          (MinusIOExp (e, loc) :: c_exp e1 loc) @ c_exp e2 loc
+      | Mult when !Options.mult_io ->
+          (MultIOExp (e, loc) :: c_exp e1 loc) @ c_exp e2 loc
+      | (Shiftlt | Shiftrt) when !Options.shift_io ->
+          (ShiftIOExp (e, loc) :: c_exp e1 loc) @ c_exp e2 loc
       | Div | Mod -> (DivExp (e, loc) :: c_exp e1 loc) @ c_exp e2 loc
       | _ -> c_exp e1 loc @ c_exp e2 loc)
-  | CastE (_, e) -> c_exp e loc
+  | CastE (_, e') when !Options.cast_io -> CastIOExp (e, loc) :: c_exp e' loc
+  | CastE (_, e') -> c_exp e' loc
   | AddrOf lv -> c_lv lv loc
   | StartOf lv -> c_lv lv loc
   | _ -> []
@@ -121,6 +142,7 @@ let query_lib =
     "memchr";
     "strncmp";
     "sprintf";
+    "fread";
   ]
 
 let c_lib f es loc =
@@ -139,6 +161,10 @@ let c_lib f es loc =
       BufferOverrunLib
         (f.vname, [ List.nth es 0; List.nth es 1; List.nth es 2 ], loc)
       :: c_exps es loc
+  | "fread" ->
+      BufferOverrunLib
+        (f.vname, [ List.nth es 0; List.nth es 1; List.nth es 2 ], loc)
+      :: c_exps es loc
   | _ -> []
 
 let c_lib_taint f es loc =
@@ -148,6 +174,11 @@ let c_lib_taint f es loc =
   | "calloc" | "g_malloc" | "g_malloc_n" | "g_malloc0" | "g_try_malloc"
   | "g_try_malloc_n" | "__builtin_alloca" ->
       [ AllocSize (f.vname, List.nth es 0, loc) ]
+  | "fread" ->
+      [
+        BufferOverrunLib
+          (f.vname, [ List.nth es 0; List.nth es 1; List.nth es 2 ], loc);
+      ]
   | "printf" -> [ Printf (f.vname, List.nth es 0, loc) ]
   | "fprintf" | "sprintf" | "vfprintf" | "vsprintf" | "vasprintf" | "__asprintf"
   | "asprintf" | "vdprintf" | "dprintf" | "easprintf" | "evasprintf" ->

@@ -106,11 +106,35 @@ let inspect_aexp_bo node aexp itvmem mem queries =
           }
           :: queries)
         taint queries
+  | BufferOverrunLib ("fread", [ _; _; cnt ], loc) ->
+      let pid = InterCfg.Node.get_pid node in
+      let taint = TaintSem.eval pid cnt itvmem mem |> TaintDom.Val.user_input in
+      TaintDom.UserInput.fold
+        (fun (src_node, src_loc) queries ->
+          let desc =
+            "source = " ^ Node.to_string src_node ^ " @ "
+            ^ CilHelper.s_location src_loc
+          in
+          {
+            node;
+            exp = aexp;
+            loc;
+            allocsite = None;
+            status = UnProven;
+            desc;
+            src = Some (src_node, src_loc);
+          }
+          :: queries)
+        taint queries
   | _ -> queries
 
-let inspect_aexp_mul node aexp itvmem mem queries =
+let inspect_aexp_io node aexp itvmem mem queries =
   match aexp with
-  | MulExp (e, loc) ->
+  | PlusIOExp (e, loc)
+  | MinusIOExp (e, loc)
+  | MultIOExp (e, loc)
+  | ShiftIOExp (e, loc)
+  | CastIOExp (e, loc) ->
       let pid = InterCfg.Node.get_pid node in
       let tv = TaintSem.eval pid e itvmem mem in
       let int_overflow, taint =
@@ -164,6 +188,30 @@ let inspect_aexp_dz node aexp itvmem mem queries =
         taint queries
   | _ -> queries
 
+let inspect_aexp_nd node aexp itvmem mem queries =
+  match aexp with
+  | DerefExp (e, loc) ->
+      let pid = InterCfg.Node.get_pid node in
+      let taint = TaintSem.eval pid e itvmem mem |> TaintDom.Val.user_input in
+      TaintDom.UserInput.fold
+        (fun (src_node, src_loc) queries ->
+          let desc =
+            "source = " ^ Node.to_string src_node ^ " @ "
+            ^ CilHelper.s_location src_loc
+          in
+          {
+            node;
+            exp = aexp;
+            loc;
+            allocsite = None;
+            status = UnProven;
+            desc;
+            src = Some (src_node, src_loc);
+          }
+          :: queries)
+        taint queries
+  | _ -> queries
+
 let generate spec (global, mem, target) =
   let nodes = InterCfg.nodesof global.icfg in
   let total = List.length nodes in
@@ -181,9 +229,9 @@ let generate spec (global, mem, target) =
             else
               match target with
               | BO -> inspect_aexp_bo node aexp ptrmem mem
-              | IO -> inspect_aexp_mul node aexp ptrmem mem
+              | IO -> inspect_aexp_io node aexp ptrmem mem
               | DZ -> inspect_aexp_dz node aexp ptrmem mem
-              | ND -> Fun.id)
+              | ND -> inspect_aexp_nd node aexp ptrmem mem)
           aexps qs
       in
       (qs, k + 1))
@@ -192,7 +240,11 @@ let generate spec (global, mem, target) =
 
 let inspect_alarm global spec inputof =
   (if !Options.bo then generate spec (global, inputof, Report.BO) else [])
-  @ (if !Options.mul then generate spec (global, inputof, Report.IO) else [])
+  @ (if
+       !Options.mult_io || !Options.plus_io || !Options.minus_io
+       || !Options.shift_io || !Options.cast_io
+     then generate spec (global, inputof, Report.IO)
+     else [])
   @ (if !Options.nd then generate spec (global, inputof, Report.ND) else [])
   @ if !Options.dz then generate spec (global, inputof, Report.DZ) else []
 
@@ -260,6 +312,6 @@ let do_analysis (global, itvdug, itvinputof) =
   let _ = Options.pfs := 100 in
   let dug = Analysis.generate_dug spec global in
   (if !Options.marshal_in then marshal_in global
-  else Analysis.perform spec global dug)
+   else Analysis.perform spec global dug)
   |> opt !Options.marshal_out marshal_out
   |> post_process spec itvdug
