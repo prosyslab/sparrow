@@ -23,10 +23,13 @@ type formatter = {
   cmd : F.formatter;
   (* Cmd for Patron *)
   set : F.formatter;
+  copy : F.formatter;
   alloc_exp : F.formatter;
   salloc_exp : F.formatter;
   call_exp : F.formatter;
+  readcall_exp : F.formatter;
   libcall_exp : F.formatter;
+  real_lv : F.formatter;
   (* Expressions *)
   const_exp : F.formatter;
   lval_exp : F.formatter;
@@ -38,9 +41,12 @@ type formatter = {
   global_var : F.formatter;
   local_var : F.formatter;
   field : F.formatter;
+  st_fld : F.formatter;
+  index : F.formatter;
   lval : F.formatter;
   mem : F.formatter;
   start_of : F.formatter;
+  addr_of : F.formatter;
   (* BinOp *)
   binop : F.formatter;
   plusa : F.formatter;
@@ -70,6 +76,10 @@ type formatter = {
   bnot : F.formatter;
   lnot : F.formatter;
   neg : F.formatter;
+  (* Sems for Patron *)
+  evallv : F.formatter;
+  allocpath : F.formatter;
+  readpath : F.formatter;
 }
 
 let binop_count = ref 0
@@ -100,16 +110,6 @@ let new_exp_id e =
   let id = "Exp-" ^ string_of_int !exp_count in
   exp_count := !exp_count + 1;
   Hashtbl.add exp_map e id;
-  id
-
-let exp_patron_count = ref 0
-
-let exp_patron_map = Hashtbl.create 1000
-
-let new_exp_patron_id (n, e) =
-  let id = "Exp-" ^ string_of_int !exp_patron_count in
-  incr exp_patron_count;
-  Hashtbl.add exp_patron_map (n, e) id;
   id
 
 let alloc_count = ref 0
@@ -151,6 +151,34 @@ let new_libcall_id e =
   libcall_count := !libcall_count + 1;
   Hashtbl.add libcall_map e id;
   id
+
+let readcall_count = ref 0
+
+let readcall_map = Hashtbl.create 1000
+
+let new_readcall_id e =
+  let id = "ReadCallExp-" ^ string_of_int !readcall_count in
+  readcall_count := !readcall_count + 1;
+  Hashtbl.add readcall_map e id;
+  id
+
+let readpath_count = ref 0
+
+let readpath_map : (Node.t * Node.t, string) Hashtbl.t = Hashtbl.create 1000
+
+let new_readpath_id n1 n2 =
+  let id = "ReadPath-" ^ string_of_int !readpath_count in
+  readpath_count := !readpath_count + 1;
+  Hashtbl.add readpath_map (n1, n2) id
+
+let allocpath_count = ref 0
+
+let allocpath_map : (Node.t * Node.t, string) Hashtbl.t = Hashtbl.create 1000
+
+let new_allocpath_id n1 n2 =
+  let id = "AllocPath-" ^ string_of_int !allocpath_count in
+  allocpath_count := !allocpath_count + 1;
+  Hashtbl.add allocpath_map (n1, n2) id
 
 let lv_count = ref 0
 
@@ -260,28 +288,14 @@ let rec pp_lv fmt n lv =
         (match offset with
         | Cil.Field (_, _) -> F.fprintf fmt.field "%s\n" id
         | _ -> ());
-        let e_id =
-          if !Options.patron then Hashtbl.find exp_patron_map (n, e)
-          else Hashtbl.find exp_map e
-        in
+        let e_id = Hashtbl.find exp_map e in
         F.fprintf fmt.mem "%s\t%s\n" id e_id
     | _, _ -> F.fprintf fmt.lval "%s\tOther\n" id
 
 and pp_exp fmt n e =
-  let is_new_expr =
-    if !Options.patron then Hashtbl.mem exp_patron_map (n, e)
-    else Hashtbl.mem exp_map e
-  in
-  let is_new =
-    if !Options.patron && is_new_expr then
-      Hashtbl.mem exp_patron_map (n, remove_cast e)
-    else is_new_expr
-  in
-  if is_new then ()
+  if Hashtbl.mem exp_map e then ()
   else
-    let id =
-      if !Options.patron then new_exp_patron_id (n, e) else new_exp_id e
-    in
+    let id = new_exp_id e in
     match e with
     | Cil.Const _ -> F.fprintf fmt.const_exp "%s\n" id
     | Cil.Lval lv ->
@@ -292,30 +306,18 @@ and pp_exp fmt n e =
         pp_binop fmt bop;
         pp_exp fmt n e1;
         pp_exp fmt n e2;
-        let e1_id =
-          if !Options.patron then Hashtbl.find exp_patron_map (n, e1)
-          else Hashtbl.find exp_map e1
-        in
-        let e2_id =
-          if !Options.patron then Hashtbl.find exp_patron_map (n, e2)
-          else Hashtbl.find exp_map e2
-        in
+        let e1_id = Hashtbl.find exp_map e1 in
+        let e2_id = Hashtbl.find exp_map e2 in
         F.fprintf fmt.binop_exp "%s\t%s\t%s\t%s\n" id (string_of_bop bop) e1_id
           e2_id
     | Cil.UnOp (unop, e, _) ->
         pp_exp fmt n e;
         pp_unop fmt unop;
-        let e_id =
-          if !Options.patron then Hashtbl.find exp_patron_map (n, e)
-          else Hashtbl.find exp_map e
-        in
+        let e_id = Hashtbl.find exp_map e in
         F.fprintf fmt.unop_exp "%s\t%s\t%s\n" id (string_of_uop unop) e_id
     | Cil.CastE (_, e) ->
         pp_exp fmt n e;
-        let e_id =
-          if !Options.patron then Hashtbl.find exp_patron_map (n, e)
-          else Hashtbl.find exp_map e
-        in
+        let e_id = Hashtbl.find exp_map e in
         F.fprintf fmt.cast_exp "%s\t%s\n" id e_id
     | Cil.StartOf l ->
         pp_lv fmt n l;
@@ -324,10 +326,7 @@ and pp_exp fmt n e =
         if !Options.patron then F.fprintf fmt.lval_exp "%s\t%s\n" id l_id
     | Cil.SizeOfE e1 ->
         pp_exp fmt n e1;
-        let e_id =
-          if !Options.patron then Hashtbl.find exp_patron_map (n, e1)
-          else Hashtbl.find exp_map e1
-        in
+        let e_id = Hashtbl.find exp_map e1 in
         F.fprintf fmt.sizeof_exp "%s\t%s\n" id e_id
     | _ -> F.fprintf fmt.other_exp "%s\n" id
 
@@ -345,16 +344,48 @@ let new_arg_pos_id () =
   incr arg_pos_count;
   id
 
-let pp_arg fmt n arg =
+let pp_arg fmt arg =
   let id = new_arg_id () in
   List.iteri
     (fun _ e ->
       let e' = if !Options.remove_cast then remove_cast e else e in
-      (if !Options.patron then Hashtbl.find exp_patron_map (n, e')
-       else Hashtbl.find exp_map e')
+      Hashtbl.find exp_map e'
       |> F.fprintf fmt.arg "%s\t%s\t%s\n" id (new_arg_pos_id ()))
     arg;
   id
+
+let parse_call_id n e' el' =
+  let read_target =
+    [
+      Str.regexp ".*getuint.*";
+      Str.regexp ".*getint.*";
+      Str.regexp ".*getfloat.*";
+      Str.regexp ".*getdouble.*";
+      Str.regexp ".*getc.*";
+      Str.regexp ".*getuchar.*";
+    ]
+  in
+  let alloc_target = [ Str.regexp ".*alloc.*" ] in
+  if
+    List.exists
+      (fun re -> Str.string_match re (CilHelper.s_exp e') 0)
+      read_target
+  then
+    if Hashtbl.mem readcall_map (n, e', el') then
+      Hashtbl.find readcall_map (n, e', el')
+    else new_readcall_id (n, e', el')
+  else if
+    List.exists
+      (fun re -> Str.string_match re (CilHelper.s_exp e') 0)
+      alloc_target
+  then
+    let size = List.hd el' in
+    let alloc = Array size in
+    if Hashtbl.mem alloc_map alloc then Hashtbl.find alloc_map alloc
+    else new_alloc_id alloc
+  else if Hashtbl.mem call_map (n, e', el') then
+    Hashtbl.find call_map (n, e', el')
+  else new_call_id (n, e', el')
 
 let pp_cmd fmt icfg n =
   if InterCfg.pred n icfg |> List.length = 2 then
@@ -370,10 +401,7 @@ let pp_cmd fmt icfg n =
       let e' = if !Options.remove_cast then remove_cast e else e in
       pp_exp fmt n e';
       let lv_id = Hashtbl.find lv_map lv in
-      let e_id =
-        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
-        else Hashtbl.find exp_map e'
-      in
+      let e_id = Hashtbl.find exp_map e' in
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id e_id;
       F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id
   | Cexternal (_, _) -> F.fprintf fmt.cmd "external\n"
@@ -382,10 +410,7 @@ let pp_cmd fmt icfg n =
       let e' = if !Options.remove_cast then remove_cast e else e in
       pp_exp fmt n e';
       let lv_id = Hashtbl.find lv_map lv in
-      let size_e_id =
-        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
-        else Hashtbl.find exp_map e'
-      in
+      let size_e_id = Hashtbl.find exp_map e' in
       let alloc_id =
         if Hashtbl.mem alloc_map alloc then Hashtbl.find alloc_map alloc
         else new_alloc_id alloc
@@ -417,12 +442,9 @@ let pp_cmd fmt icfg n =
         List.map (fun e -> if !Options.remove_cast then remove_cast e else e) el
       in
       List.iter (pp_exp fmt n) el';
-      let arg_id = pp_arg fmt n el' in
+      let arg_id = pp_arg fmt el' in
       let lv_id = Hashtbl.find lv_map lv in
-      let e_id =
-        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
-        else Hashtbl.find exp_map e'
-      in
+      let e_id = Hashtbl.find exp_map e' in
       let libcall_id =
         if Hashtbl.mem libcall_map (n, e', el') then
           Hashtbl.find libcall_map (n, e', el')
@@ -442,35 +464,28 @@ let pp_cmd fmt icfg n =
         List.map (fun e -> if !Options.remove_cast then remove_cast e else e) el
       in
       List.iter (pp_exp fmt n) el';
-      let arg_id = pp_arg fmt n el' in
+      let arg_id = pp_arg fmt el' in
       let lv_id = Hashtbl.find lv_map lv in
-      let e_id =
-        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
-        else Hashtbl.find exp_map e'
-      in
-      let call_id =
-        if Hashtbl.mem call_map (n, e', el') then
-          Hashtbl.find call_map (n, e', el')
-        else new_call_id (n, e', el')
-      in
+      let e_id = Hashtbl.find exp_map e' in
+      let call_id = parse_call_id n e' el' in
+      if Str.string_match (Str.regexp "Read.*") call_id 0 then
+        F.fprintf fmt.readcall_exp "%s\t%s\t%s\n" call_id e_id arg_id
+      else if Str.string_match (Str.regexp "Alloc.*") call_id 0 then
+        let size = List.hd el' in
+        let size_id = Hashtbl.find exp_map size in
+        F.fprintf fmt.alloc_exp "%s\t%s\n" call_id size_id
+      else F.fprintf fmt.call_exp "%s\t%s\t%s\n" call_id e_id arg_id;
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id call_id;
-      F.fprintf fmt.call_exp "%s\t%s\t%s\n" call_id e_id arg_id;
       F.fprintf fmt.call "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
   | Creturn (Some e, _) ->
       let e' = if !Options.remove_cast then remove_cast e else e in
       pp_exp fmt n e';
-      let id =
-        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
-        else Hashtbl.find exp_map e'
-      in
+      let id = Hashtbl.find exp_map e' in
       F.fprintf fmt.return "%a\t%s\n" Node.pp n id
   | Cassume (e, _, _) ->
       let e' = if !Options.remove_cast then remove_cast e else e in
       pp_exp fmt n e';
-      let e_id =
-        if !Options.patron then Hashtbl.find exp_patron_map (n, e')
-        else Hashtbl.find exp_map e'
-      in
+      let e_id = Hashtbl.find exp_map e' in
       F.fprintf fmt.assume "%a\t%s\n" Node.pp n e_id
   | _ -> F.fprintf fmt.cmd "unknown"
 
@@ -497,16 +512,22 @@ let make_formatters dirname =
   let oc_arg = open_out (dirname ^ "/Arg.facts") in
   let oc_return = open_out (dirname ^ "/Return.facts") in
   let oc_set = open_out (dirname ^ "/Set.facts") in
+  let oc_copy = open_out (dirname ^ "/Copy.facts") in
   let oc_alloc_exp = open_out (dirname ^ "/AllocExp.facts") in
   let oc_salloc_exp = open_out (dirname ^ "/SAllocExp.facts") in
   let oc_call_exp = open_out (dirname ^ "/CallExp.facts") in
   let oc_libcall_exp = open_out (dirname ^ "/LibCallExp.facts") in
+  let oc_readcall_exp = open_out (dirname ^ "/ReadCallExp.facts") in
+  let oc_real_lv = open_out (dirname ^ "/RealLv.facts") in
   let oc_global_var = open_out (dirname ^ "/GlobalVar.facts") in
   let oc_local_var = open_out (dirname ^ "/LocalVar.facts") in
   let oc_field = open_out (dirname ^ "/Field.facts") in
+  let oc_st_fld = open_out (dirname ^ "/StructField.facts") in
+  let oc_index = open_out (dirname ^ "/Index.facts") in
   let oc_lv = open_out (dirname ^ "/Lval.facts") in
   let oc_mem = open_out (dirname ^ "/Mem.facts") in
   let oc_start_of = open_out (dirname ^ "/StartOf.facts") in
+  let oc_addr_of = open_out (dirname ^ "/AddrOf.facts") in
   (* BinOp *)
   let oc_binop = open_out (dirname ^ "/Bop.map") in
   let oc_plusa = open_out (dirname ^ "/PlusA.facts") in
@@ -536,6 +557,9 @@ let make_formatters dirname =
   let oc_bnot = open_out (dirname ^ "/BNot.facts") in
   let oc_lnot = open_out (dirname ^ "/LNot.facts") in
   let oc_neg = open_out (dirname ^ "/Neg.facts") in
+  let oc_evallv = open_out (dirname ^ "/EvalLv.facts") in
+  let oc_allocpath = open_out (dirname ^ "/AllocPath.facts") in
+  let oc_readpath = open_out (dirname ^ "/ReadPath.facts") in
   let fmt =
     {
       func = F.formatter_of_out_channel oc_func;
@@ -553,10 +577,13 @@ let make_formatters dirname =
       return = F.formatter_of_out_channel oc_return;
       cmd = F.formatter_of_out_channel oc_cmd;
       set = F.formatter_of_out_channel oc_set;
+      copy = F.formatter_of_out_channel oc_copy;
       alloc_exp = F.formatter_of_out_channel oc_alloc_exp;
       salloc_exp = F.formatter_of_out_channel oc_salloc_exp;
       call_exp = F.formatter_of_out_channel oc_call_exp;
       libcall_exp = F.formatter_of_out_channel oc_libcall_exp;
+      readcall_exp = F.formatter_of_out_channel oc_readcall_exp;
+      real_lv = F.formatter_of_out_channel oc_real_lv;
       const_exp = F.formatter_of_out_channel oc_const;
       lval_exp = F.formatter_of_out_channel oc_lval;
       binop_exp = F.formatter_of_out_channel oc_binop_exp;
@@ -567,9 +594,12 @@ let make_formatters dirname =
       global_var = F.formatter_of_out_channel oc_global_var;
       local_var = F.formatter_of_out_channel oc_local_var;
       field = F.formatter_of_out_channel oc_field;
+      st_fld = F.formatter_of_out_channel oc_st_fld;
+      index = F.formatter_of_out_channel oc_index;
       lval = F.formatter_of_out_channel oc_lv;
       mem = F.formatter_of_out_channel oc_mem;
       start_of = F.formatter_of_out_channel oc_start_of;
+      addr_of = F.formatter_of_out_channel oc_addr_of;
       (* BinOp *)
       binop = F.formatter_of_out_channel oc_binop;
       plusa = F.formatter_of_out_channel oc_plusa;
@@ -599,41 +629,52 @@ let make_formatters dirname =
       bnot = F.formatter_of_out_channel oc_bnot;
       lnot = F.formatter_of_out_channel oc_lnot;
       neg = F.formatter_of_out_channel oc_neg;
+      (* Sems for Patron *)
+      evallv = F.formatter_of_out_channel oc_evallv;
+      allocpath = F.formatter_of_out_channel oc_allocpath;
+      readpath = F.formatter_of_out_channel oc_readpath;
     }
   in
   let channels =
     [
       oc_func;
+      oc_entry;
+      oc_exit;
+      oc_join;
+      oc_skip;
+      oc_assign;
+      oc_assume;
+      oc_alloc;
+      oc_salloc;
+      oc_call;
+      oc_libcall;
+      oc_arg;
+      oc_return;
+      oc_cmd;
+      oc_set;
+      oc_copy;
+      oc_alloc_exp;
+      oc_salloc_exp;
+      oc_call_exp;
+      oc_libcall_exp;
+      oc_readcall_exp;
+      oc_real_lv;
       oc_const;
       oc_lval;
       oc_binop_exp;
       oc_unop_exp;
       oc_cast;
+      oc_sizeof;
       oc_exp;
-      oc_cmd;
-      oc_entry;
-      oc_exit;
-      oc_skip;
-      oc_join;
-      oc_assign;
-      oc_assume;
-      oc_alloc;
-      oc_salloc;
-      oc_libcall;
-      oc_call;
-      oc_arg;
-      oc_return;
-      oc_set;
-      oc_alloc_exp;
-      oc_salloc_exp;
-      oc_call_exp;
-      oc_libcall_exp;
       oc_global_var;
       oc_local_var;
       oc_field;
+      oc_st_fld;
+      oc_index;
       oc_lv;
       oc_mem;
       oc_start_of;
+      oc_addr_of;
       oc_binop;
       oc_plusa;
       oc_pluspi;
@@ -661,6 +702,9 @@ let make_formatters dirname =
       oc_bnot;
       oc_lnot;
       oc_neg;
+      oc_evallv;
+      oc_allocpath;
+      oc_readpath;
     ]
   in
   (fmt, channels)
@@ -684,10 +728,13 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.cmd ();
   (* Cmd for Patron *)
   F.pp_print_flush fmt.set ();
+  F.pp_print_flush fmt.copy ();
   F.pp_print_flush fmt.alloc_exp ();
   F.pp_print_flush fmt.salloc_exp ();
   F.pp_print_flush fmt.call_exp ();
   F.pp_print_flush fmt.libcall_exp ();
+  F.pp_print_flush fmt.readcall_exp ();
+  F.pp_print_flush fmt.real_lv ();
   (* Expressions *)
   F.pp_print_flush fmt.const_exp ();
   F.pp_print_flush fmt.lval_exp ();
@@ -699,9 +746,12 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.global_var ();
   F.pp_print_flush fmt.local_var ();
   F.pp_print_flush fmt.field ();
+  F.pp_print_flush fmt.st_fld ();
+  F.pp_print_flush fmt.index ();
   F.pp_print_flush fmt.lval ();
   F.pp_print_flush fmt.mem ();
   F.pp_print_flush fmt.start_of ();
+  F.pp_print_flush fmt.addr_of ();
   (* BinOp *)
   F.pp_print_flush fmt.binop ();
   F.pp_print_flush fmt.plusa ();
@@ -731,6 +781,10 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.bnot ();
   F.pp_print_flush fmt.lnot ();
   F.pp_print_flush fmt.neg ();
+  (* Sems for Patron *)
+  F.pp_print_flush fmt.evallv ();
+  F.pp_print_flush fmt.allocpath ();
+  F.pp_print_flush fmt.readpath ();
   List.iter close_out channels
 
 let print_relation dirname icfg =
@@ -776,34 +830,8 @@ let print_raw dirname =
   close_out oc_exp_json;
   close_out oc_exp_text
 
-let print_raw_patron dirname =
-  let oc_exp_json = open_out (dirname ^ "/Exp.json") in
-  let oc_exp_text = open_out (dirname ^ "/Exp.map") in
-  let text_fmt = F.formatter_of_out_channel oc_exp_text in
-  let l =
-    Hashtbl.fold
-      (fun (_, exp) id l ->
-        F.fprintf text_fmt "%s\t%s\n" id (CilHelper.s_exp exp);
-        let json_exp = CilJson.of_exp exp in
-        let exp =
-          `Assoc
-            [
-              ("tree", json_exp);
-              ("text", `String (CilHelper.s_exp exp));
-              ("abs_text", `String (string_of_abstract_exp exp));
-            ]
-        in
-        (id, exp) :: l)
-      exp_patron_map []
-  in
-  let json = `Assoc l in
-  Yojson.Safe.to_channel oc_exp_json json;
-  close_out oc_exp_json;
-  close_out oc_exp_text
-
 let print analysis icfg =
   Hashtbl.reset exp_map;
-  Hashtbl.reset exp_patron_map;
   Hashtbl.reset lv_map;
   Hashtbl.reset binop_map;
   Hashtbl.reset unop_map;
