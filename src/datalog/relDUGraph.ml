@@ -162,7 +162,6 @@ type formatter_of_patron = {
   deduedge : F.formatter;
   duedge : F.formatter;
   dupath : F.formatter;
-  cfpath : F.formatter;
 }
 
 let loc_map = Hashtbl.create 1000
@@ -286,13 +285,11 @@ let print_sems dirname dug =
   let oc_deduedge = open_out (dirname ^ "/DetailedDUEdge.facts") in
   let oc_duedge = open_out (dirname ^ "/DUEdge.facts") in
   let oc_dupath = open_out (dirname ^ "/DUPath.facts") in
-  let oc_cfpath = open_out (dirname ^ "/CFPath.facts") in
   let fmt =
     {
       deduedge = F.formatter_of_out_channel oc_deduedge;
       duedge = F.formatter_of_out_channel oc_duedge;
       dupath = F.formatter_of_out_channel oc_dupath;
-      cfpath = F.formatter_of_out_channel oc_cfpath;
     }
   in
   G.iter_edges_e
@@ -308,11 +305,9 @@ let print_sems dirname dug =
   F.pp_print_flush fmt.deduedge ();
   F.pp_print_flush fmt.duedge ();
   F.pp_print_flush fmt.dupath ();
-  F.pp_print_flush fmt.cfpath ();
   close_out oc_deduedge;
   close_out oc_duedge;
   close_out oc_dupath;
-  close_out oc_cfpath
 
 module AlarmSet = Set.Make (struct
   type t = Node.t * Node.t [@@deriving compare]
@@ -992,8 +987,6 @@ let append_field lv f = (fst lv, add_offset (Field (f, NoOffset)) (snd lv))
 let append_index lv e = (fst lv, add_offset (Index (e, NoOffset)) (snd lv))
 
 let rec pp_lv (fmt : RelSyntax.formatter) n lv mem =
-  if String.equal (F.asprintf "%a" Node.pp n) "jpc_dec_process_siz-19004" then
-    Logging.info "pp_lv - node: %a, lv: %s\n" Node.pp n (CilHelper.s_lv lv);
   let pid = Node.get_pid n in
   let locs = ItvSem.eval_lv pid lv mem in
   let loc_id =
@@ -1084,7 +1077,7 @@ and pp_exp fmt n e mem =
       pp_lv fmt n l mem;
       let l_id = Hashtbl.find RelSyntax.lv_map l in
       F.fprintf fmt.other_exp "%s\t%s\n" id l_id;
-      if !Options.patron then F.fprintf fmt.addr_of "%s\t%s\n" id l_id
+      F.fprintf fmt.addr_of "%s\t%s\n" id l_id
   | _ -> F.fprintf fmt.other_exp "%s\n" id
 
 let alloc_target = Str.regexp ".*alloc.*"
@@ -1158,12 +1151,7 @@ let pp_dug_cmd fmt icfg dug n mem =
       let lv_id = Hashtbl.find RelSyntax.lv_map lv in
       let e_id = Hashtbl.find RelSyntax.exp_map e' in
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id e_id;
-      F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id;
-      match e' with
-      | Lval lv2 ->
-          let lv2_id = Hashtbl.find RelSyntax.lv_map lv2 in
-          F.fprintf fmt.copy "%a\t%s\t%s\n" Node.pp n lv_id lv2_id
-      | _ -> ())
+      F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id)
   | Cexternal (_, _) -> F.fprintf fmt.cmd "external\n"
   | Calloc (lv, (Array e as alloc), _, _, _) ->
       pp_lv fmt n lv mem;
@@ -1324,6 +1312,7 @@ let print_raw_alarm dirname =
   close_out oc_alarm
 
 let print_patron analysis global dug alarms =
+  (* for patern to use Loc relation, print_patron uses DUG instead *)
   let dug = G.copy dug in
   let alarms = Report.get alarms Report.UnProven in
   let print_for_one_alarm dug (i, visited) alarm =

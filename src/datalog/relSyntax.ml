@@ -23,7 +23,6 @@ type formatter = {
   cmd : F.formatter;
   (* Cmd for Patron *)
   set : F.formatter;
-  copy : F.formatter;
   alloc_exp : F.formatter;
   salloc_exp : F.formatter;
   call_exp : F.formatter;
@@ -323,7 +322,7 @@ and pp_exp fmt n e =
         pp_lv fmt n l;
         let l_id = Hashtbl.find lv_map l in
         F.fprintf fmt.start_of "%s\t%s\n" id l_id;
-        if !Options.patron then F.fprintf fmt.lval_exp "%s\t%s\n" id l_id
+        F.fprintf fmt.lval_exp "%s\t%s\n" id l_id
     | Cil.SizeOfE e1 ->
         pp_exp fmt n e1;
         let e_id = Hashtbl.find exp_map e1 in
@@ -467,14 +466,12 @@ let pp_cmd fmt icfg n =
       let arg_id = pp_arg fmt el' in
       let lv_id = Hashtbl.find lv_map lv in
       let e_id = Hashtbl.find exp_map e' in
-      let call_id = parse_call_id n e' el' in
-      if Str.string_match (Str.regexp "Read.*") call_id 0 then
-        F.fprintf fmt.readcall_exp "%s\t%s\t%s\n" call_id e_id arg_id
-      else if Str.string_match (Str.regexp "Alloc.*") call_id 0 then
-        let size = List.hd el' in
-        let size_id = Hashtbl.find exp_map size in
-        F.fprintf fmt.alloc_exp "%s\t%s\n" call_id size_id
-      else F.fprintf fmt.call_exp "%s\t%s\t%s\n" call_id e_id arg_id;
+      let call_id =
+        if Hashtbl.mem call_map (n, e', el') then
+          Hashtbl.find call_map (n, e', el')
+        else new_call_id (n, e', el')
+      in
+      F.fprintf fmt.call_exp "%s\t%s\t%s\n" call_id e_id arg_id;
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id call_id;
       F.fprintf fmt.call "%a\t%s\t%s\t%s\n" Node.pp n lv_id e_id arg_id
   | Creturn (Some e, _) ->
@@ -512,7 +509,6 @@ let make_formatters dirname =
   let oc_arg = open_out (dirname ^ "/Arg.facts") in
   let oc_return = open_out (dirname ^ "/Return.facts") in
   let oc_set = open_out (dirname ^ "/Set.facts") in
-  let oc_copy = open_out (dirname ^ "/Copy.facts") in
   let oc_alloc_exp = open_out (dirname ^ "/AllocExp.facts") in
   let oc_salloc_exp = open_out (dirname ^ "/SAllocExp.facts") in
   let oc_call_exp = open_out (dirname ^ "/CallExp.facts") in
@@ -577,7 +573,6 @@ let make_formatters dirname =
       return = F.formatter_of_out_channel oc_return;
       cmd = F.formatter_of_out_channel oc_cmd;
       set = F.formatter_of_out_channel oc_set;
-      copy = F.formatter_of_out_channel oc_copy;
       alloc_exp = F.formatter_of_out_channel oc_alloc_exp;
       salloc_exp = F.formatter_of_out_channel oc_salloc_exp;
       call_exp = F.formatter_of_out_channel oc_call_exp;
@@ -652,7 +647,6 @@ let make_formatters dirname =
       oc_return;
       oc_cmd;
       oc_set;
-      oc_copy;
       oc_alloc_exp;
       oc_salloc_exp;
       oc_call_exp;
@@ -728,7 +722,6 @@ let close_formatters fmt channels =
   F.pp_print_flush fmt.cmd ();
   (* Cmd for Patron *)
   F.pp_print_flush fmt.set ();
-  F.pp_print_flush fmt.copy ();
   F.pp_print_flush fmt.alloc_exp ();
   F.pp_print_flush fmt.salloc_exp ();
   F.pp_print_flush fmt.call_exp ();
