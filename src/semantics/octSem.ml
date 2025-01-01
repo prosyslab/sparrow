@@ -9,7 +9,6 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open ProsysCil
 open Vocab
 open AbsSem
 open Global
@@ -462,7 +461,7 @@ let binding mode global ptrmem packconf pid paramset args mem =
     paramset mem
 
 let run_cmd mode packconf node cmd ptrmem (mem, global) =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   match cmd with
   | IntraCfg.Cmd.Cset (l, e, _) ->
       let lv = ItvSem.eval_lv pid l ptrmem |> PowOctLoc.of_locs in
@@ -507,7 +506,7 @@ let run_cmd mode packconf node cmd ptrmem (mem, global) =
       if PowProc.eq fs PowProc.bot then mem
       else
         let arg_lvars_of_proc f acc =
-          let args = InterCfg.argsof global.icfg f in
+          let args = InterCfg.args_of global.icfg f in
           let lvars =
             List.map (fun x -> Loc.of_lvar f x.Cil.vname x.Cil.vtype) args
           in
@@ -517,7 +516,7 @@ let run_cmd mode packconf node cmd ptrmem (mem, global) =
         binding mode global ptrmem packconf pid arg_lvars_set arg_exps mem
   | IntraCfg.Cmd.Creturn (Some e, _) ->
       let ret_locs =
-        Dump.find (InterCfg.Node.get_pid node) global.dump |> PowOctLoc.of_locs
+        Dump.find (InterCfg.Node.pid node) global.dump |> PowOctLoc.of_locs
       in
       set mode global ptrmem packconf pid ret_locs e mem
   | IntraCfg.Cmd.Cskip _ when InterCfg.start_node = node ->
@@ -528,13 +527,13 @@ let run mode spec node (mem, global) =
   if !Options.oct_debug then (
     prerr_endline "CMD";
     prerr_endline (Node.to_string node);
-    prerr_endline (IntraCfg.Cmd.to_string (InterCfg.cmdof global.icfg node));
+    prerr_endline (IntraCfg.Cmd.to_string (InterCfg.cmd_of global.icfg node));
     prerr_endline "== input ==";
     prerr_endline (Mem.to_string mem));
   let ptrmem = ItvDom.Table.find node spec.Spec.ptrinfo in
   let mem =
     run_cmd mode spec.Spec.locset node
-      (InterCfg.cmdof global.icfg node)
+      (InterCfg.cmd_of global.icfg node)
       ptrmem (mem, global)
   in
   if !Options.oct_debug then (

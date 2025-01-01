@@ -1,8 +1,8 @@
+open Vocab
 open AlarmExp
 open BasicDom
 open Global
 open Report
-open Vocab
 module F = Format
 
 let analysis = Spec.Taint
@@ -31,7 +31,7 @@ let marshal_out (global, dug, input, output) =
 let inspect_aexp_bo node aexp itvmem mem queries =
   match aexp with
   | AllocSize (_, e, loc) ->
-      let pid = InterCfg.Node.get_pid node in
+      let pid = InterCfg.Node.pid node in
       let size_itv = ItvSem.eval pid e itvmem |> ItvDom.Val.itv_of_val in
       let taint = TaintSem.eval pid e itvmem mem |> TaintDom.Val.user_input in
       TaintDom.UserInput.fold
@@ -61,7 +61,7 @@ let inspect_aexp_bo node aexp itvmem mem queries =
           :: queries)
         taint queries
   | Printf (_, e, loc) | ArrayExp (_, e, loc) | DerefExp (e, loc) ->
-      let pid = InterCfg.Node.get_pid node in
+      let pid = InterCfg.Node.pid node in
       let taint =
         ItvSem.eval pid e itvmem |> ItvDom.Val.all_locs |> flip Mem.lookup mem
         |> TaintDom.Val.user_input
@@ -84,7 +84,7 @@ let inspect_aexp_bo node aexp itvmem mem queries =
           :: queries)
         taint queries
   | BufferOverrunLib ("sprintf", [ _; _; e3 ], loc) ->
-      let pid = InterCfg.Node.get_pid node in
+      let pid = InterCfg.Node.pid node in
       let taint =
         ItvSem.eval pid e3 itvmem |> ItvDom.Val.all_locs |> flip Mem.lookup mem
         |> TaintDom.Val.user_input
@@ -107,7 +107,7 @@ let inspect_aexp_bo node aexp itvmem mem queries =
           :: queries)
         taint queries
   | BufferOverrunLib ("fread", [ _; _; cnt ], loc) ->
-      let pid = InterCfg.Node.get_pid node in
+      let pid = InterCfg.Node.pid node in
       let taint = TaintSem.eval pid cnt itvmem mem |> TaintDom.Val.user_input in
       TaintDom.UserInput.fold
         (fun (src_node, src_loc) queries ->
@@ -135,7 +135,7 @@ let inspect_aexp_io node aexp itvmem mem queries =
   | MultIOExp (e, loc)
   | ShiftIOExp (e, loc)
   | CastIOExp (e, loc) ->
-      let pid = InterCfg.Node.get_pid node in
+      let pid = InterCfg.Node.pid node in
       let tv = TaintSem.eval pid e itvmem mem in
       let int_overflow, taint =
         (TaintDom.Val.int_overflow tv, TaintDom.Val.user_input tv)
@@ -166,7 +166,7 @@ let inspect_aexp_io node aexp itvmem mem queries =
 let inspect_aexp_dz node aexp itvmem mem queries =
   match aexp with
   | DivExp (e, loc) ->
-      let pid = InterCfg.Node.get_pid node in
+      let pid = InterCfg.Node.pid node in
       let tv = TaintSem.eval pid e itvmem mem in
       let taint = TaintDom.Val.user_input tv in
       TaintDom.UserInput.fold
@@ -191,7 +191,7 @@ let inspect_aexp_dz node aexp itvmem mem queries =
 let inspect_aexp_nd node aexp itvmem mem queries =
   match aexp with
   | DerefExp (e, loc) ->
-      let pid = InterCfg.Node.get_pid node in
+      let pid = InterCfg.Node.pid node in
       let taint = TaintSem.eval pid e itvmem mem |> TaintDom.Val.user_input in
       TaintDom.UserInput.fold
         (fun (src_node, src_loc) queries ->
@@ -213,14 +213,14 @@ let inspect_aexp_nd node aexp itvmem mem queries =
   | _ -> queries
 
 let generate spec (global, mem, target) =
-  let nodes = InterCfg.nodesof global.icfg in
+  let nodes = InterCfg.nodes_of global.icfg in
   let total = List.length nodes in
   list_fold
     (fun node (qs, k) ->
       prerr_progressbar ~itv:1000 k total;
       let ptrmem = ItvDom.Table.find node spec.Spec.ptrinfo in
       let mem = Table.find node mem in
-      let cmd = InterCfg.cmdof global.icfg node in
+      let cmd = InterCfg.cmd_of global.icfg node in
       let aexps = AlarmExp.collect analysis cmd in
       let qs =
         list_fold
@@ -272,7 +272,7 @@ let print_datalog_fact _ global dug alarms =
 let ignore_function node =
   BatSet.elements !Options.filter_function
   |> List.map Str.regexp
-  |> List.exists (fun re -> Str.string_match re (InterCfg.Node.get_pid node) 0)
+  |> List.exists (fun re -> Str.string_match re (InterCfg.Node.pid node) 0)
 
 let post_process spec itvdug (global, _, inputof, outputof) =
   let alarms =

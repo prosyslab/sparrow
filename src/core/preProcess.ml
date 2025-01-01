@@ -21,7 +21,7 @@ module L = Logging
 (* Functions related to call-graph construction *)
 
 let collect_call_from_cmd icfg node acc_calls =
-  match InterCfg.cmdof icfg node with
+  match InterCfg.cmd_of icfg node with
   | IntraCfg.Cmd.Ccall (_, Cil.Lval (Cil.Var f, Cil.NoOffset), _, _) ->
       if InterCfg.is_undef f.vname icfg then acc_calls
       else BatSet.add (node, f.vname) acc_calls
@@ -29,13 +29,13 @@ let collect_call_from_cmd icfg node acc_calls =
 
 let find_direct_calls icfg =
   let folder = collect_call_from_cmd icfg in
-  let all_nodes = InterCfg.nodesof icfg in
+  let all_nodes = InterCfg.nodes_of icfg in
   list_fold folder all_nodes BatSet.empty
 
 let approximate_call_graph global =
   let call_edges = find_direct_calls global.icfg in
   let folder (caller_node, callee_func) (icfg, callgraph) =
-    let caller_func = InterCfg.Node.get_pid caller_node in
+    let caller_func = InterCfg.Node.pid caller_node in
     ( InterCfg.add_call_edge caller_node callee_func icfg,
       CallGraph.add_edge caller_func callee_func callgraph )
   in
@@ -75,7 +75,7 @@ let weak_add k v m is_fixed =
   (BatMap.add k new_v m, is_fixed && PowProc.subset v prev_v)
 
 let update_gvar_fref_map icfg node (acc_map, acc_flag) =
-  match InterCfg.cmdof icfg node with
+  match InterCfg.cmd_of icfg node with
   | IntraCfg.Cmd.Cset ((Cil.Var v, _), e, _) ->
       let frefs = collect_fref_from_exp icfg acc_map e in
       if PowProc.is_empty frefs then (acc_map, acc_flag)
@@ -107,7 +107,7 @@ let build_gvar_fref_map icfg =
   fixpt BatMap.empty
 
 let collect_fref_from_cmd icfg gvar_map node acc_frefs =
-  match InterCfg.cmdof icfg node with
+  match InterCfg.cmd_of icfg node with
   | IntraCfg.Cmd.Cset (_, e, _) ->
       PowProc.union (collect_fref_from_exp icfg gvar_map e) acc_frefs
   | IntraCfg.Cmd.Ccall (_, f_exp, arg_exps, _) ->
@@ -149,7 +149,7 @@ let find_func_refs icfg =
 
 let remove_unreferred_funcs global =
   let frefs = find_func_refs global.icfg in
-  let pids_all = PowProc.of_list (InterCfg.pidsof global.icfg) in
+  let pids_all = PowProc.of_list (InterCfg.pids_of global.icfg) in
   let unrefs = PowProc.diff pids_all frefs in
   let recursive = PowProc.filter (fun pid -> is_rec pid global) frefs in
   L.info ~level:1 "%-16s: %d\n" "#functions all" (PowProc.cardinal pids_all);

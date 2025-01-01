@@ -313,7 +313,7 @@ let cmd_functions { global; dug; _ } functions =
   let new_dug =
     DUGraph.fold_node
       (fun node new_dug ->
-        if List.mem (Node.get_pid node) functions then dug
+        if List.mem (Node.pid node) functions then dug
         else DUGraph.remove_node node new_dug)
       dug new_dug
   in

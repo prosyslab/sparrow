@@ -8,7 +8,11 @@
 (* See the LICENSE file for details.                                   *)
 (*                                                                     *)
 (***********************************************************************)
+
 (** Vocabularies *)
+
+module F = Format
+module Cil = ProsysCil.Cil
 
 val ( <<< ) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 val ( >>> ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c

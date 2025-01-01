@@ -9,10 +9,9 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open ProsysCil
+open Vocab
 open Global
 open BasicDom
-open Vocab
 open ArrayBlk
 open OctDom
 open AlarmExp
@@ -70,7 +69,7 @@ let check packconf pid v1 v2opt v2exp ptrmem mem =
       arr []
 
 let inspect_aexp packconf node aexp ptrmem mem queries =
-  let pid = InterCfg.Node.get_pid node in
+  let pid = InterCfg.Node.pid node in
   if !Options.oct_debug then (
     prerr_endline "query";
     prerr_endline (AlarmExp.to_string aexp));
@@ -78,22 +77,22 @@ let inspect_aexp packconf node aexp ptrmem mem queries =
   | ArrayExp (lv, e, loc) ->
       let v1 =
         ItvDom.Mem.lookup
-          (ItvSem.eval_lv (InterCfg.Node.get_pid node) lv ptrmem)
+          (ItvSem.eval_lv (InterCfg.Node.pid node) lv ptrmem)
           ptrmem
       in
-      let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e ptrmem in
+      let v2 = ItvSem.eval (InterCfg.Node.pid node) e ptrmem in
       check packconf pid v1 (Some v2) (Some e) ptrmem mem
       |> List.map (fun (status, a, desc) ->
              { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
   | DerefExp (Cil.BinOp (op, e1, e2, _), loc)
     when op = Cil.PlusPI || op = Cil.IndexPI ->
-      let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 ptrmem in
-      let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e2 ptrmem in
+      let v1 = ItvSem.eval (InterCfg.Node.pid node) e1 ptrmem in
+      let v2 = ItvSem.eval (InterCfg.Node.pid node) e2 ptrmem in
       check packconf pid v1 (Some v2) (Some e2) ptrmem mem
       |> List.map (fun (status, a, desc) ->
              { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
   | DerefExp (e, loc) ->
-      let v = ItvSem.eval (InterCfg.Node.get_pid node) e ptrmem in
+      let v = ItvSem.eval (InterCfg.Node.pid node) e ptrmem in
       check packconf pid v None None ptrmem mem
       |> cond
            (ItvDom.Val.eq ItvDom.Val.bot v)
@@ -129,8 +128,8 @@ let inspect_aexp packconf node aexp ptrmem mem queries =
                     src = None;
                   }))
   | Strcpy (e1, e2, loc) ->
-      let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 ptrmem in
-      let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e2 ptrmem in
+      let v1 = ItvSem.eval (InterCfg.Node.pid node) e1 ptrmem in
+      let v2 = ItvSem.eval (InterCfg.Node.pid node) e2 ptrmem in
       let v2 =
         ItvDom.Val.of_itv (ArrayBlk.nullof (ItvDom.Val.array_of_val v2))
       in
@@ -138,8 +137,8 @@ let inspect_aexp packconf node aexp ptrmem mem queries =
       |> List.map (fun (status, a, desc) ->
              { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
   | Strcat (e1, e2, loc) ->
-      let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 ptrmem in
-      let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e2 ptrmem in
+      let v1 = ItvSem.eval (InterCfg.Node.pid node) e1 ptrmem in
+      let v2 = ItvSem.eval (InterCfg.Node.pid node) e2 ptrmem in
       let np1 = ArrayBlk.nullof (ItvDom.Val.array_of_val v1) in
       let np2 = ArrayBlk.nullof (ItvDom.Val.array_of_val v2) in
       let np = ItvDom.Val.of_itv (Itv.plus np1 np2) in
@@ -149,10 +148,10 @@ let inspect_aexp packconf node aexp ptrmem mem queries =
   | Strncpy (e1, e2, e3, loc)
   | Memcpy (e1, e2, e3, loc)
   | Memmove (e1, e2, e3, loc) ->
-      let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 ptrmem in
-      let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e2 ptrmem in
+      let v1 = ItvSem.eval (InterCfg.Node.pid node) e1 ptrmem in
+      let v2 = ItvSem.eval (InterCfg.Node.pid node) e2 ptrmem in
       let e3_1 = Cil.BinOp (Cil.MinusA, e3, Cil.mone, Cil.intType) in
-      let v3 = ItvSem.eval (InterCfg.Node.get_pid node) e3_1 ptrmem in
+      let v3 = ItvSem.eval (InterCfg.Node.pid node) e3_1 ptrmem in
       let lst1 = check packconf pid v1 (Some v3) (Some e3) ptrmem mem in
       let lst2 = check packconf pid v2 (Some v3) (Some e2) ptrmem mem in
       lst1 @ lst2
@@ -162,14 +161,14 @@ let inspect_aexp packconf node aexp ptrmem mem queries =
   @ queries
 
 let inspect_alarm global spec inputof =
-  let nodes = InterCfg.nodesof global.icfg in
+  let nodes = InterCfg.nodes_of global.icfg in
   let total = List.length nodes in
   list_fold
     (fun node (qs, k) ->
       prerr_progressbar ~itv:1000 k total;
       let ptrmem = ItvDom.Table.find node spec.Spec.ptrinfo in
       let mem = Table.find node inputof in
-      let cmd = InterCfg.cmdof global.icfg node in
+      let cmd = InterCfg.cmd_of global.icfg node in
       let aexps = AlarmExp.collect analysis cmd in
       let qs =
         list_fold
@@ -230,12 +229,12 @@ let sparrow_relation_strlen pid mem exps rel =
   | _ -> rel
 
 let manual_packing (global, itvinputof) =
-  let nodes = InterCfg.nodesof global.icfg in
+  let nodes = InterCfg.nodes_of global.icfg in
   list_fold
     (fun n a ->
       let mem = ItvDom.Table.find n itvinputof in
-      let pid = InterCfg.Node.get_pid n in
-      match InterCfg.cmdof global.icfg n with
+      let pid = InterCfg.Node.pid n in
+      match InterCfg.cmd_of global.icfg n with
       | IntraCfg.Cmd.Ccall (None, Cil.Lval (Cil.Var f, Cil.NoOffset), exps, _)
         ->
           if f.vname = "sparrow_relation_set" then

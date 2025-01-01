@@ -58,8 +58,8 @@ let update_works node forward used visited works =
   (visited, works)
 
 let transfer_normal global node uses p (slice, visited, works) =
-  let node_f = InterCfg.Node.get_pid node in
-  let p_f = InterCfg.Node.get_pid p in
+  let node_f = InterCfg.Node.pid node in
+  let p_f = InterCfg.Node.pid p in
   let _ =
     if node_f <> p_f then
       Printf.printf "Function changes: p_f = %s node_f = %s, uses = %s\n" p_f
@@ -77,31 +77,31 @@ let transfer_normal global node uses p (slice, visited, works) =
   (slice, visited, works)
 
 let skip_ret global node uses p (slice, visited, works) =
-  let caller = InterCfg.Node.get_pid node in
-  let callee = InterCfg.Node.get_pid p in
+  let caller = InterCfg.Node.pid node in
+  let callee = InterCfg.Node.pid p in
   let _ =
     Printf.printf "From %s (%s), ignore return from %s()\n"
       (InterCfg.node_to_lstr global.Global.icfg node)
       caller callee
   in
-  let call_node = InterCfg.callof node global.Global.icfg in
+  let call_node = InterCfg.call_of node global.Global.icfg in
   let slice = Slice.draw_edge_fwd call_node node uses slice in
   let visited, works = update_works call_node uses PowLoc.empty visited works in
   (slice, visited, works)
 
 let transfer global dug node uses (slice, visited, works) =
-  let node_f = InterCfg.Node.get_pid node in
-  let is_entry = InterCfg.is_entry node in
-  let is_ret = InterCfg.is_returnnode node global.Global.icfg in
+  let node_f = InterCfg.Node.pid node in
+  let is_entry_node = InterCfg.is_entry_node node in
+  let is_ret = InterCfg.is_return_node node global.Global.icfg in
   let preds = DUGraph.pred node dug in
   let folder p (slice, visited, works) =
-    let p_f = InterCfg.Node.get_pid p in
+    let p_f = InterCfg.Node.pid p in
     let locs_on_edge = DUGraph.get_abslocs p node dug in
     let uses = PowLoc.inter locs_on_edge uses in
     if PowLoc.is_empty uses then (slice, visited, works)
-    else if is_entry && BatSet.mem (p_f, node_f) global.Global.cyclic_calls then
-      (slice, visited, works)
-    else if is_ret && InterCfg.is_exit p then
+    else if is_entry_node && BatSet.mem (p_f, node_f) global.Global.cyclic_calls
+    then (slice, visited, works)
+    else if is_ret && InterCfg.is_exit_node p then
       if BatSet.mem (node_f, p_f) global.Global.cyclic_calls then
         skip_ret global node uses p (slice, visited, works)
       else transfer_normal global node uses p (slice, visited, works)
@@ -192,7 +192,7 @@ let rec slice_control_nodes_internal global works sliced_control_nodes =
     (* Add call nodes to the worklist when we reach the end of intra-procedural control dependency *)
     let call_nodes =
       if NodeSet.is_empty control_nodes then
-        let callers = Node.get_pid node |> InterCfg.get_callers icfg in
+        let callers = Node.pid node |> InterCfg.get_callers icfg in
         NodeSet.diff callers sliced_control_nodes
       else NodeSet.empty
     in
@@ -218,7 +218,7 @@ let slice_control_nodes global slice =
      sliced_control_nodes are targets of taint analysis *)
   let _, sliced_control_nodes =
     NodeSet.partition
-      (fun n -> InterCfg.is_callnode n global.Global.icfg)
+      (fun n -> InterCfg.is_call_node n global.Global.icfg)
       sliced_nodes
   in
   { slice with sliced_control_nodes }

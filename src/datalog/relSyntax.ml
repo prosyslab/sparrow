@@ -378,11 +378,11 @@ let parse_call_id n e' el' =
 let pp_cmd fmt icfg n =
   if InterCfg.pred n icfg |> List.length = 2 then
     F.fprintf fmt.join "%a\n" Node.pp n;
-  F.fprintf fmt.func "%s\t%a\n" (Node.get_pid n) Node.pp n;
-  match InterCfg.cmdof icfg n with
+  F.fprintf fmt.func "%s\t%a\n" (Node.pid n) Node.pp n;
+  match InterCfg.cmd_of icfg n with
   | Cskip _ ->
-      if InterCfg.is_entry n then F.fprintf fmt.entry "%a\n" Node.pp n
-      else if InterCfg.is_exit n then F.fprintf fmt.exit "%a\n" Node.pp n
+      if InterCfg.is_entry_node n then F.fprintf fmt.entry "%a\n" Node.pp n
+      else if InterCfg.is_exit_node n then F.fprintf fmt.exit "%a\n" Node.pp n
       else F.fprintf fmt.skip "%a\n" Node.pp n
   | Cset (lv, e, _) ->
       pp_lv fmt n lv;
@@ -771,7 +771,7 @@ let close_formatters fmt channels =
 
 let print_relation dirname icfg =
   let fmt, channels = make_formatters dirname in
-  List.iter (fun n -> pp_cmd fmt icfg n) (InterCfg.nodesof icfg);
+  List.iter (fun n -> pp_cmd fmt icfg n) (InterCfg.nodes_of icfg);
   close_formatters fmt channels
 
 let rec string_of_abstract_exp = function

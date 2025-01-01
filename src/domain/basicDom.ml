@@ -36,7 +36,7 @@ module IntAllocsite = struct
   and is_string = bool [@@deriving compare]
 
   let is_global_allocsite (node, _) =
-    Proc.equal (Node.get_pid node) InterCfg.global_proc
+    Proc.equal (Node.pid node) InterCfg.global_proc
 
   let to_string (node, _) = Node.to_string node
   let pp fmt x = Format.fprintf fmt "%s" (to_string x)
@@ -170,7 +170,7 @@ module Loc = struct
     | GVar _ -> false
     | LVar (p, _, _) -> p = pid
     (* Allocation converted from local variable declarations *)
-    | Allocsite (Local n) -> Node.get_pid n = pid
+    | Allocsite (Local n) -> Node.pid n = pid
     | Allocsite _ -> false
     | Field (l, _, _) -> is_local_of pid l
 

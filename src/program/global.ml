@@ -45,7 +45,7 @@ let remove_functions pids global =
 let is_rec pid global = CallGraph.is_rec global.callgraph pid
 
 let remove_unreachable_nodes global =
-  let nodes_all = InterCfg.nodesof global.icfg in
+  let nodes_all = InterCfg.nodes_of global.icfg in
   let unreachable = InterCfg.unreachable_node global.icfg in
   let global = remove_nodes unreachable global in
   L.info ~level:1 "\n%-14s: %d\n" "#nodes all" (List.length nodes_all);
@@ -53,7 +53,7 @@ let remove_unreachable_nodes global =
   global
 
 let remove_unreachable_functions global =
-  let pids_all = PowProc.of_list (InterCfg.pidsof global.icfg) in
+  let pids_all = PowProc.of_list (InterCfg.pids_of global.icfg) in
   let reachable =
     CallGraph.trans_callees InterCfg.global_proc global.callgraph
     |> BatSet.fold PowProc.add !Options.keep_unreachable_from
@@ -92,7 +92,7 @@ let handle_cyclic_call global =
   let folder (src, dst) acc_icfg =
     let src_nodes =
       InterCfg.nodes_of_pid icfg src
-      |> List.filter (fun n -> InterCfg.is_callnode n icfg)
+      |> List.filter (fun n -> InterCfg.is_call_node n icfg)
     in
     list_fold (fun n g -> InterCfg.remove_call_edge n dst g) src_nodes acc_icfg
   in
@@ -101,9 +101,9 @@ let handle_cyclic_call global =
 
 (* Record the original function names so we can retrieve them after inline *)
 let build_line_to_func_map global =
-  let nodes = InterCfg.nodesof global.icfg in
+  let nodes = InterCfg.nodes_of global.icfg in
   let folder acc n =
-    BatMap.add (InterCfg.node_to_lstr global.icfg n) (Node.get_pid n) acc
+    BatMap.add (InterCfg.node_to_lstr global.icfg n) (Node.pid n) acc
   in
   let line_to_func = List.fold_left folder BatMap.empty nodes in
   { global with line_to_func }
@@ -125,7 +125,7 @@ let init file =
 let is_undef pid global = InterCfg.is_undef pid global.icfg
 
 let get_leaf_procs global =
-  let pids = PowProc.of_list (InterCfg.pidsof global.icfg) in
+  let pids = PowProc.of_list (InterCfg.pids_of global.icfg) in
   PowProc.fold
     (fun fid ->
       if PowProc.cardinal (CallGraph.trans_callees fid global.callgraph) = 1

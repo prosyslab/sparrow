@@ -27,7 +27,7 @@ module type S = sig
   val nb_node : t -> int
   val nb_edge : t -> int
   val nb_loc : t -> int
-  val nodesof : t -> node BatSet.t
+  val nodes_of : t -> node BatSet.t
   val succ : node -> t -> node list
   val pred : node -> t -> node list
   val add_edge : node -> node -> t -> t

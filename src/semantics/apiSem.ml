@@ -198,7 +198,7 @@ let api_map =
   |> ApiMap.add "cuserid" { arg_typs = []; ret_typ = int_v }
   |> ApiMap.add "getlogin" { arg_typs = []; ret_typ = int_v }
   |> ApiMap.add "getlogin_r" { arg_typs = [ Skip; Skip ]; ret_typ = int_v }
-  |> ApiMap.add "getpid" { arg_typs = []; ret_typ = int_v }
+  |> ApiMap.add "pid" { arg_typs = []; ret_typ = int_v }
   |> ApiMap.add "stat" { arg_typs = [ Skip; StructPtr ]; ret_typ = ones }
   |> ApiMap.add "fstat" { arg_typs = [ Skip; StructPtr ]; ret_typ = ones }
   |> ApiMap.add "lstat" { arg_typs = [ Skip; StructPtr ]; ret_typ = ones }

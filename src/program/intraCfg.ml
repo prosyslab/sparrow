@@ -11,11 +11,7 @@
 (** CFG for a Function. *)
 
 open Vocab
-open ProsysCil.Cil
-open CilHelper
-open Printf
-module Cil = ProsysCil.Cil
-module F = Format
+open Cil
 
 module Node = struct
   type t = ENTRY | EXIT | Node of int [@@deriving compare]
@@ -93,6 +89,8 @@ module Cmd = struct
     | ReturnNode -> "ReturnNode"
     | Branch -> "Branch"
     | LoopHead -> "LoopHead"
+
+  open CilHelper
 
   let to_string = function
     | Cinstr (instrs, _) -> s_instrs instrs
@@ -218,7 +216,7 @@ let empty fd =
     scc_list = [];
   }
 
-let get_pid g = g.fd.svar.vname
+let pid g = g.fd.svar.vname
 let get_formals g = g.fd.sformals
 let get_formals_lval g = List.map Cil.var g.fd.sformals
 let get_scc_list g = g.scc_list
@@ -227,7 +225,7 @@ let transitive_closure ?(reflexive = false) g =
   { g with graph = Oper.transitive_closure ~reflexive g.graph }
 
 let pp_node_like_interCfg g fmt node =
-  Format.fprintf fmt "%s-%s" (get_pid g) (Node.to_string node)
+  Format.fprintf fmt "%s-%s" (pid g) (Node.to_string node)
 
 let children_of_dom_tree node g =
   NodeSet.remove node (NodeSet.of_list (G.succ g.dom_tree node))
@@ -240,7 +238,7 @@ let parent_of_dom_tree node g =
 
 let dom_fronts node g = BatMap.find node g.dom_fronts
 let post_dom_fronts node g = BatMap.find node g.post_dom_fronts
-let nodesof g = G.fold_vertex (fun x l -> x :: l) g.graph []
+let nodes_of g = G.fold_vertex (fun x l -> x :: l) g.graph []
 let add_edge n1 n2 g = { g with graph = G.add_edge g.graph n1 n2 }
 let add_node n g = { g with graph = G.add_vertex g.graph n }
 
@@ -280,19 +278,21 @@ let fold_edges f g a = G.fold_edges f g.graph a
 let iter_node f g = G.iter_vertex f g.graph
 let iter_vertex f g = G.iter_vertex f g.graph
 let iter_edges f g = G.iter_edges f g.graph
-let is_entry = function Node.ENTRY -> true | _ -> false
-let is_exit = function Node.EXIT -> true | _ -> false
-let is_callnode n g = match find_cmd n g with Cmd.Ccall _ -> true | _ -> false
+let is_entry_node = function Node.ENTRY -> true | _ -> false
+let is_exit_node = function Node.EXIT -> true | _ -> false
 
-let is_returnnode n g =
+let is_call_node n g =
+  match find_cmd n g with Cmd.Ccall _ -> true | _ -> false
+
+let is_return_node n g =
   let preds = pred n g in
-  List.length preds = 1 && is_callnode (List.hd preds) g
+  List.length preds = 1 && is_call_node (List.hd preds) g
 
-let entryof _ = Node.ENTRY
-let exitof _ = Node.EXIT
+let entry_of _ = Node.ENTRY
+let exit_of _ = Node.EXIT
 
-let returnof n g =
-  if is_callnode n g then (
+let return_of n g =
+  if is_call_node n g then (
     assert (List.length (succ n g) = 1);
     List.hd (succ n g))
   else failwith "IntraCfg.returnof: given node is not a call-node"
@@ -300,7 +300,7 @@ let returnof n g =
 let is_inside_loop n g =
   List.exists (fun scc -> List.length scc > 1 && List.mem n scc) g.scc_list
 
-let callof r g =
+let call_of r g =
   let preds = pred r g in
   assert (List.length preds = 1);
   List.hd preds
@@ -809,16 +809,16 @@ let insert_return_nodes g =
       | Cmd.Ccall (_, Lval (Var varinfo, _), _, loc)
         when varinfo.vname = "exit" || varinfo.vname = "abort"
              || Cil.hasAttribute "noreturn" varinfo.vattr ->
-          let r = returnof c g in
+          let r = return_of c g in
           let n = Node.make () in
           remove_edge c r g
           |> add_cmd n (Cmd.Cskip (Cmd.ReturnNode, loc))
           |> add_edge c n
       | Cmd.Ccall (_, _, _, loc) ->
-          let r = returnof c g in
+          let r = return_of c g in
           add_new_node c (Cmd.Cskip (Cmd.ReturnNode, loc)) r g
       | _ -> g)
-    g (nodesof g)
+    g (nodes_of g)
 
 (** before each exit-node, insert a return cmd if there is not *)
 let insert_return_before_exit g =
@@ -838,7 +838,7 @@ let compute_dom g =
           (fun dom_tree child -> G.add_edge dom_tree node child)
           dom_tree
           (dom_functions.Dom.dom_tree node))
-      G.empty (nodesof g)
+      G.empty (nodes_of g)
   in
   let dom_fronts =
     List.fold_left
@@ -846,7 +846,7 @@ let compute_dom g =
         BatMap.add node
           (NodeSet.of_list (dom_functions.Dom.dom_frontier node))
           dom_fronts)
-      BatMap.empty (nodesof g)
+      BatMap.empty (nodes_of g)
   in
   let post_dom_functions = Dom.compute_all (Oper.mirror g.graph) Node.EXIT in
   let post_dom_fronts =
@@ -855,7 +855,7 @@ let compute_dom g =
         BatMap.add node
           (NodeSet.of_list (post_dom_functions.Dom.dom_frontier node))
           post_dom_fronts)
-      BatMap.empty (nodesof g)
+      BatMap.empty (nodes_of g)
   in
   { g with dom_tree; dom_fronts; post_dom_fronts }
 
@@ -1023,7 +1023,7 @@ let init fd loc =
     (* generate alloc cmds for static allocations *)
     let term, g = generate_local_allocs fd fd.slocals term g in
     let g = add_edge term entry g in
-    let nodes = nodesof g in
+    let nodes = nodes_of g in
     let lasts = List.filter (fun n -> succ n g = []) nodes in
     g
     |> list_fold
@@ -1081,7 +1081,7 @@ let generate_global_proc globals fd =
   |> insert_return_nodes
 
 let unreachable_node g =
-  let all_nodes = NodeSet.of_list (nodesof g) in
+  let all_nodes = NodeSet.of_list (nodes_of g) in
   let rec remove_reachable_node' work acc =
     if NodeSet.is_empty work then acc
     else
@@ -1175,6 +1175,7 @@ let optimize_array_init g =
 let optimize = optimize_array_init
 
 let print_dot chan g =
+  let open Printf in
   fprintf chan "digraph %s {\n" g.fd.svar.vname;
   fprintf chan "{\n";
   fprintf chan "node [shape=box]\n";
@@ -1183,7 +1184,7 @@ let print_dot chan g =
       fprintf chan "%s [label=\"%s: %s\" %s]\n" (Node.to_string v)
         (Node.to_string v)
         (Cmd.to_string (find_cmd v g))
-        (if is_callnode v g then "style=filled color=grey" else ""))
+        (if is_call_node v g then "style=filled color=grey" else ""))
     g.graph;
   fprintf chan "}\n";
   G.iter_edges
@@ -1205,59 +1206,57 @@ let print_dom_tree dom_tree =
 
 module Json = Yojson.Safe
 
+let nodes_to_json g =
+  G.fold_vertex
+    (fun v nodes ->
+      let node_id = Node.to_string v in
+      let instr = find_cmd v g |> Cmd.to_string in
+      let is_call_node = is_call_node v g in
+      let attrs = `List [ `String instr; `Bool false; `Bool is_call_node ] in
+      (node_id, attrs) :: nodes)
+    g.graph []
+  |> fun x -> `Assoc x
+
+let edges_to_json g =
+  G.fold_edges
+    (fun v1 v2 edges ->
+      let nid1 = Node.to_string v1 in
+      let nid2 = Node.to_string v2 in
+      `List [ `String nid1; `String nid2 ] :: edges)
+    g.graph []
+  |> fun x -> `List x
+
+let dom_fronts_to_json g =
+  BatMap.foldi
+    (fun v1 set edges ->
+      let nid1 = Node.to_string v1 in
+      NodeSet.fold
+        (fun v2 edges ->
+          let nid2 = Node.to_string v2 in
+          let p = `List [ `String nid1; `String nid2 ] in
+          p :: edges)
+        set edges)
+    g.dom_fronts []
+  |> fun x -> `List x
+
+let control_dep_to_json g =
+  BatMap.foldi
+    (fun v1 set edges ->
+      let nid1 = Node.to_string v1 in
+      NodeSet.fold
+        (fun v2 edges ->
+          let nid2 = Node.to_string v2 in
+          let p = `List [ `String nid1; `String nid2 ] in
+          p :: edges)
+        set edges)
+    g.post_dom_fronts []
+  |> fun x -> `List x
+
 let to_json g =
-  let nodes =
-    `Assoc
-      (G.fold_vertex
-         (fun v nodes ->
-           ( Node.to_string v,
-             `List
-               [
-                 `String (Cmd.to_string (find_cmd v g));
-                 `Bool false;
-                 `Bool (is_callnode v g);
-               ] )
-           :: nodes)
-         g.graph [])
-  in
-  let edges =
-    `List
-      (G.fold_edges
-         (fun v1 v2 edges ->
-           `List [ `String (Node.to_string v1); `String (Node.to_string v2) ]
-           :: edges)
-         g.graph [])
-  in
-  let dom_fronts =
-    `List
-      (BatMap.foldi
-         (fun v1 set edges ->
-           NodeSet.fold
-             (fun v2 edges ->
-               let p =
-                 `List
-                   [ `String (Node.to_string v1); `String (Node.to_string v2) ]
-               in
-               p :: edges)
-             set edges)
-         g.dom_fronts [])
-  in
-
-  let control_dep =
-    `List
-      (BatMap.foldi
-         (fun v1 set edges ->
-           NodeSet.fold
-             (fun v2 edges ->
-               let p =
-                 `List
-                   [ `String (Node.to_string v1); `String (Node.to_string v2) ]
-               in
-               p :: edges)
-             set edges)
-         g.post_dom_fronts [])
-  in
-
+  let nodes = nodes_to_json g in
+  let edges = edges_to_json g in
+  let dom_fronts = dom_fronts_to_json g in
+  let control_dep = control_dep_to_json g in
   `Assoc
     [
       ("nodes", nodes);
@@ -1266,29 +1265,29 @@ let to_json g =
       ("control_dep", control_dep);
     ]
 
+let nodes_to_json_simple g =
+  G.fold_vertex
+    (fun v l ->
+      let cmd = find_cmd v g in
+      let loc = Cmd.location_of cmd |> CilHelper.s_location in
+      let item = `Assoc [ ("cmd", Cmd.to_json cmd); ("loc", `String loc) ] in
+      (g.fd.svar.vname ^ "-" ^ Node.to_string v, item) :: l)
+    g.graph []
+  |> fun x -> `Assoc x
+
+let edges_to_json_simple g =
+  G.fold_edges
+    (fun v1 v2 edges ->
+      `List
+        [
+          `String (pid g ^ "-" ^ Node.to_string v1);
+          `String (pid g ^ "-" ^ Node.to_string v2);
+        ]
+      :: edges)
+    g.graph []
+  |> fun x -> `List x
+
 let to_json_simple g =
-  let nodes =
-    `Assoc
-      (G.fold_vertex
-         (fun v l ->
-           let cmd = find_cmd v g in
-           let loc = Cmd.location_of cmd |> CilHelper.s_location in
-           let item =
-             `Assoc [ ("cmd", Cmd.to_json cmd); ("loc", `String loc) ]
-           in
-           (g.fd.svar.vname ^ "-" ^ Node.to_string v, item) :: l)
-         g.graph [])
-  in
-  let edges =
-    `List
-      (G.fold_edges
-         (fun v1 v2 edges ->
-           `List
-             [
-               `String (get_pid g ^ "-" ^ Node.to_string v1);
-               `String (get_pid g ^ "-" ^ Node.to_string v2);
-             ]
-           :: edges)
-         g.graph [])
-  in
+  let nodes = nodes_to_json g in
+  let edges = edges_to_json g in
   `Assoc [ ("nodes", nodes); ("edges", edges) ]

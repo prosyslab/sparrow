@@ -34,10 +34,10 @@ module Node = struct
   let to_string (pid, node) = pid ^ "-" ^ IntraCfg.Node.to_string node
   let to_json x = `String (to_string x)
   let make pid node = (pid, node)
-  let get_pid = fst
-  let get_cfgnode = snd
+  let pid = fst
+  let cfg_node = snd
   let hash = Hashtbl.hash
-  let pp fmt (p, n) = Format.fprintf fmt "%a-%a" Proc.pp p IntraCfg.Node.pp n
+  let pp fmt (p, n) = F.fprintf fmt "%a-%a" Proc.pp p IntraCfg.Node.pp n
 end
 
 module IntraNodeSet = IntraCfg.NodeSet
@@ -110,29 +110,29 @@ let compute_dom_and_scc icfg =
   }
 
 let remove_function pid icfg =
-  let is_not_pid_node node _ = Node.get_pid node <> pid in
+  let is_not_pid_node node _ = Node.pid node <> pid in
   {
     icfg with
     cfgs = BatMap.remove pid icfg.cfgs;
     call_edges = BatMap.filter is_not_pid_node icfg.call_edges;
   }
 
-let cfgof g pid =
+let cfg_of g pid =
   try BatMap.find pid g.cfgs
   with Not_found ->
-    prerr_endline ("InterCfg.cfgof " ^ pid);
+    prerr_endline ("InterCfg.cfg_of " ^ pid);
     raise Not_found
 
-let cmdof g (pid, node) = IntraCfg.find_cmd node (cfgof g pid)
+let cmd_of g (pid, node) = IntraCfg.find_cmd node (cfg_of g pid)
 
 let add_cmd g (pid, node) cmd =
   {
     g with
-    cfgs = BatMap.add pid (IntraCfg.add_cmd node cmd (cfgof g pid)) g.cfgs;
+    cfgs = BatMap.add pid (IntraCfg.add_cmd node cmd (cfg_of g pid)) g.cfgs;
   }
 
 let nodes_of_pid g pid =
-  List.map (Node.make pid) (IntraCfg.nodesof (cfgof g pid))
+  List.map (Node.make pid) (IntraCfg.nodes_of (cfg_of g pid))
 
 let fold_cfgs f g a = BatMap.foldi f g.cfgs a
 let iter f g = BatMap.iter f g.cfgs
@@ -144,41 +144,41 @@ let fold_node f icfg acc =
       IntraCfg.fold_node (fun node acc -> f (Node.make pid node) acc) cfg acc)
     icfg acc
 
-let nodesof g =
+let nodes_of g =
   BatMap.foldi
     (fun pid cfg ->
-      List.append (List.map (fun n -> Node.make pid n) (IntraCfg.nodesof cfg)))
+      List.append (List.map (fun n -> Node.make pid n) (IntraCfg.nodes_of cfg)))
     g.cfgs []
 
-let pidsof g = BatMap.foldi (fun pid _ acc -> pid :: acc) g.cfgs []
+let pids_of g = BatMap.foldi (fun pid _ acc -> pid :: acc) g.cfgs []
 let is_def pid g = BatMap.mem pid g.cfgs
 let is_undef pid g = not (BatMap.mem pid g.cfgs)
-let is_entry = function _, node -> IntraCfg.is_entry node
-let is_exit = function _, node -> IntraCfg.is_exit node
-let is_callnode (pid, node) g = IntraCfg.is_callnode node (cfgof g pid)
+let is_entry_node = function _, node -> IntraCfg.is_entry_node node
+let is_exit_node = function _, node -> IntraCfg.is_exit_node node
+let is_call_node (pid, node) g = IntraCfg.is_call_node node (cfg_of g pid)
 
-let is_returnnode (pid, node) g =
-  try IntraCfg.is_returnnode node (cfgof g pid) with _ -> false
+let is_return_node (pid, node) g =
+  try IntraCfg.is_return_node node (cfg_of g pid) with _ -> false
 
-let returnof (pid, node) g = (pid, IntraCfg.returnof node (cfgof g pid))
-let is_inside_loop (pid, node) g = IntraCfg.is_inside_loop node (cfgof g pid)
-let callof (pid, node) g = (pid, IntraCfg.callof node (cfgof g pid))
-let argsof g pid = IntraCfg.get_formals (cfgof g pid)
-let callnodesof g = List.filter (fun node -> is_callnode node g) (nodesof g)
-let entryof _ pid = Node.make pid IntraCfg.Node.entry
-let exitof _ pid = Node.make pid IntraCfg.Node.exit
+let return_of (pid, node) g = (pid, IntraCfg.return_of node (cfg_of g pid))
+let is_inside_loop (pid, node) g = IntraCfg.is_inside_loop node (cfg_of g pid)
+let call_of (pid, node) g = (pid, IntraCfg.call_of node (cfg_of g pid))
+let args_of g pid = IntraCfg.get_formals (cfg_of g pid)
+let call_nodes_of g = List.filter (fun node -> is_call_node node g) (nodes_of g)
+let entry_of _ pid = Node.make pid IntraCfg.Node.entry
+let exit_of _ pid = Node.make pid IntraCfg.Node.exit
 
 let pred (pid, node) g =
-  let intra_cfg = cfgof g pid in
+  let intra_cfg = cfg_of g pid in
   IntraCfg.pred node intra_cfg |> List.map (Node.make pid)
 
 let succ (pid, node) g =
-  let intra_cfg = cfgof g pid in
+  let intra_cfg = cfg_of g pid in
   IntraCfg.succ node intra_cfg |> List.map (Node.make pid)
 
 let get_post_dom_fronts node g =
   let pid, node = node in
-  let cfg = cfgof g pid in
+  let cfg = cfg_of g pid in
   IntraCfg.NodeSet.fold
     (fun n acc -> NodeSet.add (Node.make pid n) acc)
     (IntraCfg.post_dom_fronts node cfg)
@@ -197,13 +197,13 @@ let unreachable_node g =
   fold_cfgs add_unreachable_node g NodeSet.empty
 
 let remove_node (pid, intra_node) g =
-  let intra_cfg = cfgof g pid in
+  let intra_cfg = cfg_of g pid in
   let intra_cfg = IntraCfg.remove_node intra_node intra_cfg in
   { g with cfgs = BatMap.add pid intra_cfg g.cfgs }
 
 let print chan g = BatMap.iter (fun _ cfg -> IntraCfg.print_dot chan cfg) g.cfgs
-let get_node_loc g node = cmdof g node |> IntraCfg.Cmd.location_of
-let node_to_cmd g node = cmdof g node |> IntraCfg.Cmd.to_string
+let get_node_loc g node = cmd_of g node |> IntraCfg.Cmd.location_of
+let node_to_cmd g node = cmd_of g node |> IntraCfg.Cmd.to_string
 let node_to_filename g node = get_node_loc g node |> CilHelper.get_loc_filename
 let node_to_lstr_abs g node = get_node_loc g node |> CilHelper.s_location_abs
 let node_to_lstr g node = get_node_loc g node |> CilHelper.s_location
@@ -278,8 +278,8 @@ let print_json chan g = Yojson.Safe.pretty_to_channel chan (to_json g)
 let collect_strs icfg =
   list_fold
     (fun n ->
-      match cmdof icfg n with Csalloc (_, s, _) -> BatSet.add s | _ -> id)
-    (nodesof icfg) BatSet.empty
+      match cmd_of icfg n with Csalloc (_, s, _) -> BatSet.add s | _ -> id)
+    (nodes_of icfg) BatSet.empty
 
 let str_count = ref 0
 
@@ -296,10 +296,10 @@ let build_strmap strs =
     strs BatMap.empty
 
 let replace_salloc icfg strmap =
-  let nodes = nodesof icfg in
+  let nodes = nodes_of icfg in
   list_fold
     (fun n g ->
-      match cmdof g n with
+      match cmd_of g n with
       | Csalloc (lhs, str, location) ->
           let rhs = Lval (BatMap.find str strmap) in
           let cmd = Cset (lhs, rhs, location) in
@@ -310,11 +310,11 @@ let replace_salloc icfg strmap =
 let dummy_location = { line = 0; file = ""; byte = 0 }
 
 let insert_salloc icfg strmap =
-  let _G_ = cfgof icfg global_proc in
+  let _G_ = cfg_of icfg global_proc in
   let _G_with_sallocs =
     BatMap.foldi
       (fun str lhs g ->
-        let entry = IntraCfg.entryof g in
+        let entry = IntraCfg.entry_of g in
         let _ = assert (List.length (IntraCfg.succ entry g) = 1) in
         let next = List.nth (IntraCfg.succ entry g) 0 in
         let cmd = Csalloc (lhs, str, dummy_location) in

@@ -9,11 +9,10 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open ProsysCil
+open Vocab
 open Cil
 open Global
 open BasicDom
-open Vocab
 open ItvDom
 open ArrayBlk
 open AlarmExp
@@ -89,16 +88,16 @@ let inspect_aexp_bo node aexp mem queries =
   (match aexp with
   | ArrayExp (lv, e, loc) ->
       let v1 =
-        Mem.lookup (ItvSem.eval_lv (InterCfg.Node.get_pid node) lv mem) mem
+        Mem.lookup (ItvSem.eval_lv (InterCfg.Node.pid node) lv mem) mem
       in
-      let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e mem in
+      let v2 = ItvSem.eval (InterCfg.Node.pid node) e mem in
       let lst = check_bo v1 (Some v2) in
       List.map
         (fun (status, a, desc) ->
           { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         lst
   | DerefExp (e, loc) ->
-      let v = ItvSem.eval (InterCfg.Node.get_pid node) e mem in
+      let v = ItvSem.eval (InterCfg.Node.pid node) e mem in
       let lst = check_bo v None in
       if Val.eq Val.bot v then
         List.map
@@ -122,8 +121,8 @@ let inspect_aexp_bo node aexp mem queries =
               { node; exp = aexp; loc; status; allocsite = a; desc; src = None })
           lst
   | Strcpy (e1, e2, loc) ->
-      let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
-      let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e2 mem in
+      let v1 = ItvSem.eval (InterCfg.Node.pid node) e1 mem in
+      let v2 = ItvSem.eval (InterCfg.Node.pid node) e2 mem in
       let v2 = Val.of_itv (ArrayBlk.nullof (Val.array_of_val v2)) in
       let lst = check_bo v1 (Some v2) in
       List.map
@@ -131,8 +130,8 @@ let inspect_aexp_bo node aexp mem queries =
           { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         lst
   | Strcat (e1, e2, loc) ->
-      let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
-      let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e2 mem in
+      let v1 = ItvSem.eval (InterCfg.Node.pid node) e1 mem in
+      let v2 = ItvSem.eval (InterCfg.Node.pid node) e2 mem in
       let np1 = ArrayBlk.nullof (Val.array_of_val v1) in
       let np2 = ArrayBlk.nullof (Val.array_of_val v2) in
       let np = Val.of_itv (Itv.plus np1 np2) in
@@ -145,10 +144,10 @@ let inspect_aexp_bo node aexp mem queries =
   | Memcpy (e1, e2, e3, loc)
   | Memmove (e1, e2, e3, loc)
   | BufferOverrunLib ("strncmp", [ e1; e2; e3 ], loc) ->
-      let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
-      let v2 = ItvSem.eval (InterCfg.Node.get_pid node) e2 mem in
+      let v1 = ItvSem.eval (InterCfg.Node.pid node) e1 mem in
+      let v2 = ItvSem.eval (InterCfg.Node.pid node) e2 mem in
       let e3_1 = Cil.BinOp (Cil.MinusA, e3, Cil.one, Cil.intType) in
-      let v3 = ItvSem.eval (InterCfg.Node.get_pid node) e3_1 mem in
+      let v3 = ItvSem.eval (InterCfg.Node.pid node) e3_1 mem in
       let lst1 = check_bo v1 (Some v3) in
       let lst2 = check_bo v2 (Some v3) in
       List.map
@@ -156,17 +155,17 @@ let inspect_aexp_bo node aexp mem queries =
           { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         (lst1 @ lst2)
   | BufferOverrunLib ("memchr", [ e1; _; e3 ], loc) ->
-      let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
+      let v1 = ItvSem.eval (InterCfg.Node.pid node) e1 mem in
       let e3_1 = Cil.BinOp (Cil.MinusA, e3, Cil.one, Cil.intType) in
-      let v3 = ItvSem.eval (InterCfg.Node.get_pid node) e3_1 mem in
+      let v3 = ItvSem.eval (InterCfg.Node.pid node) e3_1 mem in
       let lst1 = check_bo v1 (Some v3) in
       List.map
         (fun (status, a, desc) ->
           { node; exp = aexp; loc; allocsite = a; status; desc; src = None })
         lst1
   | BufferOverrunLib ("sprintf", [ e1; _; e3 ], loc) ->
-      let v1 = ItvSem.eval (InterCfg.Node.get_pid node) e1 mem in
-      let v3 = ItvSem.eval (InterCfg.Node.get_pid node) e3 mem in
+      let v1 = ItvSem.eval (InterCfg.Node.pid node) e1 mem in
+      let v3 = ItvSem.eval (InterCfg.Node.pid node) e3 mem in
       let lst = check_bo v1 (Some v3) in
       List.map
         (fun (status, a, desc) ->
@@ -178,7 +177,7 @@ let inspect_aexp_bo node aexp mem queries =
 let inspect_aexp_nd node aexp mem queries =
   (match aexp with
   | DerefExp (e, loc) ->
-      let v = ItvSem.eval (InterCfg.Node.get_pid node) e mem in
+      let v = ItvSem.eval (InterCfg.Node.pid node) e mem in
       let lst = check_nd v in
       if Val.eq Val.bot v then
         List.map
@@ -212,7 +211,7 @@ let check_dz v =
 let inspect_aexp_dz node aexp mem queries =
   (match aexp with
   | DivExp (Cil.BinOp (_, _, e, _), loc) ->
-      let v = ItvSem.eval (InterCfg.Node.get_pid node) e mem in
+      let v = ItvSem.eval (InterCfg.Node.pid node) e mem in
       let lst = check_dz v in
       List.map
         (fun (status, _, desc) ->
@@ -227,7 +226,7 @@ let machine_gen_code q =
   || Filename.check_suffix q.loc.Cil.file ".yy.c"
   || Filename.check_suffix q.loc.Cil.file ".simple"
   || (* sparrow-generated code *)
-  InterCfg.Node.get_pid q.node = InterCfg.global_proc
+  InterCfg.Node.pid q.node = InterCfg.global_proc
 
 let rec unsound_exp = function
   | Cil.BinOp (Cil.PlusPI, Cil.Lval (Cil.Mem _, _), _, _) -> true
@@ -267,7 +266,7 @@ let unsound_aexp = function
   | _ -> false
 
 let formal_param global q =
-  let cfg = InterCfg.cfgof global.icfg (InterCfg.Node.get_pid q.node) in
+  let cfg = InterCfg.cfg_of global.icfg (InterCfg.Node.pid q.node) in
   let formals = IntraCfg.get_formals cfg |> List.map (fun x -> x.Cil.vname) in
   let rec find_exp = function
     | Cil.BinOp (_, e1, e2, _) -> find_exp e1 || find_exp e2
@@ -307,13 +306,13 @@ let unsound_filter _ ql =
 let filter qs s = List.filter (fun q -> q.status = s) qs
 
 let generate (global, inputof, target) =
-  let nodes = InterCfg.nodesof global.icfg in
+  let nodes = InterCfg.nodes_of global.icfg in
   let total = List.length nodes in
   list_fold
     (fun node (qs, k) ->
       prerr_progressbar ~itv:1000 k total;
       let mem = Table.find node inputof in
-      let cmd = InterCfg.cmdof global.icfg node in
+      let cmd = InterCfg.cmd_of global.icfg node in
       let aexps = AlarmExp.collect analysis cmd in
       let qs =
         list_fold
@@ -333,10 +332,10 @@ let generate (global, inputof, target) =
   |> opt (!Options.bugfinder > 0) (unsound_filter global)
 
 let generate_with_mem (global, mem, target) =
-  let nodes = InterCfg.nodesof global.icfg in
+  let nodes = InterCfg.nodes_of global.icfg in
   list_fold
     (fun node ->
-      let cmd = InterCfg.cmdof global.icfg node in
+      let cmd = InterCfg.cmd_of global.icfg node in
       let aexps = AlarmExp.collect analysis cmd in
       if mem = Mem.bot then id (* dead code *)
       else
@@ -418,7 +417,7 @@ let ignore_node node =
 let ignore_function node =
   BatSet.elements !Options.filter_function
   |> List.map Str.regexp
-  |> List.exists (fun re -> Str.string_match re (InterCfg.Node.get_pid node) 0)
+  |> List.exists (fun re -> Str.string_match re (InterCfg.Node.pid node) 0)
 
 let ignore_allocsite allocsite =
   BatSet.elements !Options.filter_allocsite

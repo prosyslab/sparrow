@@ -230,7 +230,7 @@ let eval_list spec pid exps mem =
     exps
 
 let eval_array_alloc ?(spec = Spec.empty) node e is_local is_static mem =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   let allocsite =
     if is_local then Allocsite.allocsite_of_local node
     else Allocsite.allocsite_of_node node
@@ -362,7 +362,7 @@ let model_alloc_one mode spec pid lvo f (mem, global) =
       (mem, global)
 
 let model_realloc mode spec node (lvo, exps) (mem, global) =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   match lvo with
   | Some lv -> (
       match exps with
@@ -375,7 +375,7 @@ let model_realloc mode spec node (lvo, exps) (mem, global) =
   | _ -> (mem, global)
 
 let model_calloc mode spec node (lvo, exps) (mem, global) =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   match lvo with
   | Some lv -> (
       match exps with
@@ -405,7 +405,7 @@ let model_scanf mode spec pid exps (mem, global) =
   | _ -> (mem, global)
 
 let model_strdup mode spec node (lvo, exps) (mem, global) =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   match (lvo, exps) with
   | Some lv, str :: _ ->
       let allocsite = Allocsite.allocsite_of_node node in
@@ -792,12 +792,12 @@ let process_dst mode spec node pid src_vals global alloc mem dst_e =
   else update mode spec global dst_loc src_v mem
 
 let process_buf mode spec node global mem dst_e =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   let buf_loc = Val.all_locs (eval pid dst_e mem) in
   update mode spec global buf_loc Val.itv_top mem
 
 let process_struct_ptr mode spec node global mem ptr_e =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   let struct_loc = Val.all_locs (eval pid ptr_e mem) in
   let allocsite = Allocsite.allocsite_of_node node in
   let ext_v = Val.external_value allocsite in
@@ -812,7 +812,7 @@ let rec process_args mode spec node arg_exps arg_typs src_vals (mem, global) =
       (function ApiSem.Src (ApiSem.Variable, _) -> true | _ -> false)
       arg_typs
   in
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   match (arg_exps, arg_typs) with
   | [], _ | _, [] -> mem
   | _, [ ApiSem.Dst (ApiSem.Variable, alloc) ] ->
@@ -903,7 +903,7 @@ let produce_ret mode spec node ret_typ va_src_flag src_vals dst_vals buf_vals
       gen_block mode spec node ext_v (mem, global)
 
 let handle_api mode spec node (lvo, exps) (mem, global) api_type =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   let arg_typs = api_type.ApiSem.arg_typs in
   let ret_typ = api_type.ApiSem.ret_typ in
   let src_vals = collect_src_vals exps arg_typs pid mem in
@@ -1000,8 +1000,8 @@ let eval_callees ?(spec = Spec.empty) pid fexp global mem =
 
 (* Default update option is weak update. *)
 let run mode spec node (mem, global) =
-  let pid = Node.get_pid node in
-  match InterCfg.cmdof global.icfg node with
+  let pid = Node.pid node in
+  match InterCfg.cmd_of global.icfg node with
   | IntraCfg.Cmd.Cset (l, e, _) ->
       start_provenance ();
       let ploc = eval_lv ~spec pid l mem in
@@ -1078,7 +1078,7 @@ let run mode spec node (mem, global) =
       (* user functions *)
       let fs = eval_callees ~spec pid f global mem in
       let arg_lvars_of_proc f acc =
-        let args = InterCfg.argsof global.icfg f in
+        let args = InterCfg.args_of global.icfg f in
         let lvars =
           List.map (fun x -> Loc.of_lvar f x.Cil.vname x.Cil.vtype) args
         in
@@ -1124,9 +1124,9 @@ let run mode spec node (mem, global) =
           global.relations
       in
       (mem, { global with relations })
-  | IntraCfg.Cmd.Cskip _ when InterCfg.is_returnnode node global.icfg ->
-      let callnode = InterCfg.callof node global.icfg in
-      (match InterCfg.cmdof global.icfg callnode with
+  | IntraCfg.Cmd.Cskip _ when InterCfg.is_return_node node global.icfg ->
+      let callnode = InterCfg.call_of node global.icfg in
+      (match InterCfg.cmd_of global.icfg callnode with
       | IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
           let callees = eval_callees ~spec pid f global mem in
           (* TODO: optimize this. memory access and du edges *)

@@ -266,9 +266,9 @@ let handle_unknown pid mem is_full lv_locs lv_uses arg_exps du_map =
  * to record which abslocs were used to define each absloc. *)
 let eval_def_use_internal global mem node =
   let is_full = !Options.full_slice in
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   let du_map = DefUseMap.empty in
-  match InterCfg.cmdof global.Global.icfg node with
+  match InterCfg.cmd_of global.Global.icfg node with
   | IntraCfg.Cmd.Cset (lv, e, _) ->
       let lv_locs = ItvSem.eval_lv pid lv mem in
       let lv_uses = use_of_lv pid lv mem is_full in
@@ -319,7 +319,7 @@ let eval_def_use_internal global mem node =
       let fs = ItvSem.eval_callees pid f global mem in
       let folder f acc_du_map =
         let arg_list =
-          InterCfg.argsof global.icfg f
+          InterCfg.args_of global.icfg f
           |> List.map (fun x -> Loc.of_lvar f x.Cil.vname x.Cil.vtype)
         in
         add_arg_assigns arg_list arg_uses_list acc_du_map
@@ -331,9 +331,9 @@ let eval_def_use_internal global mem node =
       let defs = Loc.return_var pid (Cil.typeOf e) |> PowLoc.singleton in
       let uses = use_of_exp pid e mem is_full in
       add_assign defs uses du_map
-  | IntraCfg.Cmd.Cskip _ when InterCfg.is_returnnode node global.icfg -> (
-      let callnode = InterCfg.callof node global.icfg in
-      match InterCfg.cmdof global.icfg callnode with
+  | IntraCfg.Cmd.Cskip _ when InterCfg.is_return_node node global.icfg -> (
+      let callnode = InterCfg.call_of node global.icfg in
+      match InterCfg.cmd_of global.icfg callnode with
       | IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
           let lv_locs = ItvSem.eval_lv pid lv mem in
           let lv_uses = use_of_lv pid lv mem is_full in
@@ -364,8 +364,8 @@ let eval_def_use global mem node =
 
 (* Evaluate abslocs used in target node. *)
 let eval_use_of_targ global mem node =
-  let pid = Node.get_pid node in
-  match InterCfg.cmdof global.Global.icfg node with
+  let pid = Node.pid node in
+  match InterCfg.cmd_of global.Global.icfg node with
   | IntraCfg.Cmd.Cset (lv, e, _) ->
       (* In the target node, we will consider abslocs used to evaluate 'lv'. For
        * example, if we have "*p = 0", we will trace data-flows on 'p'. *)

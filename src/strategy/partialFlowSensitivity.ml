@@ -574,8 +574,8 @@ let extract_loops pid mem cmd node icfg feature =
     | _ -> feature
 
 let extract1 icfg mem global node feature =
-  let pid = InterCfg.Node.get_pid node in
-  let cmd = InterCfg.cmdof icfg node in
+  let pid = InterCfg.Node.pid node in
+  let cmd = InterCfg.cmd_of icfg node in
   try
     feature
     |> (match cmd with
@@ -595,14 +595,14 @@ let extract1 icfg mem global node feature =
 
 let traverse1 global =
   let mem = global.mem in
-  let nodes = InterCfg.nodesof global.icfg in
+  let nodes = InterCfg.nodes_of global.icfg in
   list_fold (extract1 global.icfg mem global) nodes empty_feature
 
 (* extract information obtainable after first iteration *)
 (* : passed_to_alloc2, returned_from_alloc2 *)
 let extract2 icfg mem node feature =
-  let pid = InterCfg.Node.get_pid node in
-  match InterCfg.cmdof icfg node with
+  let pid = InterCfg.Node.pid node in
+  match InterCfg.cmd_of icfg node with
   | Cset (lv, e, _) -> (
       let locs_lv = ItvSem.eval_lv pid lv mem in
       let locs_e = Access.Info.useof (accessof_eval pid e mem) in
@@ -630,7 +630,7 @@ let extract2 icfg mem node feature =
   | _ -> feature
 
 let traverse2 global feature =
-  let nodes = InterCfg.nodesof global.icfg in
+  let nodes = InterCfg.nodes_of global.icfg in
   list_fold (extract2 global.icfg global.mem) nodes feature
 
 module N = struct
@@ -645,11 +645,11 @@ module G = Graph.Persistent.Digraph.ConcreteBidirectional (N)
 let build_copy_graph icfg mem =
   list_fold
     (fun n g ->
-      match InterCfg.cmdof icfg n with
+      match InterCfg.cmd_of icfg n with
       | Cset (lv, e, _) -> (
           match (lv, simplify_exp e) with
           | (Var _, NoOffset), Lval (Var _, NoOffset) ->
-              let pid = InterCfg.Node.get_pid n in
+              let pid = InterCfg.Node.pid n in
               let lhs = PowLoc.choose (ItvSem.eval_lv pid lv mem) in
               let rhs =
                 PowLoc.choose (Access.Info.useof (accessof_eval pid e mem))
@@ -657,7 +657,7 @@ let build_copy_graph icfg mem =
               G.add_edge g rhs lhs
           | _ -> g)
       | _ -> g)
-    (InterCfg.nodesof icfg) G.empty
+    (InterCfg.nodes_of icfg) G.empty
 
 let closure global feature =
   let copy_graph = build_copy_graph global.icfg global.mem in

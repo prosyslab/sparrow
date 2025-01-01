@@ -36,7 +36,7 @@ type query = {
 }
 
 let is_unproven q = q.status = UnProven
-let get_pid q = InterCfg.Node.get_pid q.node
+let pid q = InterCfg.Node.pid q.node
 let get qs status = List.filter (fun q -> q.status = status) qs
 
 let string_of_alarminfo offset size =
@@ -104,7 +104,7 @@ let filter_global partition =
     (fun ql ->
       not
         (List.exists
-           (fun q -> InterCfg.Node.get_pid q.node = InterCfg.global_proc)
+           (fun q -> InterCfg.Node.pid q.node = InterCfg.global_proc)
            ql))
     partition
 
@@ -130,7 +130,7 @@ let filter_rec global partition =
     (fun ql ->
       not
         (List.exists
-           (fun q -> Global.is_rec (InterCfg.Node.get_pid q.node) global)
+           (fun q -> Global.is_rec (InterCfg.Node.pid q.node) global)
            ql))
     partition
 
@@ -203,7 +203,7 @@ let print_alarms fmt global queries =
       F.fprintf fmt "%d. %s %s %s\n" (k + 1)
         (CilHelper.s_location part_unit)
         (string_of_set id
-           (list2set (List.map (fun q -> InterCfg.Node.get_pid q.node) qs)))
+           (list2set (List.map (fun q -> InterCfg.Node.pid q.node) qs)))
         (status_to_string (get_status qs));
       List.iter
         (fun q ->

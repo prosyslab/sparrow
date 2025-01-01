@@ -2,5 +2,5 @@ struct {
   struct {
     int a;
   };
-} * b;
+} *b;
 c() { return b->a; }

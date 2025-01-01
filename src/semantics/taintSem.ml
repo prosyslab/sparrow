@@ -106,7 +106,7 @@ let sparrow_arg mode node exps loc itvmem (mem, global) =
   | Cil.Lval argc :: Cil.Lval _ :: _ ->
       let argv_a = Allocsite.allocsite_of_ext (Some "argv") in
       let arg_a = Allocsite.allocsite_of_ext (Some "arg") in
-      let pid = Node.get_pid node in
+      let pid = Node.pid node in
       update mode global
         (ItvSem.eval_lv pid argc itvmem)
         (Val.input_value node loc) mem
@@ -196,7 +196,7 @@ let process_dst mode node pid src_vals global alloc itvmem mem dst_e =
   else update mode global dst_loc src_v mem
 
 let process_buf mode node global loc itvmem mem dst_e =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   let buf_loc = ItvDom.Val.all_locs (ItvSem.eval pid dst_e itvmem) in
   update mode global buf_loc (Val.input_value node loc) mem
 
@@ -205,7 +205,7 @@ let rec process_args mode node arg_exps arg_typs src_vals loc itvmem
   let va_src_flag =
     List.exists (function Src (Variable, _) -> true | _ -> false) arg_typs
   in
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   match (arg_exps, arg_typs) with
   | [], _ | _, [] -> mem
   | _, [ Dst (Variable, alloc) ] ->
@@ -286,7 +286,7 @@ let produce_ret mode node ret_typ va_src_flag src_vals dst_vals buf_vals
       gen_block mode node (Val.input_value node loc) (mem, global)
 
 let handle_api mode node (lvo, exps) itvmem (mem, global) api_type loc =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   let arg_typs = api_type.ApiSem.arg_typs in
   let ret_typ = api_type.ApiSem.ret_typ in
   let src_vals = collect_src_vals exps arg_typs pid itvmem mem in
@@ -344,7 +344,7 @@ let sparrow_dump mem loc =
 
 let handle_undefined_functions mode node (lvo, f, exps) itvmem (mem, global) loc
     =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   match f.vname with
   | "sparrow_arg" -> sparrow_arg mode node exps loc itvmem (mem, global)
   (*   | "sparrow_opt" -> sparrow_opt mode node exps loc itvmem (mem,global) *)
@@ -377,8 +377,8 @@ let bind_arg_lvars_set mode global arg_ids_set vs mem =
   BatSet.fold (bind_arg_ids mode global vs) arg_ids_set mem
 
 let run_cmd mode node itvmem (mem, global) =
-  let pid = Node.get_pid node in
-  match InterCfg.cmdof global.icfg node with
+  let pid = Node.pid node in
+  match InterCfg.cmd_of global.icfg node with
   | IntraCfg.Cmd.Cset (l, e, _) ->
       let lv = ItvSem.eval_lv pid l itvmem in
       update mode global lv (eval pid e itvmem mem) mem
@@ -404,7 +404,7 @@ let run_cmd mode node itvmem (mem, global) =
       if PowProc.eq fs PowProc.bot then mem
       else
         let arg_lvars_of_proc f acc =
-          let args = InterCfg.argsof global.icfg f in
+          let args = InterCfg.args_of global.icfg f in
           let lvars =
             List.map (fun x -> Loc.of_lvar f x.Cil.vname x.Cil.vtype) args
           in
@@ -418,9 +418,9 @@ let run_cmd mode node itvmem (mem, global) =
       update Weak global
         (Loc.return_var pid (Cil.typeOf e) |> PowLoc.singleton)
         (eval pid e itvmem mem) mem
-  | IntraCfg.Cmd.Cskip _ when InterCfg.is_returnnode node global.icfg -> (
-      let callnode = InterCfg.callof node global.icfg in
-      match InterCfg.cmdof global.icfg callnode with
+  | IntraCfg.Cmd.Cskip _ when InterCfg.is_return_node node global.icfg -> (
+      let callnode = InterCfg.call_of node global.icfg in
+      match InterCfg.cmd_of global.icfg callnode with
       | IntraCfg.Cmd.Ccall (Some lv, f, _, _) ->
           let callees = ItvSem.eval_callees pid f global itvmem in
           let retvar_set =

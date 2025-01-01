@@ -26,7 +26,7 @@ module type S = sig
   val nb_node : t -> int
   val nb_edge : t -> int
   val nb_loc : t -> int
-  val nodesof : t -> node BatSet.t
+  val nodes_of : t -> node BatSet.t
   val succ : node -> t -> node list
   val pred : node -> t -> node list
   val add_edge : node -> node -> t -> t
@@ -265,7 +265,7 @@ module Make (Access : Access.S) = struct
     }
 
   let clear dug = G.clear dug.graph
-  let nodesof dug = G.fold_vertex BatSet.add dug.graph BatSet.empty
+  let nodes_of dug = G.fold_vertex BatSet.add dug.graph BatSet.empty
   let access dug = dug.access
   let succ n dug = try G.succ dug.graph n with _ -> []
   let pred n dug = try G.pred dug.graph n with _ -> []

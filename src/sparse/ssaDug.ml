@@ -113,21 +113,21 @@ module Make (DUGraph : Dug.S) = struct
 
   (* locations considered as being used in the given node *)
   let lhsof (global, access) node locset =
-    let pid, cfgnode = (Node.get_pid node, Node.get_cfgnode node) in
+    let pid, cfgnode = (Node.pid node, Node.cfg_node node) in
     let ordinary_defs = get_ordinary_defs access node in
     (* entry defines use(f) *)
     let defs_at_entry =
-      if IntraCfg.is_entry cfgnode then
+      if IntraCfg.is_entry_node cfgnode then
         uses_of_function global access pid locset
       else PowLoc.empty
     in
     (* return nodes define defs(callees) *)
     let defs_at_return =
-      if InterCfg.is_returnnode node global.icfg then
+      if InterCfg.is_return_node node global.icfg then
         ProcSet.fold
           (fun callee ->
             PowLoc.union (defs_of_function global access callee locset))
-          (InterCfg.get_callees (InterCfg.callof node global.icfg) global.icfg)
+          (InterCfg.get_callees (InterCfg.call_of node global.icfg) global.icfg)
           PowLoc.empty
       else PowLoc.empty
     in
@@ -135,23 +135,24 @@ module Make (DUGraph : Dug.S) = struct
 
   (* locations considered as being defined in the given node *)
   let rhsof (global, access) node locset =
-    let pid, cfgnode = (Node.get_pid node, Node.get_cfgnode node) in
+    let pid, cfgnode = (Node.pid node, Node.cfg_node node) in
     let ordinary_uses = get_ordinary_uses access node in
     (* exit uses defs(f) *)
     let uses_at_exit =
-      if IntraCfg.is_exit cfgnode then defs_of_function global access pid locset
+      if IntraCfg.is_exit_node cfgnode then
+        defs_of_function global access pid locset
       else PowLoc.empty
     in
     (* return node inside recursive functions uses local variables of pid *)
     let uses_at_rec_return =
-      if InterCfg.is_returnnode node global.icfg && Global.is_rec pid global
+      if InterCfg.is_return_node node global.icfg && Global.is_rec pid global
       then Access.find_proc_local pid access
       else PowLoc.empty
     in
     (* return node uses not-localized variables of call node *)
     let uses_at_return =
-      if InterCfg.is_returnnode node global.icfg then
-        let call_node = InterCfg.callof node global.icfg in
+      if InterCfg.is_return_node node global.icfg then
+        let call_node = InterCfg.call_of node global.icfg in
         let callees = InterCfg.get_callees call_node global.icfg in
         let defs_of_callees =
           let add_defs callee =
@@ -168,7 +169,7 @@ module Make (DUGraph : Dug.S) = struct
     in
     (* call nodes uses uses(callees) *)
     let uses_at_call =
-      if InterCfg.is_callnode node global.icfg then
+      if InterCfg.is_call_node node global.icfg then
         ProcSet.fold
           (fun callee ->
             PowLoc.union (uses_of_function global access callee locset))
@@ -191,9 +192,9 @@ module Make (DUGraph : Dug.S) = struct
       List.fold_left
         (fun m node ->
           IntraNodeMap.add node
-            (f (global, access) (Node.make (IntraCfg.get_pid cfg) node) locset)
+            (f (global, access) (Node.make (IntraCfg.pid cfg) node) locset)
             m)
-        IntraNodeMap.empty (IntraCfg.nodesof cfg)
+        IntraNodeMap.empty (IntraCfg.nodes_of cfg)
     in
     (collect lhsof, collect rhsof)
 
@@ -208,11 +209,11 @@ module Make (DUGraph : Dug.S) = struct
               in
               LocMap.add addr (IntraNodeSet.add node set) map)
             (IntraNodeMap.find node defs_of))
-        (IntraCfg.nodesof cfg) LocMap.empty
+        (IntraCfg.nodes_of cfg) LocMap.empty
     with _ -> failwith "Dug.prepare_defnodes"
 
   let get_phi_points cfg defnodes_of : phi_points =
-    let pid = IntraCfg.get_pid cfg in
+    let pid = IntraCfg.pid cfg in
     let variables =
       LocMap.fold (fun k _ -> PowLoc.add k) defnodes_of PowLoc.empty
     in
@@ -265,12 +266,12 @@ module Make (DUGraph : Dug.S) = struct
     let init_hasalready =
       list_fold
         (fun x -> IntraNodeMap.add x 0)
-        (IntraCfg.nodesof cfg) IntraNodeMap.empty
+        (IntraCfg.nodes_of cfg) IntraNodeMap.empty
     in
     let init_work =
       list_fold
         (fun x -> IntraNodeMap.add x 0)
-        (IntraCfg.nodesof cfg) IntraNodeMap.empty
+        (IntraCfg.nodes_of cfg) IntraNodeMap.empty
     in
     let init_itercount = 0 in
     iterate_variable init_vars init_itercount init_hasalready init_work
@@ -278,7 +279,7 @@ module Make (DUGraph : Dug.S) = struct
 
   let cfg2dug (global, access, locset) cfg dug =
     Profiler.start_event "DugGen.cfg2dug init";
-    let pid = IntraCfg.get_pid cfg in
+    let pid = IntraCfg.pid cfg in
     Profiler.finish_event "DugGen.cfg2dug init";
     Profiler.start_event "DugGen.cfg2dug prepare_du";
     let node2defs, node2uses = prepare_defs_uses (global, access, locset) cfg in
@@ -347,7 +348,7 @@ module Make (DUGraph : Dug.S) = struct
 
   let draw_intraedges (global, access, locset) dug =
     Profiler.start_event "DugGen.draw_intraedges";
-    let n_pids = List.length (InterCfg.pidsof global.icfg) in
+    let n_pids = List.length (InterCfg.pids_of global.icfg) in
     L.info ~level:1 "draw intra-procedural edges\n";
     let r =
       snd
@@ -361,18 +362,18 @@ module Make (DUGraph : Dug.S) = struct
     r
 
   let draw_interedges (global, access, locset) dug =
-    let calls = InterCfg.callnodesof global.icfg in
+    let calls = InterCfg.call_nodes_of global.icfg in
     let n_calls = List.length calls in
     L.info ~level:1 "draw inter-procedural edges\n";
     list_fold
       (fun call (k, dug) ->
         prerr_progressbar k n_calls;
-        let return = InterCfg.returnof call global.icfg in
+        let return = InterCfg.return_of call global.icfg in
         ( k + 1,
           ProcSet.fold
             (fun callee dug ->
-              let entry = InterCfg.entryof global.icfg callee in
-              let exit = InterCfg.exitof global.icfg callee in
+              let entry = InterCfg.entry_of global.icfg callee in
+              let exit = InterCfg.exit_of global.icfg callee in
               let locs_on_call = uses_of_function global access callee locset in
               let locs_on_return =
                 defs_of_function global access callee locset
@@ -403,7 +404,7 @@ module Make (DUGraph : Dug.S) = struct
       single_defs dug
 
   let make (global, access, locset) =
-    let nodes = InterCfg.nodesof global.icfg in
+    let nodes = InterCfg.nodes_of global.icfg in
     (* Restricted access is used for partially flow sensitive analysis.
      * DUGraph contains the original access for later use. *)
     let r_access = Access.restrict_access access locset in
@@ -422,8 +423,8 @@ module Make (DUGraph : Dug.S) = struct
       `List
         (DUGraph.fold_edges
            (fun src dst edges ->
-             let spid = InterCfg.Node.get_pid src in
-             let dpid = InterCfg.Node.get_pid dst in
+             let spid = InterCfg.Node.pid src in
+             let dpid = InterCfg.Node.pid dst in
              if spid = dpid then
                let addrset = DUGraph.get_abslocs src dst g in
                let access_proc = Access.find_proc spid access in
@@ -458,8 +459,8 @@ module Make (DUGraph : Dug.S) = struct
       `List
         (DUGraph.fold_edges
            (fun src dst edges ->
-             let spid = InterCfg.Node.get_pid src in
-             let dpid = InterCfg.Node.get_pid dst in
+             let spid = InterCfg.Node.pid src in
+             let dpid = InterCfg.Node.pid dst in
              if not (spid = dpid) then
                let addrset = DUGraph.get_abslocs src dst g in
                let access_proc = Access.find_proc spid access in

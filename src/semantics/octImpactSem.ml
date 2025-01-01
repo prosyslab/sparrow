@@ -9,7 +9,6 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open ProsysCil
 open Vocab
 open Global
 open AbsSem
@@ -269,7 +268,7 @@ let binding mode global ptrmem pid paramset args mem =
     paramset mem
 
 let run_cmd mode node cmd ptrmem (mem, global) =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   (*  prerr_endline (IntraCfg.Cmd.to_string cmd);*)
   match cmd with
   | IntraCfg.Cmd.Cset (l, e, _) ->
@@ -316,7 +315,7 @@ let run_cmd mode node cmd ptrmem (mem, global) =
       if PowProc.eq fs PowProc.bot then mem
       else
         let arg_lvars_of_proc f acc =
-          let args = InterCfg.argsof global.icfg f in
+          let args = InterCfg.args_of global.icfg f in
           let lvars =
             List.map (fun x -> Loc.of_lvar f x.Cil.vname x.Cil.vtype) args
           in
@@ -326,7 +325,7 @@ let run_cmd mode node cmd ptrmem (mem, global) =
         binding mode global ptrmem pid arg_lvars_set arg_exps mem
   | IntraCfg.Cmd.Creturn (Some e, _) ->
       let ret_locs =
-        Dump.find (InterCfg.Node.get_pid node) global.dump |> PowOctLoc.of_locs
+        Dump.find (InterCfg.Node.pid node) global.dump |> PowOctLoc.of_locs
       in
       set mode global ptrmem pid ret_locs e mem
   | IntraCfg.Cmd.Cskip _ when InterCfg.start_node = node ->
@@ -336,7 +335,7 @@ let run_cmd mode node cmd ptrmem (mem, global) =
 let run mode spec node (mem, global) =
   let ptrmem = ItvDom.Table.find node spec.Spec.ptrinfo in
   let mem =
-    run_cmd mode node (InterCfg.cmdof global.icfg node) ptrmem (mem, global)
+    run_cmd mode node (InterCfg.cmd_of global.icfg node) ptrmem (mem, global)
   in
   (mem, global)
 

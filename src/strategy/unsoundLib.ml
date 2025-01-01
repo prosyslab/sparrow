@@ -187,7 +187,7 @@ let add_points_to global node exps feat =
 let add_extern global node exps feat =
   if exps = [] then feat
   else
-    let pid = Node.get_pid node in
+    let pid = Node.pid node in
     let has_extern e =
       let locset =
         Access.Info.accessof (AccessSem.accessof_eval pid e global.mem)
@@ -231,7 +231,7 @@ let add_gvar global node feat =
   else feat
 
 let add_finite global node exps feat =
-  let pid = Node.get_pid node in
+  let pid = Node.pid node in
   let is_finite e =
     let v = ItvSem.eval pid e global.mem in
     let itv = Val.itv_of_val v in
@@ -247,7 +247,7 @@ let add_finite global node exps feat =
   else feat
 
 let add_cstring global cond_node exps feat =
-  let pid = Node.get_pid cond_node in
+  let pid = Node.pid cond_node in
   let is_cstring e =
     let use = Access.Info.useof (AccessSem.accessof_eval pid e global.mem) in
     PowLoc.exists
@@ -292,7 +292,7 @@ let add_cstring global cond_node exps feat =
   else feat
 
 let add_inside_loop node scc_list feat =
-  if List.exists (fun x -> List.mem (InterCfg.Node.get_cfgnode node) x) scc_list
+  if List.exists (fun x -> List.mem (InterCfg.Node.cfg_node node) x) scc_list
   then { feat with inside_loop = true }
   else feat
 
@@ -365,7 +365,7 @@ let add_out_of_fun global node cfg feat =
       (fun intra_node locset ->
         match IntraCfg.find_cmd intra_node cfg with
         | IntraCfg.Cmd.Creturn (Some _, _) ->
-            let node = InterCfg.Node.make (IntraCfg.get_pid cfg) intra_node in
+            let node = InterCfg.Node.make (IntraCfg.pid cfg) intra_node in
             let use =
               Access.Info.useof
                 (AccessSem.accessof global node sem_fun global.mem)
@@ -416,7 +416,7 @@ let lib_feature global cfg trset =
              && not (List.mem f.vname ignore_libs) ->
           (* undefined library functions *)
           let libid = CilHelper.s_location loc ^ ":" ^ f.vname in
-          let pid = IntraCfg.get_pid cfg in
+          let pid = IntraCfg.pid cfg in
           let node = InterCfg.Node.make pid intra_node in
           let feat =
             empty_feature |> add_constant exps |> add_return lvo
@@ -462,7 +462,7 @@ let extract_feature global =
         match glob with
         | Cil.GFun (fd, _) -> (
             try
-              let cfg = InterCfg.cfgof global.icfg fd.svar.vname in
+              let cfg = InterCfg.cfg_of global.icfg fd.svar.vname in
               lib_feature global cfg trset
             with _ -> trset)
         | _ -> trset)

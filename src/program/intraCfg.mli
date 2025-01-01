@@ -75,20 +75,20 @@ val init : ProsysCil.Cil.fundec -> ProsysCil.Cil.location -> t
 val generate_global_proc :
   ProsysCil.Cil.global list -> ProsysCil.Cil.fundec -> t
 
-val get_pid : t -> string
+val pid : t -> string
 val get_formals : t -> ProsysCil.Cil.varinfo list
 val get_scc_list : t -> node list list
 val transitive_closure : ?reflexive:bool -> t -> t
 val pp_node_like_interCfg : t -> Format.formatter -> node -> unit
-val nodesof : t -> node list
-val entryof : t -> node
-val exitof : t -> node
-val callof : node -> t -> node
-val returnof : node -> t -> node
-val is_entry : node -> bool
-val is_exit : node -> bool
-val is_callnode : node -> t -> bool
-val is_returnnode : node -> t -> bool
+val nodes_of : t -> node list
+val entry_of : t -> node
+val exit_of : t -> node
+val call_of : node -> t -> node
+val return_of : node -> t -> node
+val is_entry_node : node -> bool
+val is_exit_node : node -> bool
+val is_call_node : node -> t -> bool
+val is_return_node : node -> t -> bool
 val is_inside_loop : node -> t -> bool
 val find_cmd : node -> t -> cmd
 val unreachable_node : t -> NodeSet.t

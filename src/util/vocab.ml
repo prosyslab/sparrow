@@ -10,6 +10,9 @@
 (***********************************************************************)
 (** Vocabularies *)
 
+module F = Format
+module Cil = ProsysCil.Cil
+
 let ( <<< ) f g x = f (g x)
 let ( >>> ) f g x = g (f x)
 let ( $> ) x f = match x with Some s -> f s | None -> None

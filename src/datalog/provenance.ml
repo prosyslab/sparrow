@@ -24,7 +24,7 @@ let extract prov l set =
   | exception _ -> set
 
 let add_set icfg node l r prov relations =
-  match InterCfg.cmdof icfg node with
+  match InterCfg.cmd_of icfg node with
   | IntraCfg.Cmd.Cset (lv, e, _) ->
       let pairset = extract prov r Rel.LocPairSet.empty in
       let rel =

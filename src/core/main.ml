@@ -9,9 +9,8 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open ProsysCil
-open Global
 open Vocab
+open Global
 module L = Logging
 module Node = InterCfg.Node
 
@@ -65,8 +64,8 @@ let init_analysis file =
     |> opt !Options.marshal_out (marshal_out file)
 
 let print_pgm_info global =
-  let pids = InterCfg.pidsof global.icfg in
-  let nodes = InterCfg.nodesof global.icfg in
+  let pids = InterCfg.pids_of global.icfg in
+  let nodes = InterCfg.nodes_of global.icfg in
   L.info "#Procs : %d\n" (List.length pids);
   L.info "#Nodes : %d\n" (List.length nodes);
   let oc = open_out (!Options.outdir ^ "/node.json") in

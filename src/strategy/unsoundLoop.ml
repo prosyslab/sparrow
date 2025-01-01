@@ -220,13 +220,13 @@ let incptr_itself_by_one (lv, e) =
   | _ -> false
 
 let add_cstring global cond_node cfg feat =
-  let pid = Node.get_pid cond_node in
+  let pid = Node.pid cond_node in
   let access = AccessSem.accessof global cond_node sem_fun global.mem in
   let locset = Access.Info.accessof access in
   (* while (c = *x++)   ==>  tmp = x; x++; c = *tmp; while(c) *)
   let locset =
     let pred0 =
-      try IntraCfg.pred (Node.get_cfgnode cond_node) cfg with _ -> []
+      try IntraCfg.pred (Node.cfg_node cond_node) cfg with _ -> []
     in
     let pred1 = try IntraCfg.pred (List.hd pred0) cfg with _ -> [] in
     let pred2 = try IntraCfg.pred (List.hd pred1) cfg with _ -> [] in
@@ -292,7 +292,7 @@ let add_gvar global cond feat =
   else feat
 
 let get_cond_exp cond cfg =
-  let cmd = IntraCfg.find_cmd (InterCfg.Node.get_cfgnode cond) cfg in
+  let cmd = IntraCfg.find_cmd (InterCfg.Node.cfg_node cond) cfg in
   match cmd with
   | IntraCfg.Cmd.Cassume (e, _, _) -> e
   | _ -> raise (Failure ("get_cond_exp : " ^ IntraCfg.Cmd.to_string cmd))
@@ -340,7 +340,7 @@ let add_constant cond _ feat =
   else feat
 
 let add_conjunction cond_node cfg feat =
-  let pred = IntraCfg.pred (Node.get_cfgnode cond_node) cfg in
+  let pred = IntraCfg.pred (Node.cfg_node cond_node) cfg in
   if List.length pred = 1 then
     let pred = IntraCfg.pred (List.hd pred) cfg in
     match IntraCfg.find_cmd (List.hd pred) cfg with
@@ -365,8 +365,8 @@ let add_finite_itv global cond_node feat =
     access feat
 
 let add_close_left_arr_size_offset global cond_node cfg feat =
-  let pid = Node.get_pid cond_node in
-  let node = Node.get_cfgnode cond_node in
+  let pid = Node.pid cond_node in
+  let node = Node.cfg_node cond_node in
   let cmd = IntraCfg.find_cmd node cfg in
   let qs = AlarmExp.collect Spec.Interval cmd in
   List.fold_left
@@ -515,7 +515,7 @@ let add_out_index _ cfg scc feat =
   else feat
 
 let add_init global conds cfg scc feat =
-  let pid = Node.get_pid (List.hd conds) in
+  let pid = Node.pid (List.hd conds) in
   let entries =
     List.fold_left
       (fun entries node ->
@@ -580,8 +580,8 @@ let add_init global conds cfg scc feat =
         | _ -> feat)
       feat entry_prev
   in
-  if List.length entry_prev = 1 && IntraCfg.is_entry (List.hd entry_prev) then
-    { feat with init_index = true }
+  if List.length entry_prev = 1 && IntraCfg.is_entry_node (List.hd entry_prev)
+  then { feat with init_index = true }
   else feat
 
 let add_diff_array_access cfg scc feat =
@@ -699,7 +699,7 @@ let extract global cfg loop_info trset =
         let conds =
           List.map
             (fun head ->
-              InterCfg.Node.make (IntraCfg.get_pid cfg)
+              InterCfg.Node.make (IntraCfg.pid cfg)
                 (List.hd (IntraCfg.succ head cfg)))
             branches
         in
@@ -792,7 +792,7 @@ let extract_feature global =
               let loop_info =
                 generate_loop_info Cil.locUnknown fd.sbody.bstmts BatMap.empty
               in
-              let cfg = InterCfg.cfgof global.icfg fd.svar.vname in
+              let cfg = InterCfg.cfg_of global.icfg fd.svar.vname in
               extract global cfg loop_info trset
             with _ -> trset)
         | _ -> trset)

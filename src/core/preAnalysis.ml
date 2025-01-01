@@ -37,8 +37,8 @@ let rec fixpt nodes k (mem, global) =
   else fixpt nodes (k + 1) (mem', global')
 
 let callees_of icfg node mem =
-  let pid = InterCfg.Node.get_pid node in
-  let c = InterCfg.cmdof icfg node in
+  let pid = InterCfg.Node.pid node in
+  let c = InterCfg.cmd_of icfg node in
   match c with
   | IntraCfg.Cmd.Ccall (_, e, _, _) ->
       Val.pow_proc_of_val (ItvSem.eval pid e mem)
@@ -48,7 +48,7 @@ let draw_call_edges nodes mem global =
   let icfg =
     List.fold_left
       (fun icfg node ->
-        if InterCfg.is_callnode node icfg then
+        if InterCfg.is_call_node node icfg then
           let callees = callees_of icfg node mem in
           PowProc.fold (InterCfg.add_call_edge node) callees icfg
         else icfg)
@@ -63,7 +63,7 @@ let draw_callgraph nodes mem global =
         let callees = callees_of global.icfg node mem in
         PowProc.fold
           (fun callee callgraph ->
-            CallGraph.add_edge (InterCfg.Node.get_pid node) callee callgraph)
+            CallGraph.add_edge (InterCfg.Node.pid node) callee callgraph)
           callees callgraph)
       global.callgraph nodes
     |> CallGraph.compute_transitive
@@ -71,7 +71,7 @@ let draw_callgraph nodes mem global =
   { global with callgraph }
 
 let perform global =
-  let nodes = InterCfg.nodesof global.icfg in
+  let nodes = InterCfg.nodes_of global.icfg in
   let mem, global = fixpt nodes 1 (Mem.bot, global) in
   L.info ~level:1 "mem size : %d\n\n" (Mem.cardinal mem);
   { global with mem } |> draw_call_edges nodes mem |> draw_callgraph nodes mem

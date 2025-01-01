@@ -218,7 +218,7 @@ let filter_slice_lines lines =
   SS.filter filter lines
 
 let compute_relevance_score global dfg =
-  let pids = InterCfg.pidsof global.Global.icfg in
+  let pids = InterCfg.pids_of global.Global.icfg in
   let folder v acc_entries =
     let func, line = v in
     let dist = Dijkstra.shortest_path dfg.graph v dfg.target |> snd in

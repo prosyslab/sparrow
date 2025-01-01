@@ -48,13 +48,14 @@ let optimize_inter_edge global old_g =
   G.fold_edges_e
     (fun src dst locset new_g ->
       if
-        (not (InterCfg.is_callnode src global.Global.icfg))
-        && (not (InterCfg.is_callnode dst global.Global.icfg))
-        && (not (InterCfg.is_exit src))
-        && not (InterCfg.is_exit dst)
+        (not (InterCfg.is_call_node src global.Global.icfg))
+        && (not (InterCfg.is_call_node dst global.Global.icfg))
+        && (not (InterCfg.is_exit_node src))
+        && not (InterCfg.is_exit_node dst)
       then G.add_abslocs src locset dst new_g
       else if
-        InterCfg.is_callnode src global.Global.icfg && InterCfg.is_entry dst
+        InterCfg.is_call_node src global.Global.icfg
+        && InterCfg.is_entry_node dst
       then new_g
       else new_g)
     old_g (G.create ())
@@ -253,8 +254,8 @@ let print analysis global dug alarms =
     (fun src dst ->
       if
         BatSet.mem dst (G.loopheads dug)
-        && Node.get_cfgnode dst |> IntraCfg.is_entry |> not
-        && Node.get_cfgnode dst |> IntraCfg.is_exit |> not
+        && Node.cfg_node dst |> IntraCfg.is_entry_node |> not
+        && Node.cfg_node dst |> IntraCfg.is_exit_node |> not
       then F.fprintf fmt_loophead "%a\n" Node.pp dst;
       if PowNode.mem dst true_branch then (
         F.fprintf fmt_tc "%a\n" Node.pp src;
@@ -983,7 +984,7 @@ let append_field lv f = (fst lv, add_offset (Field (f, NoOffset)) (snd lv))
 let append_index lv e = (fst lv, add_offset (Index (e, NoOffset)) (snd lv))
 
 let rec pp_lv (fmt : RelSyntax.formatter) n lv mem =
-  let pid = Node.get_pid n in
+  let pid = Node.pid n in
   let locs = ItvSem.eval_lv pid lv mem in
   let loc_id =
     if Hashtbl.mem loc_map locs then Hashtbl.find loc_map locs
@@ -1131,14 +1132,14 @@ let parse_call_id ?(libcall = false) n e' el' =
   else RelSyntax.new_call_id (n, e', el')
 
 let pp_dug_cmd fmt icfg dug n mem =
-  let pid = Node.get_pid n in
+  let pid = Node.pid n in
   if G.pred n dug |> List.length = 2 then
     F.fprintf fmt.RelSyntax.join "%a\n" Node.pp n;
   F.fprintf fmt.func "%s\t%a\n" pid Node.pp n;
-  match InterCfg.cmdof icfg n with
+  match InterCfg.cmd_of icfg n with
   | Cskip _ ->
-      if InterCfg.is_entry n then F.fprintf fmt.entry "%a\n" Node.pp n
-      else if InterCfg.is_exit n then F.fprintf fmt.exit "%a\n" Node.pp n
+      if InterCfg.is_entry_node n then F.fprintf fmt.entry "%a\n" Node.pp n
+      else if InterCfg.is_exit_node n then F.fprintf fmt.exit "%a\n" Node.pp n
       else F.fprintf fmt.skip "%a\n" Node.pp n
   | Cset (lv, e, _) ->
       pp_lv fmt n lv mem;

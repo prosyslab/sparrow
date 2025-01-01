@@ -16,8 +16,8 @@ module ProcSet : BatSet.S with type elt = Proc.t
 module Node : sig
   include AbsDom.HASHABLE_SET
 
-  val get_pid : t -> Proc.t
-  val get_cfgnode : t -> IntraCfg.Node.t
+  val pid : t -> Proc.t
+  val cfg_node : t -> IntraCfg.Node.t
   val make : Proc.t -> IntraCfg.Node.t -> t
 end
 
@@ -35,24 +35,24 @@ val start_node : node
 (** Starting point of program *)
 
 val init : ProsysCil.Cil.file -> t
-val cfgof : t -> pid -> IntraCfg.t
-val argsof : t -> pid -> ProsysCil.Cil.varinfo list
-val cmdof : t -> Node.t -> IntraCfg.cmd
-val pidsof : t -> pid list
-val nodesof : t -> Node.t list
-val entryof : t -> pid -> node
-val exitof : t -> pid -> node
-val callof : node -> t -> node
-val returnof : node -> t -> node
+val cfg_of : t -> pid -> IntraCfg.t
+val args_of : t -> pid -> ProsysCil.Cil.varinfo list
+val cmd_of : t -> Node.t -> IntraCfg.cmd
+val pids_of : t -> pid list
+val nodes_of : t -> Node.t list
+val entry_of : t -> pid -> node
+val exit_of : t -> pid -> node
+val call_of : node -> t -> node
+val return_of : node -> t -> node
 val pred : node -> t -> node list
 val succ : node -> t -> node list
 val get_post_dom_fronts : node -> t -> NodeSet.t
-val is_entry : node -> bool
-val is_exit : node -> bool
-val is_callnode : node -> t -> bool
-val is_returnnode : node -> t -> bool
+val is_entry_node : node -> bool
+val is_exit_node : node -> bool
+val is_call_node : node -> t -> bool
+val is_return_node : node -> t -> bool
 val is_inside_loop : node -> t -> bool
-val callnodesof : t -> node list
+val call_nodes_of : t -> node list
 val add_call_edge : Node.t -> Proc.t -> t -> t
 val remove_call_edge : Node.t -> Proc.t -> t -> t
 val get_callees : Node.t -> t -> ProcSet.t

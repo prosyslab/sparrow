@@ -123,7 +123,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
 
   let prdbg_input node (mem, global) =
     prerr_endline (Node.to_string node);
-    prerr_endline (IntraCfg.Cmd.to_string (InterCfg.cmdof global.icfg node));
+    prerr_endline (IntraCfg.Cmd.to_string (InterCfg.cmd_of global.icfg node));
     prerr_endline "== Input ==";
     prerr_endline (Dom.to_string mem);
     (mem, global)
@@ -188,7 +188,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
 
   let widening spec dug (worklist, global, inputof, outputof) =
     total_iterations := 0;
-    ( worklist |> Worklist.push_set InterCfg.start_node (DUGraph.nodesof dug)
+    ( worklist |> Worklist.push_set InterCfg.start_node (DUGraph.nodes_of dug)
     |> fun init_worklist ->
       iterate (analyze_node spec) dug (init_worklist, global, inputof, outputof)
     )
@@ -201,7 +201,7 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
     total_iterations := 0;
     ( worklist
     |> Worklist.push_set InterCfg.start_node
-         (if BatSet.is_empty initnodes then DUGraph.nodesof dug else initnodes)
+         (if BatSet.is_empty initnodes then DUGraph.nodes_of dug else initnodes)
     |> fun init_worklist ->
       iterate
         (analyze_node_with_otable (Dom.narrow, fun x y -> Dom.le y x) spec)
@@ -263,8 +263,8 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
 
   (* add pre-analysis memory to unanalyzed nodes *)
   let bind_unanalyzed_node global mem_fi dug inputof =
-    let nodes = InterCfg.nodesof global.icfg in
-    let nodes_in_dug = DUGraph.nodesof dug in
+    let nodes = InterCfg.nodes_of global.icfg in
+    let nodes_in_dug = DUGraph.nodes_of dug in
     list_fold
       (fun node t ->
         if BatSet.mem node nodes_in_dug then t

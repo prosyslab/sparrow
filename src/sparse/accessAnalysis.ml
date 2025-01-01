@@ -36,7 +36,7 @@ module Make (Sem : AccessSem.S) = struct
   module LocMap = Access.LocMap
 
   let init_access global locset mem f =
-    let nodes = InterCfg.nodesof global.icfg in
+    let nodes = InterCfg.nodes_of global.icfg in
     let initial =
       list_fold
         (fun node ->
@@ -54,7 +54,7 @@ module Make (Sem : AccessSem.S) = struct
 
   let init_access_proc access =
     let add_access_node node access m =
-      Access.add_proc (Node.get_pid node) access m
+      Access.add_proc (Node.pid node) access m
     in
     Access.fold add_access_node access access
 
@@ -135,7 +135,7 @@ module Make (Sem : AccessSem.S) = struct
       access access
 
   let perform global locset sem mem =
-    let pids = InterCfg.pidsof global.icfg in
+    let pids = InterCfg.pids_of global.icfg in
     init_access global locset mem sem
     |> init_access_proc
     |> init_access_proc_reach pids global.callgraph
