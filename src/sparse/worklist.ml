@@ -18,17 +18,11 @@ module type S = sig
   type t
 
   val init : DUGraph.t -> t
-
   val pick : t -> (BasicDom.Node.t * t) option
-
   val push : BasicDom.Node.t -> BasicDom.Node.t -> t -> t
-
   val push_set : BasicDom.Node.t -> BasicDom.Node.t BatSet.t -> t -> t
-
   val is_loopheader : BasicDom.Node.t -> t -> bool
-
   val loopheads : t -> BasicDom.Node.t BatSet.t
-
   val backedges : t -> (BasicDom.Node.t, BasicDom.Node.t list) BatMap.t
 end
 
@@ -37,7 +31,6 @@ module NGraph = struct
     type t = int [@@deriving compare]
 
     let hash = Hashtbl.hash
-
     let equal = ( = )
   end
 
@@ -231,7 +224,6 @@ module Make (DUGraph : Dug.S) = struct
 
   module Ord = struct
     type t = workorder * DUGraph.node
-
     and workorder = int * bool
 
     let compare ((o1, head1), v1) ((o2, head2), v2) =
@@ -282,11 +274,8 @@ module Make (DUGraph : Dug.S) = struct
       succs ws
 
   let init dug = { set = S.empty; order = Workorder.perform dug }
-
   let is_loopheader idx ws = Workorder.is_loopheader idx ws.order
-
   let loopheads ws = ws.order.loopheads
-
   let backedges ws = ws.order.backedges
 
   let pick ws =

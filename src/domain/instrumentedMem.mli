@@ -11,11 +11,9 @@
 
 module type S = sig
   include MapDom.CPO
-
   module Access : Access.S with type Loc.t = A.t and type PowLoc.t = PowA.t
 
   val init_access : unit -> unit
-
   val return_access : unit -> Access.info
 end
 

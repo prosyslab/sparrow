@@ -23,7 +23,6 @@ module Spec = Spec.Make (Dom)
 module Rel = RelSemantics
 
 let provenance = ref Provenance.G.empty
-
 let record_provenance = ref false
 
 let start_provenance () =

@@ -16,11 +16,8 @@ open BasicDom
 
 module type S = sig
   module Dom : InstrumentedMem.S
-
   module Loc : AbsDom.SET
-
   module PowLoc : PowDom.CPO
-
   module Access : Access.S with type Loc.t = Loc.t and type PowLoc.t = PowLoc.t
 
   val perform :

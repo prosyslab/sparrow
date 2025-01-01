@@ -16,35 +16,20 @@ module Val = struct
   include ProdDom.Make5 (Itv) (PowLoc) (ArrayBlk) (StructBlk) (PowProc)
 
   let null = (Itv.bot, PowLoc.null, ArrayBlk.bot, StructBlk.bot, PowProc.bot)
-
   let is_itv (i, _, _, _, _) = not (Itv.is_bot i)
-
   let is_array (_, _, a, _, _) = not (ArrayBlk.is_empty a)
-
   let make (i, p, a, s, proc) = (i, p, a, s, proc)
-
   let itv_of_val = fst
-
   let pow_loc_of_val = snd
-
   let array_of_val = trd
-
   let struct_of_val = frth
-
   let pow_proc_of_val = fifth
-
   let allocsites_of_val v = v |> array_of_val |> ArrayBlk.allocsites_of_array
-
   let all_locs (_, p, a, _, _) = PowLoc.join p (ArrayBlk.pow_loc_of_array a)
-
   let of_itv x = (x, PowLoc.bot, ArrayBlk.bot, StructBlk.bot, PowProc.bot)
-
   let of_pow_loc x = (Itv.bot, x, ArrayBlk.bot, StructBlk.bot, PowProc.bot)
-
   let of_array x = (Itv.bot, PowLoc.bot, x, StructBlk.bot, PowProc.bot)
-
   let of_struct x = (Itv.bot, PowLoc.bot, ArrayBlk.bot, x, PowProc.bot)
-
   let of_pow_proc x = (Itv.bot, PowLoc.bot, ArrayBlk.bot, StructBlk.bot, x)
 
   let modify_itv i x =
@@ -109,7 +94,6 @@ module Mem = struct
       PowLoc.fold find_join locs Val.bot
 
   let strong_update locs v mem = PowLoc.fold (fun x -> add x v) locs mem
-
   let weak_update locs v mem = PowLoc.fold (fun x -> weak_add x v) locs mem
 end
 

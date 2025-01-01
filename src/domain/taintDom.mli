@@ -34,9 +34,7 @@ module Val : sig
   include AbsDom.LAT with type t := t
 
   val int_overflow : t -> IntOverflow.t
-
   val user_input : t -> UserInput.t
-
   val input_value : BasicDom.Node.t -> ProsysCil.Cil.location -> t
 end
 
@@ -44,9 +42,7 @@ module Mem : sig
   include InstrumentedMem.S
 
   val lookup : BasicDom.PowLoc.t -> t -> Val.t
-
   val strong_update : BasicDom.PowLoc.t -> Val.t -> t -> t
-
   val weak_update : BasicDom.PowLoc.t -> Val.t -> t -> t
 end
 with type A.t = BasicDom.Loc.t

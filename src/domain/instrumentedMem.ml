@@ -10,11 +10,9 @@
 (***********************************************************************)
 module type S = sig
   include MapDom.CPO
-
   module Access : Access.S with type Loc.t = A.t and type PowLoc.t = PowA.t
 
   val init_access : unit -> unit
-
   val return_access : unit -> Access.info
 end
 
@@ -25,7 +23,6 @@ module Make (Mem : MapDom.CPO) = struct
   module Access = Access.Make (Mem)
 
   let access = ref Access.Info.empty
-
   let access_mode = ref false
 
   let init_access : unit -> unit =

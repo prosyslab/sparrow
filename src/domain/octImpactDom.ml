@@ -18,7 +18,6 @@ module AbsOct = struct
     include OctLoc
 
     let equal = ( = )
-
     let hash = Hashtbl.hash
   end
 
@@ -26,13 +25,10 @@ module AbsOct = struct
 
   module W = struct
     type edge = G.edge
-
     type t = int [@@deriving compare]
 
     let weight _ = 1
-
     let add = ( + )
-
     let zero = 0
   end
 
@@ -43,11 +39,8 @@ module AbsOct = struct
 
   (* relation * const * defined *)
   let bot = Bot
-
   let top = V (G.empty, PowOctLoc.bot, PowOctLoc.bot)
-
   let fold f g a = match g with Bot -> a | V (g, _, _) -> G.fold_edges f g a
-
   let is_defined x = function Bot -> false | V (_, _, d) -> PowOctLoc.mem x d
 
   let closure = function
@@ -177,11 +170,8 @@ module AbsOct = struct
         V (newg, PowOctLoc.join c1 c2, PowOctLoc.join d1 d2)
 
   let eq = ( = )
-
   let compare = compare
-
   let widen = join
-
   let narrow = meet
 
   let to_string = function
@@ -208,9 +198,7 @@ module Mem = struct
     PackConf.fold (fun pack -> add pack AbsOct.top) packconf bot
 
   let top = init
-
   let cardinal mem = try choose mem |> snd |> AbsOct.cardinal with _ -> 0
-
   let lookup mem = try choose mem |> snd with _ -> AbsOct.bot
 
   let to_string m =
@@ -225,7 +213,6 @@ module Relation = struct
     include OctLoc
 
     let equal = ( = )
-
     let hash = Hashtbl.hash
   end
 
@@ -235,7 +222,6 @@ module Relation = struct
   type t = G.t
 
   let empty = G.empty
-
   let add_edge x y g = G.add_edge g x y
 
   let add_absoct aoct g =
@@ -251,5 +237,4 @@ module Relation = struct
 end
 
 let pack = Pack.singleton OctLoc.dummy
-
 let packconf = PackConf.singleton pack

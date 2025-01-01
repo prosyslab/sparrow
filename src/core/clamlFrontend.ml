@@ -55,15 +55,10 @@ module BlockEnv = struct
     env
 
   let mem_var name env = H.mem name env.var
-
   let mem_typ name env = H.mem name env.typ
-
   let mem_comp name env = H.mem name env.comp
-
   let find_var name env = H.find name env.var
-
   let find_typ name env = H.find name env.typ
-
   let find_comp name env = H.find name env.comp
 end
 
@@ -77,7 +72,6 @@ module LabelEnv = struct
     env
 
   let mem_label name env = H.mem env name
-
   let find_label name env = H.find env name
 end
 
@@ -85,7 +79,6 @@ module Scope = struct
   type t = BlockEnv.t list * LabelEnv.t list
 
   let empty = ([], [])
-
   let create () = ([ BlockEnv.create () ], [ LabelEnv.create () ])
 
   let enter_block scope =
@@ -96,7 +89,6 @@ module Scope = struct
     | bs, fs -> (BlockEnv.create () :: bs, LabelEnv.create () :: fs)
 
   let exit_block scope = match scope with bs, fs -> (List.tl bs, fs)
-
   let exit_function scope = match scope with bs, fs -> (List.tl bs, List.tl fs)
 
   let add name varinfo = function
@@ -185,7 +177,6 @@ module Scope = struct
 end
 
 let empty_block = { Cil.battrs = []; bstmts = [] }
-
 let struct_id_count = ref 0
 
 let is_init_list expr =
@@ -346,9 +337,7 @@ let trans_binop lhs rhs = function
   | _ -> failwith "invalid binop"
 
 let const_attribute = [ Cil.Attr ("const", []) ]
-
 let trans_attribute typ = if typ.C.QualType.const then const_attribute else []
-
 let failwith_decl decl = failwith (C.Decl.get_kind_name decl)
 
 let trans_integer_literal il =
@@ -446,9 +435,7 @@ let rec append_stmt_list_internal sl1 sl2 result =
   | h1 :: t1, _ -> append_stmt_list_internal t1 sl2 (h1 :: result)
 
 let append_stmt_list sl1 sl2 = append_stmt_list_internal sl1 sl2 [] |> List.rev
-
 let get_opt msg = function Some x -> x | None -> failwith msg
-
 let goto_count = ref 0
 
 module Chunk = struct
@@ -568,7 +555,6 @@ let trans_goto loc label =
   }
 
 let att_nothrow = Cil.Attr ("nothrow", [])
-
 let att_gnu_inline = Cil.Attr ("gnu_inline", [])
 
 let trans_decl_attribute attrs =

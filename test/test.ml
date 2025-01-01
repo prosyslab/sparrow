@@ -9,7 +9,6 @@
 (*                                                                     *)
 (***********************************************************************)
 let analyzer = "../bin/sparrow"
-
 let default_opt = "-verbose 0"
 
 type test_suite = { opt : string; files : string list }
@@ -67,13 +66,9 @@ let run opt f =
   Unix.close fd
 
 let color_green = "\x1B[32m"
-
 let color_red = "\x1B[31m"
-
 let color_reset = "\x1B[0m"
-
 let msg_pass = color_green ^ "PASS" ^ color_reset
-
 let msg_fail = color_red ^ "FAIL" ^ color_reset
 
 let check f =

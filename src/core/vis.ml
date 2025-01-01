@@ -17,7 +17,6 @@ let opts =
   [ ("-interactive", Arg.Set interactive, "Run with interactive mode") ]
 
 let usage = ""
-
 let file = ref ""
 
 let args f =

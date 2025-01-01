@@ -46,11 +46,8 @@ and s_exp_paren e =
   | _ -> s_exp e
 
 and s_const c = tostring (d_const () c)
-
 and s_type typ = tostring (d_type () typ)
-
 and s_stmt s = tostring (d_stmt () s)
-
 and s_lv (lh, offset) = s_lhost lh ^ s_offset offset
 
 and s_lhost = function
@@ -69,7 +66,6 @@ and s_offset = function
   | Index (e, offset) -> "[" ^ s_exp e ^ "]" ^ s_offset offset
 
 and s_uop u = tostring (d_unop () u)
-
 and s_bop b = tostring (d_binop () b)
 
 and s_instr i =
@@ -90,9 +86,7 @@ let get_loc_filename loc =
   with _ -> loc.file
 
 let s_location loc = get_loc_filename loc ^ ":" ^ string_of_int loc.line
-
 let s_location_abs loc = loc.file ^ ":" ^ string_of_int loc.line
-
 let eq_lval l1 l2 = s_lv l1 = s_lv l2
 
 (* ************* *
@@ -225,7 +219,6 @@ module Lval = struct
   type t = Cil.lval
 
   let compare x y = compare (Hashtbl.hash x) (Hashtbl.hash y)
-
   let pp fmt x = F.fprintf fmt "%s" (s_lv x)
 end
 
@@ -233,7 +226,6 @@ module Exp = struct
   type t = Cil.exp
 
   let compare x y = compare (Hashtbl.hash x) (Hashtbl.hash y)
-
   let pp fmt x = F.fprintf fmt "%s" (s_exp x)
 end
 

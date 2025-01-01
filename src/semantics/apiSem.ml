@@ -48,32 +48,20 @@ type api_typ = { arg_typs : arg_typ list; ret_typ : ret_typ }
 
 (* arguments that generates query *)
 let v_src = Src (Fixed, Value)
-
 let v_src_va = Src (Variable, Value)
-
 let arr_src = Src (Fixed, Array)
-
 let arr_src_va = Src (Variable, Array)
-
 let dst = Dst (Fixed, false)
-
 let dst_alloc = Dst (Fixed, true)
-
 let dst_va = Dst (Variable, false)
-
 let buf = Buf (Fixed, false)
-
 let buf_va = Buf (Variable, false)
 
 (* Fixed return values *)
 let ones = Const
-
 let int_v = Const
-
 let tainted_v = TaintInput
-
 let int_arr = AllocConst
-
 let tainted_arr = AllocBuf
 
 module ApiMap = Map.Make (struct

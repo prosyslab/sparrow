@@ -1,9 +1,7 @@
 module L = Logging
 
 let json_to_string = function `String s -> s | _ -> failwith "Invalid json"
-
 let json_to_list = function `List l -> l | _ -> failwith "Invalid json"
-
 let json_to_assoc = function `Assoc a -> a | _ -> failwith "Invalid json"
 
 let rec create_dirs path =

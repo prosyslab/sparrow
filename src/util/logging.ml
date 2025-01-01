@@ -1,19 +1,13 @@
 module F = Format
 
 type formatter = { file : F.formatter; dual : F.formatter }
-
 type level = DEBUG | INFO | WARN | ERROR
 
 let logger = ref None
-
 let reporter = ref None
-
 let level = ref INFO
-
 let log_file = ref None
-
 let report_file = ref None
-
 let set_level x = level := x
 
 let copy_formatter f =
@@ -107,7 +101,5 @@ let info ?(to_consol = true) ?(level = 0) =
   else F.ifprintf F.err_formatter
 
 let warn ?(to_consol = true) = log to_consol !logger WARN
-
 let error ?(to_consol = true) = log to_consol !logger ERROR
-
 let report ?(to_consol = false) = log to_consol !reporter INFO

@@ -28,11 +28,8 @@ module Node = struct
     | _, _ -> false
 
   let hash = Hashtbl.hash
-
   let entry = ENTRY
-
   let exit = EXIT
-
   let nid = ref 0
 
   let fromCilStmt s =
@@ -79,13 +76,9 @@ module Cmd = struct
     | Cskip of tag * location
 
   and alloc = Array of exp | Struct of compinfo
-
   and local = bool
-
   and static = bool
-
   and branch = bool
-
   and tag = Unknown | ReturnNode | Branch | LoopHead
 
   let fromCilStmt = function
@@ -174,7 +167,6 @@ module Cmd = struct
 end
 
 type node = Node.t
-
 type cmd = Cmd.t
 
 module G = Graph.Persistent.Digraph.ConcreteBidirectional (Node)
@@ -189,23 +181,14 @@ module GDom = struct
   type t = G.t
 
   let empty () = G.empty
-
   let fromG g = g
-
   let pred = G.pred
-
   let succ = G.succ
-
   let fold_vertex = G.fold_vertex
-
   let iter_vertex = G.iter_vertex
-
   let iter_succ = G.iter_succ
-
   let nb_vertex = G.nb_vertex
-
   let add_edge g _ _ = g
-
   let create : ?size:int -> unit -> t = fun ?size:_ () -> empty ()
 end
 
@@ -222,7 +205,6 @@ type t = {
 }
 
 and dom_fronts = (Node.t, NodeSet.t) BatMap.t
-
 and dom_tree = G.t
 
 let empty fd =
@@ -237,11 +219,8 @@ let empty fd =
   }
 
 let get_pid g = g.fd.svar.vname
-
 let get_formals g = g.fd.sformals
-
 let get_formals_lval g = List.map Cil.var g.fd.sformals
-
 let get_scc_list g = g.scc_list
 
 let transitive_closure ?(reflexive = false) g =
@@ -260,13 +239,9 @@ let parent_of_dom_tree node g =
   | _ -> raise (Failure "IntraCfg.parent_of_dom_tree: fatal")
 
 let dom_fronts node g = BatMap.find node g.dom_fronts
-
 let post_dom_fronts node g = BatMap.find node g.post_dom_fronts
-
 let nodesof g = G.fold_vertex (fun x l -> x :: l) g.graph []
-
 let add_edge n1 n2 g = { g with graph = G.add_edge g.graph n1 n2 }
-
 let add_node n g = { g with graph = G.add_vertex g.graph n }
 
 let find_cmd n g =
@@ -278,9 +253,7 @@ let find_cmd n g =
 (* else raise (Failure ("Can't find cmd of " ^ Node.to_string n)) *)
 
 let add_cmd n c g = { g with cmd_map = BatMap.add n c g.cmd_map }
-
 let add_node_with_cmd n c g = g |> add_node n |> add_cmd n c
-
 let remove_edge n1 n2 g = { g with graph = G.remove_edge g.graph n1 n2 }
 
 let remove_node n g =
@@ -301,23 +274,14 @@ let add_new_node n cmd s g =
 
 (* TODO: optimize G.pred *)
 let pred n g = G.pred g.graph n
-
 let succ n g = G.succ g.graph n
-
 let fold_node f g a = G.fold_vertex f g.graph a
-
 let fold_edges f g a = G.fold_edges f g.graph a
-
 let iter_node f g = G.iter_vertex f g.graph
-
 let iter_vertex f g = G.iter_vertex f g.graph
-
 let iter_edges f g = G.iter_edges f g.graph
-
 let is_entry = function Node.ENTRY -> true | _ -> false
-
 let is_exit = function Node.EXIT -> true | _ -> false
-
 let is_callnode n g = match find_cmd n g with Cmd.Ccall _ -> true | _ -> false
 
 let is_returnnode n g =
@@ -325,7 +289,6 @@ let is_returnnode n g =
   List.length preds = 1 && is_callnode (List.hd preds) g
 
 let entryof _ = Node.ENTRY
-
 let exitof _ = Node.EXIT
 
 let returnof n g =

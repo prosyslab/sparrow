@@ -55,15 +55,10 @@ module BlockEnv = struct
     env
 
   let mem_var name env = H.mem name env.var
-
   let mem_typ name env = H.mem name env.typ
-
   let mem_comp name env = H.mem name env.comp
-
   let find_var name env = H.find name env.var
-
   let find_typ name env = H.find name env.typ
-
   let find_comp name env = H.find name env.comp
 end
 
@@ -77,7 +72,6 @@ module LabelEnv = struct
     env
 
   let mem_label name env = H.mem env name
-
   let find_label name env = H.find env name
 end
 
@@ -85,7 +79,6 @@ module Scope = struct
   type t = BlockEnv.t list * LabelEnv.t list (* (BlockScope * FunScope) List *)
 
   let empty = ([], [])
-
   let create () = ([ BlockEnv.create () ], [ LabelEnv.create () ])
 
   let enter_block scope =
@@ -96,7 +89,6 @@ module Scope = struct
     | bs, fs -> (BlockEnv.create () :: bs, LabelEnv.create () :: fs)
 
   let exit_block scope = match scope with bs, fs -> (List.tl bs, fs)
-
   let exit_function scope = match scope with bs, fs -> (List.tl bs, List.tl fs)
 
   let add name varinfo = function
@@ -183,7 +175,6 @@ module Scope = struct
 end
 
 let empty_block = { Cil.battrs = []; bstmts = [] }
-
 let struct_id_count = ref 0
 
 let is_init_list (expr : C.Ast.expr) =
@@ -322,9 +313,7 @@ let string_of_declaration_name name =
   | _ -> failwith "name_of_ident_ref"
 
 let name_of_ident_ref idref = string_of_declaration_name idref.C.Ast.name
-
 let const_attribute = [ Cil.Attr ("const", []) ]
-
 let trans_attribute typ = if typ.C.Ast.const then const_attribute else []
 
 let failwith_decl (decl : C.Ast.decl) =
@@ -1158,7 +1147,6 @@ and trans_unary_expr scope fundec_opt loc kind argument =
       ([], Some (Cil.AlignOf typ))
 
 let get_opt msg = function Some x -> x | None -> failwith msg
-
 let goto_count = ref 0
 
 module Chunk = struct
@@ -1283,7 +1271,6 @@ let trans_goto loc label =
   }
 
 let att_nothrow = Cil.Attr ("nothrow", [])
-
 let att_gnu_inline = Cil.Attr ("gnu_inline", [])
 
 let trans_decl_attribute attrs =

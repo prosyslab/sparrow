@@ -89,7 +89,6 @@ let rec add_offset o orig_offset =
   | Index (e, o1) -> Index (e, add_offset o o1)
 
 let append_field lv f = (fst lv, add_offset (Field (f, NoOffset)) (snd lv))
-
 let append_index lv e = (fst lv, add_offset (Index (e, NoOffset)) (snd lv))
 
 let rec c_offset lv offset loc =

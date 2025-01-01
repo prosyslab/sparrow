@@ -8,11 +8,8 @@ type wrapper_type =
   | NoWrapper
 
 let vptr_return_funcs = ref SS.empty
-
 let vptr_return_fields = ref SS.empty
-
 let unwrapped_funcs = ref SS.empty
-
 let unwrapped_fields = ref SS.empty
 
 let identify_vptr_return_funcs file =
@@ -57,7 +54,6 @@ let malloc =
 
 (* Subsume 'realloc' here. Note that there's no gurantee that 'm' appears. *)
 let alloc_re = Str.regexp ".*alloc.*"
-
 let calloc_re = Str.regexp ".*calloc.*"
 
 let is_unrolled_int typ =

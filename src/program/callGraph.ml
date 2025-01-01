@@ -86,9 +86,7 @@ let remove_edge src dst g =
   g
 
 let callees pid g = G.succ g.graph pid |> PowProc.of_list
-
 let trans_callees pid g = G.succ g.trans_callees pid |> PowProc.of_list
-
 let trans_callers pid g = G.succ g.trans_callers pid |> PowProc.of_list
 
 let compute_transitive callgraph =

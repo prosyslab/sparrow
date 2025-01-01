@@ -2,6 +2,7 @@ SPARROW=sparrow
 VIS=sparrow-vis
 
 all:
+	-dune fmt
 	dune build src/main.exe
 	dune build src/vis.exe
 	@ln -sf ../_build/default/src/main.exe bin/$(SPARROW)

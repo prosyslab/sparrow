@@ -14,64 +14,40 @@ open Vocab
 
 module type CPO = sig
   include AbsDom.CPO
-
   module A : AbsDom.SET
-
   module B : AbsDom.CPO
-
   module PowA : PowDom.CPO with type elt = A.t
 
   val empty : t
-
   val is_empty : t -> bool
-
   val find : A.t -> t -> B.t
-
   val add : A.t -> B.t -> t -> t
-
   val weak_add : A.t -> B.t -> t -> t
-
   val remove : A.t -> t -> t
-
   val map : (B.t -> B.t) -> t -> t
-
   val mapi : (A.t -> B.t -> B.t) -> t -> t
-
   val fold : (A.t -> B.t -> 'a -> 'a) -> t -> 'a -> 'a
-
   val foldi : (A.t -> B.t -> 'a -> 'a) -> t -> 'a -> 'a
-
   val iter : (A.t -> B.t -> unit) -> t -> unit
-
   val mem : A.t -> t -> bool
-
   val filter : (A.t -> B.t -> bool) -> t -> t
-
   val cardinal : t -> int
-
   val choose : t -> A.t * B.t
-
   val to_string : t -> string
-
   val for_all : (A.t -> B.t -> bool) -> t -> bool
-
   val exists : (A.t -> B.t -> bool) -> t -> bool
-
   val keys : t -> PowA.t
 
   val unstables :
     t -> t -> (B.t -> B.t -> bool) -> PowA.t -> (A.t * B.t * B.t) list
 
   val join_pairs : (A.t * B.t) list -> t -> t
-
   val widen_pairs : (A.t * B.t) list -> t -> t
-
   val meet_big_small : t -> t -> t
 end
 
 module type LAT = sig
   include AbsDom.LAT
-
   include CPO with type t := t
 end
 
@@ -94,7 +70,6 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
     else "{" ^ BatMap.fold add_string_of_k_v x "" ^ "}"
 
   let cardinal = BatMap.cardinal
-
   let choose = BatMap.choose
 
   let le : t -> t -> bool =
@@ -146,7 +121,6 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
       loop (BatEnum.get enum1) (BatEnum.get enum2)
 
   let bot : t = BatMap.empty
-
   let filter = BatMap.filter
 
   let join : t -> t -> t =
@@ -210,9 +184,7 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
   (** {6 Functions for map} *)
 
   let empty : t = BatMap.empty
-
   let is_empty : t -> bool = BatMap.is_empty
-
   let find : A.t -> t -> B.t = fun k a -> try BatMap.find k a with _ -> B.bot
 
   let add : A.t -> B.t -> t -> t =
@@ -238,7 +210,6 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
         x
 
   let remove : A.t -> t -> t = BatMap.remove
-
   let iter = BatMap.iter
 
   (* Type of map is restricted to return the same type.  *)
@@ -301,17 +272,11 @@ module MakeCPO (A : AbsDom.SET) (B : AbsDom.CPO) = struct
     list_fold add_pair pairs m
 
   let join_pairs : (A.t * B.t) list -> t -> t = add_pairs weak_add
-
   let widen_pairs : (A.t * B.t) list -> t -> t = add_pairs widen_add
-
   let keys m = foldi (fun k _ -> PowA.add k) m PowA.empty
-
   let mem = BatMap.mem
-
   let for_all = BatMap.for_all
-
   let exists = BatMap.exists
-
   let bindings = BatMap.bindings
 
   let le_small_big : t -> t -> bool =
@@ -345,9 +310,7 @@ module MakeLAT (A : AbsDom.SET) (B : AbsDom.CPO) = struct
   type t = V of MapCPO.t | Top [@@deriving compare]
 
   let bot = V MapCPO.bot
-
   let top = Top
-
   let to_string = function V x -> MapCPO.to_string x | Top -> "top"
 
   let cardinal = function
@@ -397,7 +360,6 @@ module MakeLAT (A : AbsDom.SET) (B : AbsDom.CPO) = struct
   (** {6 Functions for map} *)
 
   let empty = V MapCPO.empty
-
   let is_empty = function Top -> false | V m -> MapCPO.is_empty m
 
   let find k = function
@@ -405,13 +367,9 @@ module MakeLAT (A : AbsDom.SET) (B : AbsDom.CPO) = struct
     | Top -> raise (Failure "Error: find")
 
   let add k v = function V x -> V (MapCPO.add k v x) | Top -> top
-
   let weak_add k v = function V m -> V (MapCPO.weak_add k v m) | Top -> top
-
   let widen_add k v = function V m -> V (MapCPO.widen_add k v m) | Top -> top
-
   let remove k = function V m -> V (MapCPO.remove k m) | Top -> top
-
   let iter f = function V m -> MapCPO.iter f m | Top -> ()
 
   (* Type of map is restricted to return the same type.  *)
@@ -450,9 +408,7 @@ module MakeLAT (A : AbsDom.SET) (B : AbsDom.CPO) = struct
     list_fold add_pair pairs m
 
   let join_pairs = add_pairs weak_add
-
   let widen_pairs = add_pairs widen_add
-
   let keys m = foldi (fun k _ -> PowA.add k) m PowA.empty
 
   let mem k = function

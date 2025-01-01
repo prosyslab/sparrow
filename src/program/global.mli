@@ -25,15 +25,9 @@ type t = {
 }
 
 val init : Cil.file -> t
-
 val is_rec : InterCfg.pid -> t -> bool
-
 val is_undef : InterCfg.pid -> t -> bool
-
 val handle_cyclic_call : t -> t
-
 val build_line_to_func_map : t -> t
-
 val remove_functions : BasicDom.PowProc.t -> t -> t
-
 val remove_unreachable_functions : t -> t

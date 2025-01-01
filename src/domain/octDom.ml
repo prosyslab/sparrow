@@ -18,9 +18,7 @@ module OctLoc = struct
   type t = Loc of Loc.t | Size of Allocsite.t [@@deriving compare]
 
   let dummy = Loc Loc.dummy
-
   let of_loc l = Loc l
-
   let of_size a = Size a
 
   let to_string = function
@@ -127,13 +125,10 @@ end
 
 module Octagon = struct
   type t = V of oct | Bot
-
   and oct = Oct.t Abstract1.t
 
   let man = Oct.manager_alloc ()
-
   let compare = compare
-
   let bot = Bot
 
   let top pack =

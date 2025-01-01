@@ -28,8 +28,7 @@ module type S = sig
        and type Dom.PowA.t = Dom.PowA.t
 
   val generate_dug : Spec.t -> Global.t -> DUGraph.t
-
-  val to_json : (Global.t * DUGraph.t) -> Yojson.Safe.t
+  val to_json : Global.t * DUGraph.t -> Yojson.Safe.t
 
   val perform :
     Spec.t -> Global.t -> DUGraph.t -> Global.t * DUGraph.t * Table.t * Table.t

@@ -14,7 +14,6 @@ and of_offset = function
       `List [ `String "Index"; of_exp e; of_offset offset ]
 
 and of_lval (lhost, offset) = `List [ of_lhost lhost; of_offset offset ]
-
 and of_const = function _ -> `Int 0
 
 and of_exp = function

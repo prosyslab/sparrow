@@ -18,55 +18,32 @@ module type CPO = sig
   module A : AbsDom.SET with type t = elt
 
   val empty : t
-
   val filter : (elt -> bool) -> t -> t
-
   val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
-
   val fold2 : (elt -> elt -> 'a -> 'a) -> t -> t -> 'a -> 'a
-
   val map : (elt -> elt) -> t -> t
-
   val iter : (elt -> unit) -> t -> unit
-
   val singleton : elt -> t
-
   val subset : t -> t -> bool
-
   val cardinal : t -> int
-
   val mem : elt -> t -> bool
-
   val add : elt -> t -> t
-
   val diff : t -> t -> t
-
   val choose : t -> elt
-
   val pop : t -> elt * t
-
   val remove : elt -> t -> t
-
   val is_empty : t -> bool
-
   val union : t -> t -> t
-
   val union_small_big : t -> t -> t
-
   val inter : t -> t -> t
-
   val for_all : (elt -> bool) -> t -> bool
-
   val exists : (elt -> bool) -> t -> bool
-
   val of_list : elt list -> t
-
   val elements : t -> elt list
 end
 
 module type LAT = sig
   include AbsDom.LAT
-
   include CPO with type t := t
 end
 

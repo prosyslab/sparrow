@@ -637,7 +637,6 @@ module N = struct
   include Loc
 
   let equal = ( = )
-
   let hash = Hashtbl.hash
 end
 

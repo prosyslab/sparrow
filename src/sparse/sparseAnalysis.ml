@@ -16,9 +16,7 @@ open AbsSem
 module L = Logging
 
 let total_iterations = ref 0
-
 let g_clock = ref 0.0
-
 let l_clock = ref 0.0
 
 module type S = sig
@@ -39,7 +37,6 @@ module type S = sig
        and type Dom.PowA.t = Dom.PowA.t
 
   val generate_dug : Spec.t -> Global.t -> DUGraph.t
-
   val to_json : Global.t * DUGraph.t -> Yojson.Safe.t
 
   val perform :
@@ -58,7 +55,6 @@ module MakeWithAccess (Sem : AccessSem.S) = struct
   module PowLoc = Sem.Dom.PowA
 
   let needwidening idx wl = Worklist.is_loopheader idx wl
-
   let def_locs_cache = Hashtbl.create 251
 
   let get_def_locs idx dug =

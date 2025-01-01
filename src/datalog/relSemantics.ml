@@ -82,7 +82,6 @@ module Bind = struct
   type t = Loc.t * Loc.t [@@deriving compare]
 
   let make x y = (x, y)
-
   let pp fmt (x, y) = F.fprintf fmt "Bind: Bind(%a,%a)" Loc.pp x Loc.pp y
 end
 
@@ -90,7 +89,6 @@ module Relation = struct
   type t = PointsTo of PointsTo.t | Bind of Bind.t [@@deriving compare]
 
   let points_to x = PointsTo x
-
   let bind x = Bind x
 
   let pp fmt = function

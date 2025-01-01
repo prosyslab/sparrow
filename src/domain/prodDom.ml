@@ -16,9 +16,7 @@ module Make (A : CPO) (B : CPO) = struct
   type t = A.t * B.t [@@deriving compare]
 
   let make a b = (a, b)
-
   let fst (a, _) = a
-
   let snd (_, b) = b
 
   let le ((a1, b1) as x) ((a2, b2) as y) =
@@ -31,15 +29,10 @@ module Make (A : CPO) (B : CPO) = struct
     if x == y then y else (A.join a1 a2, B.join b1 b2)
 
   let meet (a1, b1) (a2, b2) = (A.meet a1 a2, B.meet b1 b2)
-
   let widen (a1, b1) (a2, b2) = (A.widen a1 a2, B.widen b1 b2)
-
   let narrow (a1, b1) (a2, b2) = (A.narrow a1 a2, B.narrow b1 b2)
-
   let bot = (A.bot, B.bot)
-
   let to_string x = "(" ^ A.to_string (fst x) ^ ", " ^ B.to_string (snd x) ^ ")"
-
   let pp fmt (a, b) = Format.fprintf fmt "(%a, %a)" A.pp a B.pp b
 end
 
@@ -47,15 +40,10 @@ module Make5 (A : CPO) (B : CPO) (C : CPO) (D : CPO) (E : CPO) = struct
   type t = A.t * B.t * C.t * D.t * E.t [@@deriving compare]
 
   let fst (a, _, _, _, _) = a
-
   let snd (_, b, _, _, _) = b
-
   let trd (_, _, c, _, _) = c
-
   let frth (_, _, _, d, _) = d
-
   let fifth (_, _, _, _, e) = e
-
   let make (a, b, c, d, e) = (a, b, c, d, e)
 
   let le ((a1, b1, c1, d1, e1) as x) ((a2, b2, c2, d2, e2) as y) =

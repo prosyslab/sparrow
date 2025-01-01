@@ -140,7 +140,6 @@ module WorkList = struct
       Some (node, locs, wl)
 
   let push node locs wl = M.modify_def PowLoc.empty node (PowLoc.union locs) wl
-
   let empty = M.empty
 end
 

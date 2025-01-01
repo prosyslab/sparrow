@@ -20,37 +20,21 @@ module Val : sig
     t
 
   val itv_of_val : t -> Itv.t
-
   val pow_loc_of_val : t -> BasicDom.PowLoc.t
-
   val array_of_val : t -> ArrayBlk.t
-
   val struct_of_val : t -> StructBlk.t
-
   val pow_proc_of_val : t -> BasicDom.PowProc.t
-
   val allocsites_of_val : t -> BasicDom.Allocsite.t BatSet.t
-
   val all_locs : t -> BasicDom.PowLoc.t
-
   val of_itv : Itv.t -> t
-
   val of_pow_loc : BasicDom.PowLoc.t -> t
-
   val of_array : ArrayBlk.t -> t
-
   val of_struct : StructBlk.t -> t
-
   val of_pow_proc : BasicDom.PowProc.t -> t
-
   val modify_itv : Itv.t -> t -> t
-
   val modify_arr : ArrayBlk.t -> t -> t
-
   val external_value : BasicDom.Allocsite.t -> t
-
   val itv_top : t
-
   val cast : ProsysCil.Cil.typ -> ProsysCil.Cil.typ -> t -> t
 end
 
@@ -58,9 +42,7 @@ module Mem : sig
   include InstrumentedMem.S
 
   val lookup : BasicDom.PowLoc.t -> t -> Val.t
-
   val strong_update : BasicDom.PowLoc.t -> Val.t -> t -> t
-
   val weak_update : BasicDom.PowLoc.t -> Val.t -> t -> t
 end
 with type A.t = BasicDom.Loc.t

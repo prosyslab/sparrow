@@ -11,21 +11,13 @@
 (** Vocabularies *)
 
 let ( <<< ) f g x = f (g x)
-
 let ( >>> ) f g x = g (f x)
-
 let ( $> ) x f = match x with Some s -> f s | None -> None
-
 let ( &> ) x f = match x with Some s -> Some (f s) | None -> None
-
 let ( @ ) l1 l2 = BatList.append l1 l2
-
 let id x = x
-
 let flip f y x = f x y
-
 let cond c f g x = if c then f x else g x
-
 let opt c f x = if c then f x else x
 
 let rec case cases default x =
@@ -35,13 +27,9 @@ let rec case cases default x =
   | [] -> default x
 
 let tuple x = (x, x)
-
 let compare_string = Base.compare_string
-
 let compare_bool = Base.compare_bool
-
 let compare_int = Base.compare_int
-
 let domof m = BatMap.foldi (fun k _ set -> BatSet.add k set) m BatSet.empty
 
 (** This applies [List.fold_left], but the argument type is the same with
@@ -64,13 +52,9 @@ let list_rev l =
   list_rev_rec l []
 
 let is_list_empty = function [] -> true | _ -> false
-
 let append_opt x l = match x with None -> l | Some x -> x :: l
-
 let find_opt k m = try Some (BatMap.find k m) with Not_found -> None
-
 let find_def k m default = try BatMap.find k m with _ -> default
-
 let link_by_sep sep s acc = if acc = "" then s else acc ^ sep ^ s
 
 let string_of_list ?(first = "[") ?(last = "]") ?(sep = ";") string_of_v list =
@@ -91,11 +75,8 @@ let string_of_map ?(first = "{") ?(last = "}") ?(sep = ",\n") ?(indent = "")
   else indent ^ first ^ BatMap.foldi add_string_of_k_v map "" ^ last
 
 let i2s = string_of_int
-
 let list2set l = list_fold BatSet.add l BatSet.empty
-
 let set2list s = BatSet.fold (fun x l -> x :: l) s []
-
 let set_union_small_big small big = BatSet.fold BatSet.add small big
 
 (* print progress bar *)
@@ -124,9 +105,7 @@ let rec fix f init =
   if BatSet.subset next init then init else fix f next
 
 let my_prerr_endline str = if !Options.verbose >= 1 then prerr_endline str
-
 let my_prerr_newline () = if !Options.verbose >= 1 then prerr_newline ()
-
 let my_prerr_string str = if !Options.verbose >= 1 then prerr_string str
 
 let prerr_memory_usage () =

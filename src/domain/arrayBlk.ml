@@ -147,11 +147,8 @@ module ArrInfo = struct
     { arr with size = Itv.join arr.size (Itv.plus i arr.size) }
 
   let plus_offset arr i = { arr with offset = Itv.plus arr.offset i }
-
   let minus_offset arr i = { arr with offset = Itv.minus arr.offset i }
-
   let set_null_pos arr i = { arr with null_pos = i }
-
   let plus_null_pos arr i = { arr with null_pos = Itv.plus arr.null_pos i }
 
   let to_string arr =
@@ -169,11 +166,8 @@ end
 include MapDom.MakeLAT (Allocsite) (ArrInfo)
 
 let make a o sz st np = add a (ArrInfo.make (o, sz, st, np, PowStruct.bot)) bot
-
 let offsetof a = fold (fun _ arr -> Itv.join arr.ArrInfo.offset) a Itv.bot
-
 let sizeof a = fold (fun _ arr -> Itv.join arr.ArrInfo.size) a Itv.bot
-
 let nullof a = fold (fun _ arr -> Itv.join arr.ArrInfo.null_pos) a Itv.bot
 
 let extern allocsite =
@@ -183,13 +177,9 @@ let input allocsite =
   if !Options.top_location then top else add allocsite ArrInfo.input empty
 
 let weak_plus_size arr i = map (fun a -> ArrInfo.weak_plus_size a i) arr
-
 let plus_offset arr i = map (fun a -> ArrInfo.plus_offset a i) arr
-
 let minus_offset arr i = map (fun a -> ArrInfo.minus_offset a i) arr
-
 let set_null_pos arr i = map (fun a -> ArrInfo.set_null_pos a i) arr
-
 let plus_null_pos arr i = map (fun a -> ArrInfo.plus_null_pos a i) arr
 
 let cast_array typ a =

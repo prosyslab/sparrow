@@ -26,11 +26,8 @@ module Integer = struct
   type t = Int of int | MInf | PInf [@@deriving compare]
 
   let pinf = PInf
-
   let minf = MInf
-
   let zero = Int 0
-
   let of_int i = Int i
 
   let to_string = function
@@ -54,9 +51,7 @@ module Integer = struct
     | _, _ -> false
 
   let absolute = function Int i -> Int (abs i) | MInf -> PInf | PInf -> PInf
-
   let min x y = if le x y then x else y
-
   let max x y = if le x y then y else x
 
   let lower_widen x y =
@@ -134,7 +129,6 @@ module Integer = struct
     | Int _, PInf | Int _, MInf -> Int 0
 
   let min4 x y z w = min (min x y) (min z w)
-
   let max4 x y z w = max (max x y) (max z w)
 end
 
@@ -144,17 +138,11 @@ open Integer
 type t = V of Integer.t * Integer.t | Bot [@@deriving compare]
 
 let zero = V (Int 0, Int 0)
-
 let one = V (Int 1, Int 1)
-
 let pos = V (Int 1, PInf)
-
 let neg = V (MInf, Int (-1))
-
 let nat = V (Int 0, PInf)
-
 let upper = function V (_, Int x) -> x | _ -> invalid_arg "Itv.upper"
-
 let lower = function V (Int x, _) -> x | _ -> invalid_arg "Itv.lower"
 
 let upper_integer = function
@@ -166,9 +154,7 @@ let lower_integer = function
   | _ -> invalid_arg "Itv.lower_integer"
 
 let of_int i = V (Int i, Int i)
-
 let of_ints lb ub = V (Int lb, Int ub)
-
 let of_integer l u = V (l, u)
 
 let to_string = function
@@ -214,7 +200,6 @@ let eq x y =
     | _, _ -> assert false
 
 let top = V (MInf, PInf)
-
 let bot = Bot
 
 let join x y =
@@ -270,7 +255,6 @@ let open_left x =
   if is_bot x then false else match x with V (MInf, _) -> true | _ -> false
 
 let is_range x = not (is_bot x)
-
 let is_const = function V (Int x, Int y) -> x = y | _ -> false
 
 let is_finite x =
@@ -337,9 +321,7 @@ let divide x y =
     | _, _ -> assert false
 
 let false_itv = V (Int 0, Int 0)
-
 let true_itv = V (Int 1, Int 1)
-
 let unknown_bool_itv = V (Int 0, Int 1)
 
 let l_and x y =
@@ -393,7 +375,6 @@ let le_itv x y =
     | _, _ -> unknown_bool_itv
 
 let gt_itv x y = lt_itv y x
-
 let ge_itv x y = le_itv y x
 
 let l_not x =
@@ -403,7 +384,6 @@ let l_not x =
   else false_itv
 
 let unknown_binary x y = if is_bot x || is_bot y then bot else top
-
 let unknown_unary x = if is_bot x then Bot else top
 
 let l_shift x y =

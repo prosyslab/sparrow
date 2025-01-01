@@ -31,7 +31,5 @@ type t =
   | Printf of string * Cil.exp * Cil.location
 
 val location_of : t -> Cil.location
-
 val collect : Spec.analysis -> IntraCfg.cmd -> t list
-
 val to_string : t -> string

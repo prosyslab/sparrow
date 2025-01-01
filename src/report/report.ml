@@ -17,9 +17,7 @@ module F = Format
 module L = Logging
 
 type target = BO | ND | DZ | IO
-
 type status = Proven | UnProven | BotAlarm
-
 type part_unit = Cil.location
 
 let status_to_string = function
@@ -38,9 +36,7 @@ type query = {
 }
 
 let is_unproven q = q.status = UnProven
-
 let get_pid q = InterCfg.Node.get_pid q.node
-
 let get qs status = List.filter (fun q -> q.status = status) qs
 
 let string_of_alarminfo offset size =

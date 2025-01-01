@@ -17,19 +17,14 @@ module L = Logging
 
 module type S = sig
   module Access : Access.S
-
   module DUGraph : Dug.S
-
   module PowLoc : PowDom.CPO
 
   type node = BasicDom.Node.t
-
   type loc
 
   val make : Global.t * Access.t * PowLoc.t -> DUGraph.t
-
   val to_json_intra : DUGraph.t -> Access.t -> Yojson.Safe.t
-
   val to_json_inter : DUGraph.t -> Access.t -> Yojson.Safe.t
 end
 
@@ -59,13 +54,9 @@ module Make (DUGraph : Dug.S) = struct
     Access.Info.useof (Access.find_node node access)
 
   let use_table = Hashtbl.create 10000
-
   let def_table = Hashtbl.create 10000
-
   let def_wo_local_table = Hashtbl.create 10000
-
   let access_table = Hashtbl.create 10000
-
   let access_wo_local_table = Hashtbl.create 10000
 
   let uses_of_function global access pid locset =

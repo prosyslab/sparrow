@@ -10,42 +10,29 @@
 (***********************************************************************)
 
 type task = All | Capture | Analyze
-
 type frontend = Clang | Claml | Cil
 
 let task = ref All
-
 let entry_point = ref "main"
-
 let skip_main_analysis = ref false
 
 (* Capture *)
 let skip_build = ref false
-
 let build_commands = ref []
-
 let frontend = ref Cil
 
 (* IL *)
 let il = ref false
-
 let cfg = ref false
-
 let dug = ref false
-
 let optil = ref true
-
 let cut_cyclic_call = ref false
-
 let keep_unreachable = ref false
-
 let keep_unreachable_from = ref BatSet.empty
 
 (* Context & Flow Sensitivity *)
 let inline = ref []
-
 let inline_size = ref 100000
-
 let pfs = ref 100
 
 let pfs_wv =
@@ -62,9 +49,7 @@ let pfs_wv =
 
 (* Octagon Analysis *)
 let oct = ref false
-
 let pack_impact = ref true
-
 let pack_manual = ref false
 
 (* Taint Analysis *)
@@ -73,11 +58,8 @@ let taint = ref false
 (* Analyzer *)
 
 let nobar = ref false
-
 let narrow = ref false
-
 let profile = ref false
-
 let scaffold = ref true
 
 (* Transformation *)
@@ -86,45 +68,28 @@ let unwrap_alloc = ref false
 
 (* Unsoundness *)
 let max_pre_iter = ref 0
-
 let unsound_loop = ref BatSet.empty
-
 let unsound_lib = ref BatSet.empty
-
 let extract_loop_feat = ref false
-
 let extract_lib_feat = ref false
-
 let top_location = ref false
-
 let unsound_recursion = ref false
-
 let unsound_alloc = ref false
-
 let unsound_const_string = ref false
-
 let unsound_skip_file = ref []
-
 let unsound_noreturn_function = ref false
-
 let unsound_skip_function = ref []
-
 let unsound_skip_global_array_init = ref max_int
-
 let bugfinder = ref 0
 
 (* datalog *)
 let extract_datalog_fact = ref false
-
 let extract_datalog_fact_full = ref false
-
 let extract_datalog_fact_full_no_opt = ref false
 
 (* for patron *)
 let patron = ref false
-
 let target_loc = ref []
-
 let target_alarm_map = ref BatMap.empty
 
 let add_target_alarm s =
@@ -140,50 +105,29 @@ let remove_cast = ref false
 
 (* Alarm Report *)
 let noalarm = ref false
-
 let bo = ref true
-
 let nd = ref false
-
 let detailed_io = ref false
-
 let plus_io = ref false
-
 let minus_io = ref false
-
 let mult_io = ref false
-
 let shift_io = ref false
-
 let cast_io = ref false
-
 let dz = ref false
-
 let show_all_query = ref false
-
 let filter_extern = ref false
-
 let filter_global = ref false
-
 let filter_lib = ref false
-
 let filter_complex_exp = ref false
-
 let filter_rec = ref false
-
 let filter_allocsite = ref BatSet.empty
-
 let filter_file = ref BatSet.empty
-
 let filter_function = ref BatSet.empty
-
 let filter_node = ref BatSet.empty
 
 (* Input & OUtput *)
 let outdir = ref "sparrow-out"
-
 let marshal_in = ref false
-
 let marshal_out = ref false
 
 (* DUG slice *)
@@ -198,23 +142,17 @@ let add_slice_target s =
       exit 1
 
 let full_slice = ref false
-
 let max_control_deps = ref 0
 
 (* Debug *)
 let debug = ref false
-
 let oct_debug = ref false
-
 let taint_debug = ref false
 
 (* ETC *)
 let print_pre_mem = ref false
-
 let verbose = ref 1
-
 let int_overflow = ref false
-
 let memtrace = ref false
 
 let unsoundness_opts =

@@ -85,7 +85,6 @@ class copyBodyVisitor (host : fundec)
 
     (* Keep here a list of statements to be patched *)
     val patches : stmt list ref = ref []
-
     val argid = ref 0
 
     (* This is the entry point *)

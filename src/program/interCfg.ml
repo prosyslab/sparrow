@@ -19,11 +19,8 @@ module Proc = struct
   include String
 
   let equal = ( = )
-
   let hash = Hashtbl.hash
-
   let to_string x = x
-
   let pp fmt x = Format.fprintf fmt "%s" x
 end
 
@@ -35,17 +32,11 @@ module Node = struct
   type t = Proc.t * IntraCfg.Node.t [@@deriving compare, equal]
 
   let to_string (pid, node) = pid ^ "-" ^ IntraCfg.Node.to_string node
-
   let to_json x = `String (to_string x)
-
   let make pid node = (pid, node)
-
   let get_pid = fst
-
   let get_cfgnode = snd
-
   let hash = Hashtbl.hash
-
   let pp fmt (p, n) = Format.fprintf fmt "%a-%a" Proc.pp p IntraCfg.Node.pp n
 end
 
@@ -87,7 +78,6 @@ let get_callers g pid =
     g.call_edges NodeSet.empty
 
 let global_proc = "_G_"
-
 let start_node = Node.make global_proc IntraCfg.Node.entry
 
 let ignore_file regexps loc =
@@ -145,9 +135,7 @@ let nodes_of_pid g pid =
   List.map (Node.make pid) (IntraCfg.nodesof (cfgof g pid))
 
 let fold_cfgs f g a = BatMap.foldi f g.cfgs a
-
 let iter f g = BatMap.iter f g.cfgs
-
 let map_cfgs f g = { g with cfgs = BatMap.map f g.cfgs }
 
 let fold_node f icfg acc =
@@ -163,32 +151,21 @@ let nodesof g =
     g.cfgs []
 
 let pidsof g = BatMap.foldi (fun pid _ acc -> pid :: acc) g.cfgs []
-
 let is_def pid g = BatMap.mem pid g.cfgs
-
 let is_undef pid g = not (BatMap.mem pid g.cfgs)
-
 let is_entry = function _, node -> IntraCfg.is_entry node
-
 let is_exit = function _, node -> IntraCfg.is_exit node
-
 let is_callnode (pid, node) g = IntraCfg.is_callnode node (cfgof g pid)
 
 let is_returnnode (pid, node) g =
   try IntraCfg.is_returnnode node (cfgof g pid) with _ -> false
 
 let returnof (pid, node) g = (pid, IntraCfg.returnof node (cfgof g pid))
-
 let is_inside_loop (pid, node) g = IntraCfg.is_inside_loop node (cfgof g pid)
-
 let callof (pid, node) g = (pid, IntraCfg.callof node (cfgof g pid))
-
 let argsof g pid = IntraCfg.get_formals (cfgof g pid)
-
 let callnodesof g = List.filter (fun node -> is_callnode node g) (nodesof g)
-
 let entryof _ pid = Node.make pid IntraCfg.Node.entry
-
 let exitof _ pid = Node.make pid IntraCfg.Node.exit
 
 let pred (pid, node) g =
@@ -225,15 +202,10 @@ let remove_node (pid, intra_node) g =
   { g with cfgs = BatMap.add pid intra_cfg g.cfgs }
 
 let print chan g = BatMap.iter (fun _ cfg -> IntraCfg.print_dot chan cfg) g.cfgs
-
 let get_node_loc g node = cmdof g node |> IntraCfg.Cmd.location_of
-
 let node_to_cmd g node = cmdof g node |> IntraCfg.Cmd.to_string
-
 let node_to_filename g node = get_node_loc g node |> CilHelper.get_loc_filename
-
 let node_to_lstr_abs g node = get_node_loc g node |> CilHelper.s_location_abs
-
 let node_to_lstr g node = get_node_loc g node |> CilHelper.s_location
 
 let node_to_filtered_pid g line_to_func node =

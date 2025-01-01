@@ -14,116 +14,69 @@ open BasicDom
 
 module type S = sig
   module Loc : SET
-
   module PowLoc : PowDom.CPO with type elt = Loc.t
 
   module Info : sig
     type t
-
     type kind
 
     val empty : t
-
     val def : kind
-
     val use : kind
-
     val all : kind
-
     val add : kind -> Loc.t -> t -> t
-
     val singleton : kind -> Loc.t -> t
-
     val mem : Loc.t -> t -> bool
-
     val add_set : kind -> PowLoc.t -> t -> t
-
     val from_set : kind -> PowLoc.t -> t
-
     val add_list : kind -> Loc.t list -> t -> t
-
     val union : t -> t -> t
-
     val diff : t -> t -> PowLoc.t
-
     val restrict : PowLoc.t -> t -> t
-
     val filter_out : PowLoc.t -> t -> t
-
     val accessof : t -> PowLoc.t
-
     val useof : t -> PowLoc.t
-
     val defof : t -> PowLoc.t
-
     val cardinal : t -> int
-
     val to_string_use : t -> string
-
     val to_string_def : t -> string
-
     val to_string : t -> string
-
     val print : t -> unit
-
     val print_use : t -> unit
-
     val print_def : t -> unit
   end
 
   module LocMap : BatMap.S with type key = Loc.t
 
   type t
-
   type info = Info.t
 
   val empty : t
-
   val add_node : BasicDom.Node.t -> Info.t -> t -> t
-
   val add_proc : BasicDom.Proc.t -> Info.t -> t -> t
-
   val add_proc_reach : BasicDom.Proc.t -> Info.t -> t -> t
-
   val add_proc_local : BasicDom.Proc.t -> Loc.t -> t -> t
-
   val add_proc_reach_wo_local : BasicDom.Proc.t -> Info.t -> t -> t
-
   val add_program_local : PowLoc.t -> t -> t
-
   val add_def_nodes : Loc.t -> BasicDom.PowNode.t -> t -> t
-
   val add_use_nodes : Loc.t -> BasicDom.PowNode.t -> t -> t
-
   val add_total_abslocs : PowLoc.t -> t -> t
-
   val fold : (BasicDom.Node.t -> Info.t -> 'a -> 'a) -> t -> 'a -> 'a
-
   val fold_proc : (BasicDom.Proc.t -> Info.t -> 'a -> 'a) -> t -> 'a -> 'a
 
   val fold_proc_local :
     (BasicDom.Proc.t -> PowLoc.t -> 'a -> 'a) -> t -> 'a -> 'a
 
   val total_abslocs : t -> PowLoc.t
-
   val find_node : BasicDom.Node.t -> t -> Info.t
-
   val find_proc : Proc.t -> t -> Info.t
-
   val find_proc_reach : Proc.t -> t -> Info.t
-
   val find_proc_reach_wo_local : BasicDom.Proc.t -> t -> Info.t
-
   val find_proc_local : BasicDom.Proc.t -> t -> PowLoc.t
-
   val find_program_local : t -> PowLoc.t
-
   val find_def_nodes : Loc.t -> t -> BasicDom.PowNode.t
-
   val find_use_nodes : Loc.t -> t -> BasicDom.PowNode.t
-
   val find_single_defs : t -> PowLoc.t
-
   val restrict_access : t -> PowLoc.t -> t
 end
 
@@ -133,15 +86,11 @@ module Make (Dom : MapDom.CPO) = struct
 
   module Info = struct
     type kind = DEF | USE | ALL
-
     type t = { def : PowLoc.t; use : PowLoc.t }
 
     let def = DEF
-
     let use = USE
-
     let all = ALL
-
     let empty = { def = PowLoc.empty; use = PowLoc.empty }
 
     let add m a info =
@@ -151,7 +100,6 @@ module Make (Dom : MapDom.CPO) = struct
       | ALL -> { use = PowLoc.add a info.use; def = PowLoc.add a info.def }
 
     let singleton m a = add m a empty
-
     let mem l a = PowLoc.mem l a.def || PowLoc.mem l a.use
 
     let remove a info =
@@ -168,13 +116,9 @@ module Make (Dom : MapDom.CPO) = struct
           { use = PowLoc.union info.use aset; def = PowLoc.union info.def aset }
 
     let from_set m aset = add_set m aset empty
-
     let add_list m alist info = list_fold (add m) alist info
-
     let accessof l = PowLoc.union l.def l.use
-
     let useof l = l.use
-
     let defof l = l.def
 
     let union l1 l2 =
@@ -189,17 +133,11 @@ module Make (Dom : MapDom.CPO) = struct
       { use = PowLoc.diff l.use addrs; def = PowLoc.diff l.def addrs }
 
     let cardinal l = PowLoc.cardinal (accessof l)
-
     let to_string_use l = "Use = " ^ PowLoc.to_string l.use
-
     let to_string_def l = "Def = " ^ PowLoc.to_string l.def
-
     let to_string l = to_string_use l ^ "\n" ^ to_string_def l
-
     let print l = prerr_string (to_string l)
-
     let print_use l = prerr_endline (to_string_use l)
-
     let print_def l = prerr_endline (to_string_def l)
   end
 
@@ -235,7 +173,6 @@ module Make (Dom : MapDom.CPO) = struct
     }
 
   let total_abslocs t = t.total_abslocs
-
   let find_node n t = try NodeMap.find n t.access with _ -> Info.empty
 
   let find_proc pid t =
@@ -315,10 +252,7 @@ module Make (Dom : MapDom.CPO) = struct
     { access with use_nodes = LocMap.add x nodes access.use_nodes }
 
   let add_total_abslocs total_abslocs access = { access with total_abslocs }
-
   let fold f access a = NodeMap.fold f access.access a
-
   let fold_proc f access a = ProcMap.fold f access.access_proc a
-
   let fold_proc_local f access a = ProcMap.fold f access.access_proc_local a
 end

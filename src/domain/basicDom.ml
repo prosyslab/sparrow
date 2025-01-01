@@ -21,9 +21,7 @@ module ExtAllocsite = struct
   type t = Input | Unknown of string [@@deriving compare]
 
   let input = Input
-
   let unknown s = Unknown s
-
   let is_cmd_arg x = match x with Unknown s -> s = "arg" | _ -> false
 
   let to_string = function
@@ -35,14 +33,12 @@ end
 
 module IntAllocsite = struct
   type t = Node.t * is_string
-
   and is_string = bool [@@deriving compare]
 
   let is_global_allocsite (node, _) =
     Proc.equal (Node.get_pid node) InterCfg.global_proc
 
   let to_string (node, _) = Node.to_string node
-
   let pp fmt x = Format.fprintf fmt "%s" (to_string x)
 end
 
@@ -55,15 +51,10 @@ module Allocsite = struct
   [@@deriving compare]
 
   let allocsite_of_local n = Local n
-
   let allocsite_of_node n = Internal (n, false)
-
   let allocsite_of_string n = Internal (n, true)
-
   let of_super s = Super s
-
   let is_node_allocsite = function Internal (_, false) -> true | _ -> false
-
   let is_string_allocsite = function Internal (_, true) -> true | _ -> false
 
   let is_global_allocsite = function
@@ -126,7 +117,6 @@ module Loc = struct
     | Field _ -> 3
 
   let equal = [%compare.equal: t]
-
   let hash = Hashtbl.hash
 
   let typ = function
@@ -140,21 +130,13 @@ module Loc = struct
     | Field (a, f, _) -> to_string a ^ "." ^ f
 
   let pp fmt x = Format.fprintf fmt "%s" (to_string x)
-
   let return_var_name = "__return__"
-
   let dummy = GVar ("__dummy__", Cil.voidType)
-
   let null = GVar ("NULL", Cil.voidPtrType)
-
   let is_null x = x = null
-
   let is_var = function GVar _ | LVar _ -> true | _ -> false
-
   let is_gvar = function GVar _ -> true | _ -> false
-
   let is_lvar = function LVar _ -> true | _ -> false
-
   let is_allocsite = function Allocsite _ -> true | _ -> false
 
   let is_super_allocsite = function
@@ -193,15 +175,10 @@ module Loc = struct
     | Field (l, _, _) -> is_local_of pid l
 
   let get_proc = function LVar (p, _, _) -> p | _ -> raise Not_found
-
   let of_gvar x typ = GVar (x, typ)
-
   let of_lvar p x typ = LVar (p, x, typ)
-
   let of_allocsite x = Allocsite x
-
   let return_var pid typ = LVar (pid, return_var_name, typ)
-
   let append_field x f typ = Field (x, f, typ)
 end
 

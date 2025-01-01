@@ -17,7 +17,6 @@ module Struct = struct
   include String
 
   let to_string = id
-
   let pp fmt x = Format.fprintf fmt "%s" x
 end
 
@@ -36,7 +35,6 @@ let append_field s f =
     s PowLoc.bot
 
 let pow_loc_of_struct str = foldi (fun k _ -> PowLoc.add k) str PowLoc.bot
-
 let extern () = if !Options.top_location then top else bot
 
 let to_string x =

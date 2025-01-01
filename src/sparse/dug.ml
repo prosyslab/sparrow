@@ -11,103 +11,61 @@
 
 module type S = sig
   type t
-
   type node = BasicDom.Node.t
 
   module V = BasicDom.Node
-
   module Loc : AbsDom.SET
-
   module PowLoc : PowDom.CPO with type elt = Loc.t
-
   module Access : Access.S with type Loc.t = Loc.t and type PowLoc.t = PowLoc.t
 
   type path_checker
 
   val create : ?size:int -> ?access:Access.t -> unit -> t
-
   val copy : t -> t
-
   val clear : t -> unit
-
   val nb_node : t -> int
-
   val nb_edge : t -> int
-
   val nb_loc : t -> int
-
   val nodesof : t -> node BatSet.t
-
   val succ : node -> t -> node list
-
   val pred : node -> t -> node list
-
   val add_edge : node -> node -> t -> t
-
   val remove_edge : node -> node -> t -> t
-
   val remove_node : node -> t -> t
-
   val get_abslocs : node -> node -> t -> PowLoc.t
-
   val mem_node : node -> t -> bool
-
   val mem_duset : Loc.t -> PowLoc.t -> bool
-
   val add_absloc : node -> Loc.t -> node -> t -> t
-
   val add_abslocs : node -> PowLoc.t -> node -> t -> t
-
   val access : t -> Access.t
-
   val update_loopheads : node BatSet.t -> t -> t
-
   val update_backedges : (node, node list) BatMap.t -> t -> t
-
   val loopheads : t -> node BatSet.t
-
   val backedges : t -> (node, node list) BatMap.t
-
   val shortest_path : t -> node -> node -> node list
-
   val shortest_path_loc : t -> node -> node -> Loc.t -> node list
-
   val shortest_path_loc_str : t -> node -> node -> string -> node list
-
   val create_path_checker : t -> path_checker
-
   val check_path : path_checker -> node -> node -> bool
-
   val find_node_of_string : t -> string -> node option
-
   val transitive_closure : ?reflexive:bool -> t -> t
 
   (** {2 Iterator } *)
 
   val fold_node : (node -> 'a -> 'a) -> t -> 'a -> 'a
-
   val fold_edges : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
-
   val fold_edges_e : (node -> node -> PowLoc.t -> 'a -> 'a) -> t -> 'a -> 'a
-
   val iter_vertex : (node -> unit) -> t -> unit
-
   val iter_node : (node -> unit) -> t -> unit
-
   val iter_edges : (node -> node -> unit) -> t -> unit
-
   val iter_edges_e : (node -> node -> PowLoc.t -> unit) -> t -> unit
-
   val fold_pred : (node -> 'a -> 'a) -> t -> node -> 'a -> 'a
-
   val fold_succ : (node -> 'a -> 'a) -> t -> node -> 'a -> 'a
-
   val iter_succ : (node -> unit) -> t -> node -> unit
 
   (** {2 Print } *)
 
   val to_dot : ?color:(node * string) list -> t -> string
-
   val to_json : t -> Yojson.Safe.t
 end
 
@@ -126,15 +84,11 @@ module Make (Access : Access.S) = struct
 
     module W = struct
       type edge = I.E.t
-
       type t = int
 
       let weight _ = 1
-
       let compare = compare
-
       let add = ( + )
-
       let zero = 0
     end
 
@@ -143,7 +97,6 @@ module Make (Access : Access.S) = struct
     module Oper = Graph.Oper.I (I)
 
     type t = { graph : I.t; label : (node * node, locset) Hashtbl.t }
-
     type path_checker = Check.path_checker
 
     let create ~size () =
@@ -156,11 +109,8 @@ module Make (Access : Access.S) = struct
       Hashtbl.clear g.label
 
     let succ g n = I.succ g.graph n
-
     let pred g n = I.pred g.graph n
-
     let nb_vertex g = I.nb_vertex g.graph
-
     let nb_edge g = I.nb_edges g.graph
 
     let pred_e g n =
@@ -168,11 +118,8 @@ module Make (Access : Access.S) = struct
       |> List.map (fun p -> (p, Hashtbl.find g.label (p, n), n))
 
     let mem_vertex g n = I.mem_vertex g.graph n
-
     let mem_edge g n1 n2 = I.mem_edge g.graph n1 n2
-
     let fold_vertex f g a = I.fold_vertex f g.graph a
-
     let fold_edges f g a = I.fold_edges f g.graph a
 
     let fold_edges_e f g a =
@@ -183,9 +130,7 @@ module Make (Access : Access.S) = struct
         g.graph a
 
     let iter_vertex f g = I.iter_vertex f g.graph
-
     let iter_edges f g = I.iter_edges f g.graph
-
     let fold_pred f g a = I.fold_pred f g.graph a
 
     let iter_edges_e f g =
@@ -196,7 +141,6 @@ module Make (Access : Access.S) = struct
         g.graph
 
     let fold_succ f g a = I.fold_succ f g.graph a
-
     let iter_succ f g = I.iter_succ f g.graph
 
     let remove_vertex g n =
@@ -229,7 +173,6 @@ module Make (Access : Access.S) = struct
       let module W :
         Graph.Sig.WEIGHT with type t = int option and type edge = I.E.t = struct
         type edge = I.E.t
-
         type t = int option
 
         let weight edge =
@@ -261,7 +204,6 @@ module Make (Access : Access.S) = struct
       let module W :
         Graph.Sig.WEIGHT with type t = int option and type edge = I.E.t = struct
         type edge = I.E.t
-
         type t = int option
 
         let weight edge =
@@ -291,7 +233,6 @@ module Make (Access : Access.S) = struct
       match w with None -> [] | Some _ -> path
 
     let create_path_checker g = Check.create g.graph
-
     let check_path pc src dst = Check.check_path pc src dst
 
     let transitive_closure ?(reflexive = false) g =
@@ -324,21 +265,13 @@ module Make (Access : Access.S) = struct
     }
 
   let clear dug = G.clear dug.graph
-
   let nodesof dug = G.fold_vertex BatSet.add dug.graph BatSet.empty
-
   let access dug = dug.access
-
   let succ n dug = try G.succ dug.graph n with _ -> []
-
   let pred n dug = try G.pred dug.graph n with _ -> []
-
   let nb_node dug = G.nb_vertex dug.graph
-
   let nb_edge dug = G.nb_edge dug.graph
-
   let remove_node n dug = { dug with graph = G.remove_vertex dug.graph n }
-
   let add_edge src dst dug = { dug with graph = G.add_edge dug.graph src dst }
 
   let remove_edge src dst dug =
@@ -348,9 +281,7 @@ module Make (Access : Access.S) = struct
     try G.find_label dug.graph src dst with _ -> PowLoc.empty
 
   let mem_node n g = G.mem_vertex g.graph n
-
   let mem_duset x duset = PowLoc.mem x duset
-
   let add_edge_e dug e = { dug with graph = G.add_edge_e dug.graph e }
 
   let add_absloc src x dst dug =
@@ -369,23 +300,14 @@ module Make (Access : Access.S) = struct
       }
 
   let fold_node f g a = G.fold_vertex f g.graph a
-
   let fold_edges f g a = G.fold_edges f g.graph a
-
   let fold_edges_e f g a = G.fold_edges_e f g.graph a
-
   let iter_node f g = G.iter_vertex f g.graph
-
   let iter_vertex f g = G.iter_vertex f g.graph
-
   let iter_edges f g = G.iter_edges f g.graph
-
   let iter_edges_e f g = G.iter_edges_e f g.graph
-
   let fold_pred f g a = G.fold_pred f g.graph a
-
   let fold_succ f g a = G.fold_succ f g.graph a
-
   let iter_succ f g = G.iter_succ f g.graph
 
   let nb_loc dug =
@@ -394,15 +316,10 @@ module Make (Access : Access.S) = struct
       dug 0
 
   let succ_e n g = List.map (fun s -> (s, get_abslocs n s g)) (succ n g)
-
   let pred_e n g = List.map (fun p -> (p, get_abslocs p n g)) (pred n g)
-
   let update_loopheads loopheads g = { g with loopheads }
-
   let update_backedges backedges g = { g with backedges }
-
   let loopheads g = g.loopheads
-
   let backedges g = g.backedges
 
   let shortest_path g src dst =
@@ -430,7 +347,6 @@ module Make (Access : Access.S) = struct
       [] el
 
   let create_path_checker g = G.create_path_checker g.graph
-
   let check_path pc src dst = G.check_path pc src dst
 
   let find_node_of_string dug name =

@@ -11,21 +11,13 @@
 (* Compile time option for profiler *)
 
 let record_calling_frequency = false
-
 let record_max_time = false
-
 let events = ref BatMap.empty
-
 let log = ref BatMap.empty
-
 let count_log = ref BatMap.empty
-
 let recursive_log = ref BatMap.empty
-
 let max_log = ref BatMap.empty
-
 let arguments_log = ref BatMap.empty
-
 let log_start = ref 0.0
 
 (* (internal procedure) *)

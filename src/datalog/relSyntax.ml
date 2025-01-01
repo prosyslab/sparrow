@@ -82,7 +82,6 @@ type formatter = {
 }
 
 let binop_count = ref 0
-
 let binop_map = Hashtbl.create 1000
 
 let new_binop_id bop =
@@ -92,7 +91,6 @@ let new_binop_id bop =
   id
 
 let unop_count = ref 0
-
 let unop_map = Hashtbl.create 1000
 
 let new_unop_id uop =
@@ -102,7 +100,6 @@ let new_unop_id uop =
   id
 
 let exp_count = ref 0
-
 let exp_map = Hashtbl.create 1000
 
 let new_exp_id e =
@@ -112,7 +109,6 @@ let new_exp_id e =
   id
 
 let alloc_count = ref 0
-
 let alloc_map = Hashtbl.create 1000
 
 let new_alloc_id e =
@@ -122,7 +118,6 @@ let new_alloc_id e =
   id
 
 let salloc_count = ref 0
-
 let salloc_map = Hashtbl.create 1000
 
 let new_salloc_id e =
@@ -132,7 +127,6 @@ let new_salloc_id e =
   id
 
 let call_count = ref 0
-
 let call_map = Hashtbl.create 1000
 
 let new_call_id e =
@@ -142,7 +136,6 @@ let new_call_id e =
   id
 
 let libcall_count = ref 0
-
 let libcall_map = Hashtbl.create 1000
 
 let new_libcall_id e =
@@ -152,7 +145,6 @@ let new_libcall_id e =
   id
 
 let readcall_count = ref 0
-
 let readcall_map = Hashtbl.create 1000
 
 let new_readcall_id e =
@@ -162,7 +154,6 @@ let new_readcall_id e =
   id
 
 let readpath_count = ref 0
-
 let readpath_map : (Node.t * Node.t, string) Hashtbl.t = Hashtbl.create 1000
 
 let new_readpath_id n1 n2 =
@@ -171,7 +162,6 @@ let new_readpath_id n1 n2 =
   Hashtbl.add readpath_map (n1, n2) id
 
 let allocpath_count = ref 0
-
 let allocpath_map : (Node.t * Node.t, string) Hashtbl.t = Hashtbl.create 1000
 
 let new_allocpath_id n1 n2 =
@@ -180,7 +170,6 @@ let new_allocpath_id n1 n2 =
   Hashtbl.add allocpath_map (n1, n2) id
 
 let lv_count = ref 0
-
 let lv_map = Hashtbl.create 1000
 
 let new_lv_id lv =

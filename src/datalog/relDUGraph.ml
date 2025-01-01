@@ -165,7 +165,6 @@ type formatter_of_patron = {
 }
 
 let loc_map = Hashtbl.create 1000
-
 let loc_count = ref 0
 
 let new_loc_id loc =
@@ -182,7 +181,6 @@ let new_val_id () =
   id
 
 let str_map = Hashtbl.create 1000
-
 let str_count = ref 0
 
 let new_str_id str =
@@ -307,7 +305,7 @@ let print_sems dirname dug =
   F.pp_print_flush fmt.dupath ();
   close_out oc_deduedge;
   close_out oc_duedge;
-  close_out oc_dupath;
+  close_out oc_dupath
 
 module AlarmSet = Set.Make (struct
   type t = Node.t * Node.t [@@deriving compare]
@@ -340,7 +338,6 @@ type formatter = {
 }
 
 let alarm_count = ref 0
-
 let alarm_exp_map = Hashtbl.create 1000
 
 let new_alarm_exp_id aexp =
@@ -983,7 +980,6 @@ let rec add_offset o orig_offset =
   | Cil.Index (e, o1) -> Cil.Index (e, add_offset o o1)
 
 let append_field lv f = (fst lv, add_offset (Field (f, NoOffset)) (snd lv))
-
 let append_index lv e = (fst lv, add_offset (Index (e, NoOffset)) (snd lv))
 
 let rec pp_lv (fmt : RelSyntax.formatter) n lv mem =
@@ -1144,14 +1140,14 @@ let pp_dug_cmd fmt icfg dug n mem =
       if InterCfg.is_entry n then F.fprintf fmt.entry "%a\n" Node.pp n
       else if InterCfg.is_exit n then F.fprintf fmt.exit "%a\n" Node.pp n
       else F.fprintf fmt.skip "%a\n" Node.pp n
-  | Cset (lv, e, _) -> (
+  | Cset (lv, e, _) ->
       pp_lv fmt n lv mem;
       let e' = if !Options.remove_cast then RelSyntax.remove_cast e else e in
       pp_exp fmt n e' mem;
       let lv_id = Hashtbl.find RelSyntax.lv_map lv in
       let e_id = Hashtbl.find RelSyntax.exp_map e' in
       F.fprintf fmt.set "%a\t%s\t%s\n" Node.pp n lv_id e_id;
-      F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id)
+      F.fprintf fmt.assign "%a\t%s\t%s\n" Node.pp n lv_id e_id
   | Cexternal (_, _) -> F.fprintf fmt.cmd "external\n"
   | Calloc (lv, (Array e as alloc), _, _, _) ->
       pp_lv fmt n lv mem;

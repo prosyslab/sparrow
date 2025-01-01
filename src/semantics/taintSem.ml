@@ -327,7 +327,6 @@ let is_printf1 fname =
     ]
 
 let is_printf2 fname = List.mem fname [ "snprintf"; "vsnprintf" ]
-
 let is_printf fname = is_printf0 fname || is_printf1 fname || is_printf2 fname
 
 let dummy_read_printf fname pid exps itvmem mem =

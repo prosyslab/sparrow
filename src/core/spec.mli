@@ -11,7 +11,6 @@
 type analysis = Pre | Interval | OctagonImpact | Octagon | Taint
 
 val string_of_analysis : analysis -> string
-
 val pp_analysis : Format.formatter -> analysis -> unit
 
 module type S = sig
@@ -30,7 +29,6 @@ module type S = sig
   }
 
   val empty : t
-
   val is_interval : t -> bool
 end
 

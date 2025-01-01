@@ -18,7 +18,6 @@ module E = Errormsg
 module L = Logging
 
 let files = ref []
-
 let marshal_file = ref ""
 
 let args f =

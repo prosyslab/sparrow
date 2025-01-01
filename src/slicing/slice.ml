@@ -8,9 +8,7 @@ module Line = struct
   type t = string * string
 
   let compare = Stdlib.compare
-
   let equal = ( = )
-
   let hash = Hashtbl.hash
 end
 
@@ -19,15 +17,11 @@ module LineLevelG = Graph.Imperative.Digraph.ConcreteBidirectional (Line)
 
 module W = struct
   type edge = LineLevelG.E.t
-
   type t = int
 
   let weight _ = 1
-
   let compare = compare
-
   let add = ( + )
-
   let zero = 0
 end
 
@@ -161,18 +155,14 @@ let update_loc_map node locs du_map =
   else Hashtbl.replace du_map node locs
 
 let update_def_map node defs dfg = update_loc_map node defs dfg.du_map.defs
-
 let update_use_map node uses dfg = update_loc_map node uses dfg.du_map.uses
-
 let update_fwd_map node fwds dfg = update_loc_map node fwds dfg.du_map.fwds
 
 let lookup_loc_map node du_map =
   if Hashtbl.mem du_map node then Hashtbl.find du_map node else PowLoc.empty
 
 let lookup_def_map node dfg = lookup_loc_map node dfg.du_map.defs
-
 let lookup_use_map node dfg = lookup_loc_map node dfg.du_map.uses
-
 let lookup_fwd_map node dfg = lookup_loc_map node dfg.du_map.fwds
 
 (* 'src' defines 'defined' by using 'used', and this def is passed to 'dst'. *)

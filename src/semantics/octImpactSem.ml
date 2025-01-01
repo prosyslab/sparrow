@@ -22,7 +22,6 @@ module Dom = OctImpactDom.Mem
 module Spec = Spec.Make (Dom)
 
 let pack = OctImpactDom.pack
-
 let lookup mem = Mem.find pack mem
 
 let can_strong_update mode global pid =
