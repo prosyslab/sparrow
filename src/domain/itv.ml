@@ -44,6 +44,16 @@ module Integer = struct
     | Int i, Int j -> i <= j
     | _, _ -> false
 
+  let lt x y =
+    match (x, y) with
+    | MInf, _ -> true
+    | _, PInf -> true
+    | Int i, Int j -> i < j
+    | _, _ -> false
+
+  let ge x y = le y x
+  let gt x y = lt y x
+
   let eq x y =
     match (x, y) with
     | MInf, MInf | PInf, PInf -> true
@@ -450,20 +460,25 @@ let cast from_typ to_typ itv =
 let prune op x y =
   if is_bot x || is_bot y then Bot
   else
-    let pruned =
-      match (op, x, y) with
-      | Cil.Lt, V (a, b), V (_, d) ->
-          V (a, Integer.min b (Integer.minus d (Int 1)))
-      | Cil.Gt, V (a, b), V (c, _) ->
-          V (Integer.max a (Integer.plus c (Int 1)), b)
-      | Cil.Le, V (a, b), V (_, d) -> V (a, Integer.min b d)
-      | Cil.Ge, V (a, b), V (c, _) -> V (Integer.max a c, b)
-      | Cil.Eq, V (_, _), V (_, _) -> meet x y
-      | Cil.Ne, V (a, b), V (c, d) when Integer.eq b c && Integer.eq c d ->
-          V (a, Integer.minus b (Int 1))
-      | Cil.Ne, V (a, b), V (c, d) when Integer.eq a c && Integer.eq c d ->
-          V (Integer.plus a (Int 1), b)
-      | Cil.Ne, V _, V _ -> x
-      | _ -> invalid_arg "itv.ml:prune"
-    in
-    normalize pruned
+    match (op, x, y) with
+    | Cil.Lt, V (a, b), V (_, d) ->
+        if Integer.le d a then bot
+        else V (a, Integer.min b (Integer.minus d (Int 1)))
+    | Cil.Gt, V (a, b), V (c, _) ->
+        if Integer.ge c b then bot
+        else V (Integer.max a (Integer.plus c (Int 1)), b)
+    | Cil.Le, V (a, b), V (_, d) ->
+        if Integer.lt d a then bot else V (a, Integer.min b d)
+    | Cil.Ge, V (a, b), V (c, _) ->
+        if Integer.gt c b then bot else V (Integer.max a c, b)
+    | Cil.Eq, V (_, _), V (_, _) -> meet x y
+    | Cil.Ne, V (a, b), V (c, d)
+      when Integer.lt a b && Integer.eq b c && Integer.eq c d ->
+        V (a, Integer.minus b (Int 1))
+    | Cil.Ne, V (Int a, Int b), V (Int c, Int d) when a = b && b = c && c = d ->
+        bot
+    | Cil.Ne, V (a, b), V (c, d)
+      when Integer.lt a b && Integer.eq a c && Integer.eq c d ->
+        V (Integer.plus a (Int 1), b)
+    | Cil.Ne, V _, V _ -> x
+    | _ -> invalid_arg "itv.ml:prune"
