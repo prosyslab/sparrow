@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 find src test -name "*.ml" | xargs ocamlformat -i
-find test -name "*.c" | xargs clang-format -i
+find test -name "*.c" | xargs clang-format-15 -i

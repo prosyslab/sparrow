@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   check:
     name: build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -29,21 +29,21 @@ jobs:
             ${{ env.cache-name }}-build-${{ hashFiles('opam', 'build.sh') }}
             ${{ env.cache-name }}-build-
 
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmpfr-dev llvm-15-dev libclang-15-dev
+
       - name: Install ocamlformat
         run: opam install ocamlformat.0.24.1
 
       - name: Check format
         run: |
-          eval $(opam env)
-          script/check-format
-      - name: Install deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libmpfr-dev llvm-12-dev pkg-config libclang-12-dev
+          opam exec -- script/check-format
 
       - name: Build Sparrow
         run: |
-          ./build.sh || eval $(opam env) && make -j
+          opam exec -- ./build.sh --user-opam-switch
 
-      - name: Run test (regression)
-        run: eval $(opam env) && make test
+      - name: Run test
+        run: opam exec -- make test

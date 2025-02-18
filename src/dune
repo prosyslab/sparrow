@@ -11,8 +11,6 @@
   batteries
   prosys-cil
   prosys-cil.all-features
-  clangml
-  clangml.printer
   claml
   lymp
   ocamlgraph
@@ -30,8 +28,6 @@
   batteries
   prosys-cil
   prosys-cil.all-features
-  clangml
-  clangml.printer
   claml
   lymp
   memtrace

@@ -12,9 +12,7 @@
 
 open AbsDom
 
-module Make
-    (A : CPO)
-    (B : CPO) : sig
+module Make (A : CPO) (B : CPO) : sig
   include AbsDom.CPO
 
   val make : A.t -> B.t -> t
@@ -23,12 +21,7 @@ module Make
 end
 with type t = A.t * B.t
 
-module Make5
-    (A : CPO)
-    (B : CPO)
-    (C : CPO)
-    (D : CPO)
-    (E : CPO) : sig
+module Make5 (A : CPO) (B : CPO) (C : CPO) (D : CPO) (E : CPO) : sig
   include AbsDom.CPO
 
   val make : A.t * B.t * C.t * D.t * E.t -> t

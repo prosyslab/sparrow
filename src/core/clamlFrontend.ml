@@ -1169,7 +1169,8 @@ and trans_binary_operator scope fundec_opt loc kind lhs rhs =
       match (rhs_expr, rhs_sl) with
       | ( Cil.Lval _,
           [
-            ({ Cil.skind = Cil.Instr [ Cil.Call (Some _, f, el, loc) ]; _ } as s);
+            ({ Cil.skind = Cil.Instr [ Cil.Call (Some _, f, el, loc) ]; _ } as
+            s);
           ] ) ->
           let stmt =
             { s with skind = Cil.Instr [ Cil.Call (Some lval, f, el, loc) ] }

@@ -1321,16 +1321,16 @@ let print_patron analysis global dug alarms =
       let dug = G.copy dug in
       let aexp = alarm.Report.exp in
       (if AexpSet.mem aexp visited |> not then
-         let alarms = [ alarm ] in
-         let dug = optimize ~verbose:false alarms dug in
-         if G.mem_node alarm.Report.node dug then (
-           let dirname =
-             F.sprintf "%s/datalog/%d" (FileManager.analysis_dir analysis) i
-           in
-           FileManager.mkdir dirname;
-           print_fact_patron dirname global.Global.icfg dug global.mem;
-           print_taint_alarm_in_dir dirname alarms;
-           print_sems dirname dug));
+       let alarms = [ alarm ] in
+       let dug = optimize ~verbose:false alarms dug in
+       if G.mem_node alarm.Report.node dug then (
+         let dirname =
+           F.sprintf "%s/datalog/%d" (FileManager.analysis_dir analysis) i
+         in
+         FileManager.mkdir dirname;
+         print_fact_patron dirname global.Global.icfg dug global.mem;
+         print_taint_alarm_in_dir dirname alarms;
+         print_sems dirname dug));
       G.clear dug;
       (i + 1, AexpSet.add aexp visited))
     else (i, visited)

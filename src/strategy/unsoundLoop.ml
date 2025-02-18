@@ -777,7 +777,7 @@ let normalize trset =
         points_to = feat.points_to /. max_points_to;
         diff_array_access =
           (if feat.diff_array_access = 0.0 then 0.0
-           else feat.diff_array_access /. max_diff_array_access);
+          else feat.diff_array_access /. max_diff_array_access);
         idx_pp = (if feat.idx_pp = 0.0 then 0.0 else feat.idx_pp /. max_idx_pp);
       })
     trset
