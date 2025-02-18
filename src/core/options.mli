@@ -11,7 +11,7 @@
 (** Commandline options *)
 
 type task = All | Capture | Analyze
-type frontend = Clang | Claml | Cil
+type frontend = Claml | Cil
 
 val task : task ref
 val skip_build : bool ref
